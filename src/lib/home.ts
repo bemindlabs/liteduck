@@ -60,12 +60,12 @@ export const homeConfigWrite = (config: Config) =>
   invoke<undefined>("home_config_write", { config });
 
 /**
- * Resolve the effective config for the given workspace by merging:
- *   workspace `.LiteDuck/config.json` → global `~/.LiteDuck/config.json` → built-in defaults.
+ * Resolve the effective config by merging:
+ *   global `~/.LiteDuck/config.json` → built-in defaults.
  *
- * `workspace` should be the absolute path to the workspace directory.
- * When omitted (or `undefined`) only the global config and built-in defaults are used.
- * A missing workspace config file is not an error.
+ * The `workspace` argument is accepted for backwards compatibility but no
+ * longer changes the result — config is global-only. A missing global config
+ * file is not an error.
  */
 export const homeResolveConfig = (workspace?: string) =>
   invoke<Config>("home_resolve_config", { workspace: workspace ?? null });

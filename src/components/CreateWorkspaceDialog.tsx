@@ -53,13 +53,12 @@ const GITIGNORE_TEMPLATES = [
 ] as const;
 
 const GITIGNORE_CONTENTS: Record<string, string> = {
-  none: ".LiteDuck\n.DS_Store\nThumbs.db\n",
-  node: ".LiteDuck\nnode_modules/\ndist/\n.env\n.env.local\n*.log\n.DS_Store\nThumbs.db\n",
-  python:
-    ".LiteDuck\n__pycache__/\n*.py[cod]\n*.egg-info/\ndist/\n.venv/\n.env\n*.log\n.DS_Store\n",
-  rust: ".LiteDuck\ntarget/\n*.log\n.DS_Store\nThumbs.db\n",
-  go: ".LiteDuck\nbin/\n*.exe\n*.log\n.DS_Store\nThumbs.db\n",
-  java: ".LiteDuck\ntarget/\n*.class\n*.jar\n*.log\n.DS_Store\nThumbs.db\n",
+  none: ".DS_Store\nThumbs.db\n",
+  node: "node_modules/\ndist/\n.env\n.env.local\n*.log\n.DS_Store\nThumbs.db\n",
+  python: "__pycache__/\n*.py[cod]\n*.egg-info/\ndist/\n.venv/\n.env\n*.log\n.DS_Store\n",
+  rust: "target/\n*.log\n.DS_Store\nThumbs.db\n",
+  go: "bin/\n*.exe\n*.log\n.DS_Store\nThumbs.db\n",
+  java: "target/\n*.class\n*.jar\n*.log\n.DS_Store\nThumbs.db\n",
 };
 
 const DEFAULT_TWO: StepTwoOptions = {
@@ -295,7 +294,7 @@ export function CreateWorkspaceDialog({ open, onClose, onCreated }: CreateWorksp
       }
 
       if (two.initDevCanvas) {
-        // workspace_init creates the directory and scaffolds .LiteDuck templates
+        // workspace_init creates the workspace directory and copies any bundled templates
         await workspaceInit(fullPath);
       }
       // Note: if the user opts out of LiteDuck init, the directory is not
@@ -482,7 +481,7 @@ export function CreateWorkspaceDialog({ open, onClose, onCreated }: CreateWorksp
               <CheckboxRow
                 id="opt-liteduck"
                 label="Initialize LiteDuck scaffolding"
-                description="Copies .LiteDuck templates into the project (also creates the directory)"
+                description="Creates the project directory and copies any bundled templates"
                 icon={<FolderPlus className="h-3.5 w-3.5" />}
                 checked={two.initDevCanvas}
                 onChange={() => toggleTwo("initDevCanvas")}

@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { LiteDuckLogo } from "@/components/LiteDuckLogo";
 import { getSetting, saveSetting } from "@/lib/settings";
 import { workspaceInit } from "@/lib/workspace";
-import { filesReadText, filesWriteText } from "@/lib/files";
 import { createLogger } from "@/lib/logger";
 import { markWizardCompletedForWorkspace } from "@/lib/wizard";
 import { WorkspaceStep } from "@/components/wizard/WorkspaceStep";
@@ -106,7 +105,6 @@ interface SummaryStepProps extends WizardStepProps {
 
 function SummaryStep({ onNext, skippedSteps, setWorkspace }: SummaryStepProps) {
   const [finishing, setFinishing] = useState(false);
-  const [addGitignore, setAddGitignore] = useState(true);
 
   const services = [
     {
@@ -130,26 +128,6 @@ function SummaryStep({ onNext, skippedSteps, setWorkspace }: SummaryStepProps) {
           await workspaceInit(workspaceDir);
         } catch (err) {
           logger.warn("Failed to initialize workspace templates:", err);
-        }
-
-        // Add .LiteDuck to .gitignore if opted in
-        if (addGitignore) {
-          try {
-            const gitignorePath = `${workspaceDir}/.gitignore`;
-            let content = "";
-            try {
-              content = await filesReadText(gitignorePath);
-            } catch {
-              // .gitignore doesn't exist yet — will create it
-            }
-            if (!content.split("\n").some((line) => line.trim() === ".LiteDuck")) {
-              const separator = content && !content.endsWith("\n") ? "\n" : "";
-              const header = content ? "" : "# LiteDuck workspace data\n";
-              await filesWriteText(gitignorePath, content + separator + header + ".LiteDuck\n");
-            }
-          } catch (err) {
-            logger.warn("Failed to update .gitignore:", err);
-          }
         }
       }
       await saveSetting("wizard_completed", "true");
@@ -212,29 +190,6 @@ function SummaryStep({ onNext, skippedSteps, setWorkspace }: SummaryStepProps) {
           );
         })}
       </div>
-
-      {/* .gitignore option */}
-      <label className="flex items-start gap-3 rounded-lg border border-[var(--color-border)] px-4 py-3 cursor-pointer hover:bg-[var(--color-accent)] transition-colors">
-        <input
-          type="checkbox"
-          checked={addGitignore}
-          onChange={(e) => setAddGitignore(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--color-border)] accent-[var(--color-sidebar-primary)]"
-        />
-        <div className="flex flex-col gap-0.5">
-          <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-foreground)]">
-            <GitBranch className="h-3.5 w-3.5 text-[var(--color-muted-foreground)]" />
-            Add{" "}
-            <code className="rounded bg-[var(--color-accent)] px-1 py-0.5 text-[10px] font-mono">
-              .LiteDuck
-            </code>{" "}
-            to .gitignore
-          </span>
-          <span className="text-xs text-[var(--color-muted-foreground)]">
-            Prevent workspace data from being committed to version control.
-          </span>
-        </div>
-      </label>
 
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-accent)] px-4 py-3 space-y-1">
         <p className="text-xs font-medium text-[var(--color-foreground)]">What&apos;s next?</p>

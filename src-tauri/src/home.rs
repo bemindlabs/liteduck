@@ -383,15 +383,13 @@ pub fn write_config(config: &Config) -> Result<(), String> {
     Ok(())
 }
 
-/// Resolve effective config by merging: workspace → global → defaults.
+/// Resolve effective config by merging: global → defaults.
 ///
-/// Missing workspace config is not an error — falls through to global.
 /// Missing global config falls through to built-in defaults.
 ///
-/// Resolution chain (ADR-001):
-///   1. `<workspace>/.LiteDuck/config.json` (workspace override)
-///   2. `~/.LiteDuck/config.json` (global defaults)
-///   3. Built-in `Default` (hardcoded)
+/// Resolution chain:
+///   1. `~/.LiteDuck/config.json` (global config)
+///   2. Built-in `Default` (hardcoded)
 ///
 /// Resolved configs are cached in memory for [`CONFIG_TTL`], keyed by the
 /// workspace path. When the workspace changes the old entry is replaced. The
@@ -1092,9 +1090,8 @@ pub fn home_memory_search(query: String) -> Result<Vec<MemoryNoteSummary>, Strin
 
 /// Find global memory notes relevant to `title` using keyword scoring.
 ///
-/// This is used for context injection into AI prompts from the global layer.
-/// For multi-layer (workspace + global) search use
-/// `agent_memory::find_relevant_notes_multi_layer`.
+/// This is used for context injection into AI prompts from the global
+/// (`~/.liteduck/memory/`) layer.
 pub fn home_memory_find_relevant(title: &str, max: usize) -> Vec<MemoryNote> {
     find_relevant_notes_at(&home_memory_dir(), title, max)
 }
@@ -1544,7 +1541,7 @@ mod tests {
     use super::*;
     use crate::test_env::ENV_LOCK;
 
-    /// `home_dir()` returns `~/.LiteDuck` when no env var is set.
+    /// `home_dir()` returns `~/.liteduck` when no env var is set.
     #[test]
     fn home_dir_defaults_to_dot_liteduck() {
         let _guard = ENV_LOCK.lock().unwrap();
@@ -1552,8 +1549,8 @@ mod tests {
 
         let result = home_dir();
         assert!(
-            result.to_string_lossy().ends_with(".LiteDuck"),
-            "expected path to end with .LiteDuck, got: {}",
+            result.to_string_lossy().ends_with(".liteduck"),
+            "expected path to end with .liteduck, got: {}",
             result.display()
         );
     }

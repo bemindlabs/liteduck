@@ -88,8 +88,7 @@ export async function deleteSetting(key: string, isSecret = false): Promise<void
  * `~/.LiteDuck/config.json` to defaults, truncates the SQLite `settings`
  * table, and wipes the in-memory secret cache.
  *
- * Workspace-scoped data (`<ws>/.LiteDuck/scrum`, `agents`, `chat`,
- * `automations`, `mcp`) and chat history are NOT affected.
+ * Chat history is NOT affected.
  *
  * Requires biometric authentication on the backend; rejects with an
  * "Biometric authentication required" error if the gate is locked.

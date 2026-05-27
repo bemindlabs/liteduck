@@ -134,18 +134,16 @@ export function WorkspaceStep({ onNext }: WizardStepProps) {
 
       {/* Info callout */}
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-accent)] px-4 py-3 space-y-1">
-        <p className="text-xs font-medium text-[var(--color-foreground)]">What gets stored here?</p>
-        <ul className="list-disc list-inside space-y-0.5 text-xs text-[var(--color-muted-foreground)]">
-          <li>Workspace settings and overrides</li>
-          <li>Editor and terminal preferences</li>
-          <li>Workspace templates</li>
-        </ul>
-        <p className="text-xs text-[var(--color-muted-foreground)] pt-1">
-          All data is saved under a{" "}
+        <p className="text-xs font-medium text-[var(--color-foreground)]">
+          This is your project directory
+        </p>
+        <p className="text-xs text-[var(--color-muted-foreground)]">
+          Your code and files live here. LiteDuck keeps its own settings, preferences, and
+          templates globally in{" "}
           <code className="rounded bg-[var(--color-background)] px-1 py-0.5 text-[10px] font-mono">
-            .LiteDuck/
-          </code>{" "}
-          subfolder inside your chosen directory.
+            ~/.liteduck
+          </code>
+          {" — "}nothing is written into your project folder.
         </p>
       </div>
 

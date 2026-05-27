@@ -7,8 +7,9 @@ export interface WorkspaceInitResult {
 }
 
 /**
- * Initialize a workspace by creating the .LiteDuck directory structure.
- * Safe to call multiple times — only creates directories that don't already exist.
+ * Initialize a workspace by creating the workspace directory and copying any
+ * bundled template files. Safe to call multiple times — existing files are
+ * never overwritten.
  */
 export async function workspaceInit(workspace: string): Promise<WorkspaceInitResult> {
   return invoke<WorkspaceInitResult>("workspace_init", { workspace });

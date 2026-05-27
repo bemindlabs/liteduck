@@ -67,29 +67,6 @@ fn copy_dir_skip_existing(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Create the `.LiteDuck/` subdirectory tree inside `workspace_dir`.
-///
-/// Returns the list of subdirectory paths (relative strings) that were
-/// newly created.  Directories that already exist are silently skipped.
-/// Extracted so the logic can be tested without a `tauri::AppHandle`.
-pub(crate) fn create_liteduck_dirs(workspace_dir: &Path) -> Result<Vec<String>, String> {
-    let mut created = Vec::new();
-    for subdir in LITEDUCK_SUBDIRS {
-        let dir_path = workspace_dir.join(subdir);
-        if !dir_path.exists() {
-            log::info!("workspace_init: creating {subdir}");
-            fs::create_dir_all(&dir_path).map_err(|e| {
-                log::error!("workspace_init: failed to create {subdir}: {e}");
-                format!("Failed to create {subdir}: {e}")
-            })?;
-            created.push(subdir.to_string());
-        } else {
-            log::debug!("workspace_init: {subdir} already exists, skipping");
-        }
-    }
-    Ok(created)
-}
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -285,87 +262,10 @@ mod tests {
             "resolve_template must return None when neither source exists"
         );
     }
-
-    // ── create_liteduck_dirs ───────────────────────────────────────────────────
-
-    /// All 6 `.LiteDuck/` subdirectories are created under the workspace root.
-    #[test]
-    fn workspace_init_creates_liteduck_dirs() {
-        let workspace = tempfile::tempdir().expect("workspace tempdir");
-
-        create_liteduck_dirs(workspace.path()).expect("create_liteduck_dirs should succeed");
-
-        for subdir in LITEDUCK_SUBDIRS {
-            let dir_path = workspace.path().join(subdir);
-            assert!(
-                dir_path.exists(),
-                "expected {subdir} to exist after create_liteduck_dirs"
-            );
-            assert!(dir_path.is_dir(), "expected {subdir} to be a directory");
-        }
-    }
-
-    /// Calling `create_liteduck_dirs` a second time on a workspace where the
-    /// directories already exist must not return an error (idempotent).
-    #[test]
-    fn workspace_init_liteduck_idempotent() {
-        let workspace = tempfile::tempdir().expect("workspace tempdir");
-
-        create_liteduck_dirs(workspace.path()).expect("first call should succeed");
-        let result = create_liteduck_dirs(workspace.path());
-
-        assert!(
-            result.is_ok(),
-            "second call must not error when dirs already exist: {:?}",
-            result
-        );
-
-        // On the second call nothing new should be reported as created.
-        let created = result.unwrap();
-        assert!(
-            created.is_empty(),
-            "second call must return no newly created dirs, got: {created:?}"
-        );
-    }
-
-    /// `create_liteduck_dirs` returns a vec containing every subdir path that
-    /// was newly created (all 6 on a fresh workspace).
-    #[test]
-    fn workspace_init_reports_created_dirs() {
-        let workspace = tempfile::tempdir().expect("workspace tempdir");
-
-        let created =
-            create_liteduck_dirs(workspace.path()).expect("create_liteduck_dirs should succeed");
-
-        assert_eq!(
-            created.len(),
-            LITEDUCK_SUBDIRS.len(),
-            "all subdirs must be reported on first creation, got: {created:?}"
-        );
-
-        for subdir in LITEDUCK_SUBDIRS {
-            assert!(
-                created.contains(&subdir.to_string()),
-                "expected '{subdir}' in created list, got: {created:?}"
-            );
-        }
-    }
 }
 
 /// CLI tool files copied to the WORKSPACE ROOT.
 const CLI_TEMPLATE_FILES: &[(&str, &str)] = &[];
-
-/// `.LiteDuck/` subdirectory paths created inside the workspace (relative to workspace root).
-///
-/// Only directories that will contain files per ADR-001 are listed here.
-const LITEDUCK_SUBDIRS: &[&str] = &[
-    ".LiteDuck",
-    ".LiteDuck/scrum",
-    ".LiteDuck/agents",
-    ".LiteDuck/chat",
-    ".LiteDuck/automations",
-    ".LiteDuck/mcp",
-];
 
 /// Resolve a template file path. Checks user templates first, then bundled resources.
 ///
@@ -550,7 +450,7 @@ pub fn workspace_init(
         })?
         .join("resources");
 
-    let mut copied_dirs: Vec<String> = Vec::new();
+    let copied_dirs: Vec<String> = Vec::new();
     let mut copied_files: Vec<String> = Vec::new();
     let mut skipped: Vec<String> = Vec::new();
 
@@ -594,24 +494,6 @@ pub fn workspace_init(
             }
         }
     }
-
-    // Migrate legacy `.liteduck` → `.LiteDuck` on case-sensitive filesystems
-    // (e.g. Linux ext4, case-sensitive macOS volumes).  On case-insensitive
-    // filesystems `.liteduck` and `.LiteDuck` resolve to the same inode, so
-    // the rename is a no-op in practice.
-    let old_liteduck = workspace_dir.join(".liteduck");
-    let new_liteduck = workspace_dir.join(".LiteDuck");
-    if old_liteduck.exists() && !new_liteduck.exists() {
-        log::info!("workspace_init: migrating legacy '.liteduck' → '.LiteDuck' in '{workspace}'");
-        fs::rename(&old_liteduck, &new_liteduck).map_err(|e| {
-            log::error!("workspace_init: failed to rename '.liteduck' → '.LiteDuck': {e}");
-            format!("Failed to migrate .liteduck to .LiteDuck: {e}")
-        })?;
-    }
-
-    // Create .LiteDuck/ workspace data directory structure
-    let new_dirs = create_liteduck_dirs(workspace_dir)?;
-    copied_dirs.extend(new_dirs);
 
     log::info!(
         "workspace_init: done — dirs created: {}, files copied: {}, skipped: {}",
@@ -658,15 +540,6 @@ pub fn workspace_check_templates(workspace: String) -> Result<Vec<TemplateItemSt
             name: dst_name.to_string(),
             is_dir: false,
             present: file_path.exists(),
-        });
-    }
-
-    for subdir in LITEDUCK_SUBDIRS {
-        let dir_path = ws.join(subdir);
-        items.push(TemplateItemStatus {
-            name: subdir.to_string(),
-            is_dir: true,
-            present: dir_path.exists(),
         });
     }
 
