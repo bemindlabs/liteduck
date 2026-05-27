@@ -1,0 +1,26 @@
+// liteduck_core.udl
+// UniFFI interface definition for liteduck-core.
+//
+// This file declares only the items that cannot be expressed via proc-macros:
+//   - The namespace declaration (required by uniffi::include_scaffolding!)
+//   - The shared error type
+//
+// EventSink and SecretStore are internal Rust traits (see traits.rs) used only
+// within the Tauri layer and are not exposed over the FFI boundary.
+//
+// All exported functions and record types are annotated directly in Rust source
+// with #[uniffi::export] and #[derive(uniffi::Record)] respectively.
+//
+// Exposes the scrum (filesystem-based) and device_identity modules to
+// Swift (iOS/watchOS) and Kotlin (Android/WearOS) via generated bindings.
+// The db module (rusqlite) is intentionally excluded — mobile platforms
+// handle their own DB path lifecycle.
+
+namespace liteduck_core {};
+
+// ── Error type ────────────────────────────────────────────────────────────────
+
+[Error]
+interface LiteduckError {
+    General(string message);
+};

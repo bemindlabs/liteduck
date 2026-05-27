@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiteDuck Design System</title>
+<style>
+  /* ── Reset ──────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Tokens ─────────────────────────────────────────────────── */
+  :root {
+    --bg:    #17121f; --fg:    #f0edf3;
+    --card:  #241e30; --card-fg: #f0edf3;
+    --primary: #8b5cf6; --primary-fg: #fafafa;
+    --secondary: #2e2640; --secondary-fg: #e2dce9;
+    --muted: #2b253a; --muted-fg: #b0a5c0;
+    --accent: #352d4a; --accent-fg: #f0edf3;
+    --destructive: #ef4444; --success: #22c55e;
+    --warning: #eab308; --info: #3b82f6;
+    --border: #3d3452; --ring: #7c3aed;
+    --sidebar: #1a1425;
+    --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px;
+    --font: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .light {
+    --bg:    #faf9fc; --fg:    #1e1833;
+    --card:  #fcfbfe; --card-fg: #1e1833;
+    --primary: #7c3aed; --primary-fg: #fafafa;
+    --secondary: #eee9f5; --secondary-fg: #2a2340;
+    --muted: #edebf2; --muted-fg: #706882;
+    --accent: #e7e0f3; --accent-fg: #2a2340;
+    --destructive: #dc2626; --success: #16a34a;
+    --warning: #ca8a04; --info: #2563eb;
+    --border: #e4e0ec; --ring: #7c3aed;
+    --sidebar: #f5f3f8;
+  }
+
+  /* ── Base ────────────────────────────────────────────────────── */
+  body { background: var(--bg); color: var(--fg); font-family: var(--font); line-height: 1.5; }
+  .page { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-fg); margin: 40px 0 16px; }
+  p.sub { font-size: 14px; color: var(--muted-fg); margin-bottom: 32px; }
+
+  /* ── Theme toggle ───────────────────────────────────────────── */
+  .toggle { position: fixed; top: 16px; right: 16px; z-index: 50; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px 14px; font: 13px var(--font); color: var(--fg); cursor: pointer; }
+  .toggle:hover { background: var(--accent); }
+
+  /* ── Color grid ─────────────────────────────────────────────── */
+  .colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .swatch { border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); }
+  .swatch-block { height: 56px; }
+  .swatch-info { padding: 8px 10px; background: var(--card); }
+  .swatch-name { font-size: 12px; font-weight: 600; color: var(--fg); }
+  .swatch-value { font-size: 10px; font-family: var(--mono); color: var(--muted-fg); margin-top: 2px; }
+
+  /* ── Token table ────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-weight: 600; color: var(--muted-fg); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  td code { font-family: var(--mono); font-size: 12px; background: var(--muted); padding: 2px 6px; border-radius: var(--radius-sm); }
+  .preview { display: inline-block; width: 16px; height: 16px; border-radius: var(--radius-sm); vertical-align: middle; margin-right: 6px; border: 1px solid var(--border); }
+
+  /* ── Typography samples ─────────────────────────────────────── */
+  .type-row { display: flex; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .type-label { width: 80px; font-size: 11px; font-family: var(--mono); color: var(--muted-fg); flex-shrink: 0; }
+  .type-sample { color: var(--fg); }
+
+  /* ── Radius samples ─────────────────────────────────────────── */
+  .radius-row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .radius-box { width: 64px; height: 64px; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--primary-fg); font-family: var(--mono); }
+
+  /* ── Spacing scale ──────────────────────────────────────────── */
+  .space-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
+  .space-bar { height: 12px; background: var(--primary); border-radius: 2px; opacity: 0.7; }
+  .space-label { font-size: 11px; font-family: var(--mono); color: var(--muted-fg); width: 40px; flex-shrink: 0; }
+
+  /* ── Button samples ─────────────────────────────────────────── */
+  .btns { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 16px; border-radius: var(--radius-md); font: 500 14px var(--font); cursor: pointer; border: none; transition: all 150ms; }
+  .btn-primary { background: var(--primary); color: var(--primary-fg); }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-secondary { background: var(--secondary); color: var(--secondary-fg); }
+  .btn-destructive { background: var(--destructive); color: #fafafa; }
+  .btn-outline { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  .btn-outline:hover { background: var(--accent); }
+  .btn-ghost { background: transparent; color: var(--fg); }
+  .btn-ghost:hover { background: var(--accent); }
+  .btn-sm { height: 30px; padding: 0 12px; font-size: 12px; }
+  .btn-lg { height: 42px; padding: 0 24px; font-size: 15px; }
+
+  /* ── Card sample ────────────────────────────────────────────── */
+  .sample-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 20px; max-width: 320px; }
+  .sample-card h3 { font-size: 16px; font-weight: 600; color: var(--card-fg); }
+  .sample-card p { font-size: 13px; color: var(--muted-fg); margin-top: 6px; }
+  .sample-card .tag { display: inline-block; font-size: 10px; background: var(--accent); color: var(--accent-fg); padding: 2px 8px; border-radius: 999px; margin-top: 10px; }
+
+  /* ── Animations ─────────────────────────────────────────────── */
+  .anim-row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .anim-box { width: 48px; height: 48px; background: var(--primary); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; color: var(--primary-fg); font-size: 18px; }
+  .anim-label { font-size: 11px; color: var(--muted-fg); margin-top: 4px; text-align: center; font-family: var(--mono); }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(139,92,246,0.4); } 100% { box-shadow: 0 0 0 12px rgba(139,92,246,0); } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes shimmer { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+  .a-bob { animation: bob 3s ease-in-out infinite; }
+  .a-pulse { animation: pulse-ring 1.5s ease-out infinite; }
+  .a-spin { animation: spin 2s linear infinite; }
+  .a-shimmer { animation: shimmer 1.5s ease-in-out infinite; }
+
+  /* ── Status colors ──────────────────────────────────────────── */
+  .status-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ── Responsive ─────────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .colors { grid-template-columns: repeat(2, 1fr); }
+    h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="document.documentElement.classList.toggle('light'); this.textContent = document.documentElement.classList.contains('light') ? 'Dark' : 'Light'">Light</button>
+
+<div class="page">
+  <h1>LiteDuck Design System</h1>
+  <p class="sub">Tailwind CSS v4 + shadcn/ui + OKLch color tokens. Toggle theme above.</p>
+
+  <!-- ── Colors ─────────────────────────────────────────────── -->
+  <h2>Core Colors</h2>
+  <div class="colors">
+    <div class="swatch"><div class="swatch-block" style="background:var(--primary)"></div><div class="swatch-info"><div class="swatch-name">Primary</div><div class="swatch-value">#8b5cf6</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--bg)"></div><div class="swatch-info"><div class="swatch-name">Background</div><div class="swatch-value">#17121f</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--card)"></div><div class="swatch-info"><div class="swatch-name">Card</div><div class="swatch-value">#241e30</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--secondary)"></div><div class="swatch-info"><div class="swatch-name">Secondary</div><div class="swatch-value">#2e2640</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--muted)"></div><div class="swatch-info"><div class="swatch-name">Muted</div><div class="swatch-value">#2b253a</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--accent)"></div><div class="swatch-info"><div class="swatch-name">Accent</div><div class="swatch-value">#352d4a</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--border)"></div><div class="swatch-info"><div class="swatch-name">Border</div><div class="swatch-value">#3d3452</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--ring)"></div><div class="swatch-info"><div class="swatch-name">Ring</div><div class="swatch-value">#7c3aed</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--sidebar)"></div><div class="swatch-info"><div class="swatch-name">Sidebar</div><div class="swatch-value">#1a1425</div></div></div>
+  </div>
+
+  <h2>Semantic Colors</h2>
+  <div class="colors">
+    <div class="swatch"><div class="swatch-block" style="background:var(--destructive)"></div><div class="swatch-info"><div class="swatch-name">Destructive</div><div class="swatch-value">#ef4444</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--success)"></div><div class="swatch-info"><div class="swatch-name">Success</div><div class="swatch-value">#22c55e</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--warning)"></div><div class="swatch-info"><div class="swatch-name">Warning</div><div class="swatch-value">#eab308</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--info)"></div><div class="swatch-info"><div class="swatch-name">Info</div><div class="swatch-value">#3b82f6</div></div></div>
+  </div>
+
+  <h2>Foreground Colors</h2>
+  <div class="colors">
+    <div class="swatch"><div class="swatch-block" style="background:var(--fg)"></div><div class="swatch-info"><div class="swatch-name">Foreground</div><div class="swatch-value">#f0edf3</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--muted-fg)"></div><div class="swatch-info"><div class="swatch-name">Muted FG</div><div class="swatch-value">#b0a5c0</div></div></div>
+    <div class="swatch"><div class="swatch-block" style="background:var(--secondary-fg)"></div><div class="swatch-info"><div class="swatch-name">Secondary FG</div><div class="swatch-value">#e2dce9</div></div></div>
+  </div>
+
+  <!-- ── Typography ──────────────────────────────────────────── -->
+  <h2>Typography</h2>
+  <div>
+    <div class="type-row"><span class="type-label">3xl / 30px</span><span class="type-sample" style="font-size:30px;font-weight:700">The Way of the Duck</span></div>
+    <div class="type-row"><span class="type-label">2xl / 24px</span><span class="type-sample" style="font-size:24px;font-weight:700">AI Coding Workflow</span></div>
+    <div class="type-row"><span class="type-label">xl / 20px</span><span class="type-sample" style="font-size:20px;font-weight:600">Launch an Agent</span></div>
+    <div class="type-row"><span class="type-label">lg / 18px</span><span class="type-sample" style="font-size:18px;font-weight:600">Sprint Backlog</span></div>
+    <div class="type-row"><span class="type-label">base / 16px</span><span class="type-sample" style="font-size:16px">Body text used in paragraphs and descriptions.</span></div>
+    <div class="type-row"><span class="type-label">sm / 14px</span><span class="type-sample" style="font-size:14px">Default UI text — labels, buttons, inputs</span></div>
+    <div class="type-row"><span class="type-label">xs / 11px</span><span class="type-sample" style="font-size:11px;color:var(--muted-fg)">SECTION HEADER &middot; timestamps &middot; metadata</span></div>
+    <div class="type-row"><span class="type-label">mono</span><span class="type-sample" style="font-family:var(--mono);font-size:13px">git commit -m "feat: add agent launcher"</span></div>
+  </div>
+
+  <!-- ── Border Radius ───────────────────────────────────────── -->
+  <h2>Border Radius</h2>
+  <div class="radius-row">
+    <div><div class="radius-box" style="border-radius:var(--radius-sm)">sm</div><div class="anim-label">4px</div></div>
+    <div><div class="radius-box" style="border-radius:var(--radius-md)">md</div><div class="anim-label">6px</div></div>
+    <div><div class="radius-box" style="border-radius:var(--radius-lg)">lg</div><div class="anim-label">8px</div></div>
+    <div><div class="radius-box" style="border-radius:var(--radius-xl)">xl</div><div class="anim-label">12px</div></div>
+    <div><div class="radius-box" style="border-radius:999px">pill</div><div class="anim-label">999px</div></div>
+  </div>
+
+  <!-- ── Spacing ─────────────────────────────────────────────── -->
+  <h2>Spacing Scale (4px grid)</h2>
+  <div>
+    <div class="space-row"><span class="space-label">0.5</span><div class="space-bar" style="width:2px"></div><span style="font-size:11px;color:var(--muted-fg)">2px</span></div>
+    <div class="space-row"><span class="space-label">1</span><div class="space-bar" style="width:4px"></div><span style="font-size:11px;color:var(--muted-fg)">4px</span></div>
+    <div class="space-row"><span class="space-label">2</span><div class="space-bar" style="width:8px"></div><span style="font-size:11px;color:var(--muted-fg)">8px</span></div>
+    <div class="space-row"><span class="space-label">3</span><div class="space-bar" style="width:12px"></div><span style="font-size:11px;color:var(--muted-fg)">12px</span></div>
+    <div class="space-row"><span class="space-label">4</span><div class="space-bar" style="width:16px"></div><span style="font-size:11px;color:var(--muted-fg)">16px</span></div>
+    <div class="space-row"><span class="space-label">6</span><div class="space-bar" style="width:24px"></div><span style="font-size:11px;color:var(--muted-fg)">24px</span></div>
+    <div class="space-row"><span class="space-label">8</span><div class="space-bar" style="width:32px"></div><span style="font-size:11px;color:var(--muted-fg)">32px</span></div>
+    <div class="space-row"><span class="space-label">12</span><div class="space-bar" style="width:48px"></div><span style="font-size:11px;color:var(--muted-fg)">48px</span></div>
+    <div class="space-row"><span class="space-label">16</span><div class="space-bar" style="width:64px"></div><span style="font-size:11px;color:var(--muted-fg)">64px</span></div>
+  </div>
+
+  <!-- ── Buttons ─────────────────────────────────────────────── -->
+  <h2>Button Variants</h2>
+  <div class="btns">
+    <button class="btn btn-primary">Primary</button>
+    <button class="btn btn-secondary">Secondary</button>
+    <button class="btn btn-destructive">Destructive</button>
+    <button class="btn btn-outline">Outline</button>
+    <button class="btn btn-ghost">Ghost</button>
+  </div>
+  <div class="btns" style="margin-top:12px">
+    <button class="btn btn-primary btn-sm">Small</button>
+    <button class="btn btn-primary">Default</button>
+    <button class="btn btn-primary btn-lg">Large</button>
+  </div>
+
+  <!-- ── Status Indicators ───────────────────────────────────── -->
+  <h2>Status Indicators</h2>
+  <div class="status-row">
+    <span class="status-pill" style="background:rgba(34,197,94,0.15);color:var(--success)"><span class="dot" style="background:var(--success)"></span>Active</span>
+    <span class="status-pill" style="background:rgba(234,179,8,0.15);color:var(--warning)"><span class="dot" style="background:var(--warning)"></span>In Progress</span>
+    <span class="status-pill" style="background:rgba(59,130,246,0.15);color:var(--info)"><span class="dot" style="background:var(--info)"></span>Pending</span>
+    <span class="status-pill" style="background:rgba(239,68,68,0.15);color:var(--destructive)"><span class="dot" style="background:var(--destructive)"></span>Failed</span>
+    <span class="status-pill" style="background:var(--muted);color:var(--muted-fg)"><span class="dot" style="background:var(--muted-fg)"></span>Idle</span>
+  </div>
+
+  <!-- ── Card Sample ─────────────────────────────────────────── -->
+  <h2>Card Component</h2>
+  <div class="sample-card">
+    <h3>Claude Code</h3>
+    <p>Anthropic Claude Code CLI - automatically loads CLAUDE.md for project context.</p>
+    <span class="tag">AI Agent</span>
+    <span class="tag" style="margin-left:4px">CLI</span>
+  </div>
+
+  <!-- ── Animations ──────────────────────────────────────────── -->
+  <h2>Animations</h2>
+  <div class="anim-row">
+    <div><div class="anim-box a-bob">B</div><div class="anim-label">bob</div></div>
+    <div><div class="anim-box a-pulse">P</div><div class="anim-label">pulse</div></div>
+    <div><div class="anim-box a-spin">S</div><div class="anim-label">spin</div></div>
+    <div><div class="anim-box a-shimmer">~</div><div class="anim-label">shimmer</div></div>
+  </div>
+
+  <!-- ── Token Reference ─────────────────────────────────────── -->
+  <h2>CSS Variable Reference</h2>
+  <table>
+    <thead><tr><th>Token</th><th>Dark</th><th>Light</th><th>Usage</th></tr></thead>
+    <tbody>
+      <tr><td><code>--color-background</code></td><td><span class="preview" style="background:#17121f"></span>#17121f</td><td><span class="preview" style="background:#faf9fc"></span>#faf9fc</td><td>Page background</td></tr>
+      <tr><td><code>--color-foreground</code></td><td><span class="preview" style="background:#f0edf3"></span>#f0edf3</td><td><span class="preview" style="background:#1e1833"></span>#1e1833</td><td>Default text</td></tr>
+      <tr><td><code>--color-primary</code></td><td><span class="preview" style="background:#8b5cf6"></span>#8b5cf6</td><td><span class="preview" style="background:#7c3aed"></span>#7c3aed</td><td>Buttons, links</td></tr>
+      <tr><td><code>--color-card</code></td><td><span class="preview" style="background:#241e30"></span>#241e30</td><td><span class="preview" style="background:#fcfbfe"></span>#fcfbfe</td><td>Card surfaces</td></tr>
+      <tr><td><code>--color-muted</code></td><td><span class="preview" style="background:#2b253a"></span>#2b253a</td><td><span class="preview" style="background:#edebf2"></span>#edebf2</td><td>Subtle backgrounds</td></tr>
+      <tr><td><code>--color-muted-foreground</code></td><td><span class="preview" style="background:#b0a5c0"></span>#b0a5c0</td><td><span class="preview" style="background:#706882"></span>#706882</td><td>Secondary text</td></tr>
+      <tr><td><code>--color-accent</code></td><td><span class="preview" style="background:#352d4a"></span>#352d4a</td><td><span class="preview" style="background:#e7e0f3"></span>#e7e0f3</td><td>Hover states</td></tr>
+      <tr><td><code>--color-border</code></td><td><span class="preview" style="background:#3d3452"></span>#3d3452</td><td><span class="preview" style="background:#e4e0ec"></span>#e4e0ec</td><td>Borders, dividers</td></tr>
+      <tr><td><code>--color-ring</code></td><td><span class="preview" style="background:#7c3aed"></span>#7c3aed</td><td><span class="preview" style="background:#7c3aed"></span>#7c3aed</td><td>Focus rings</td></tr>
+      <tr><td><code>--color-destructive</code></td><td><span class="preview" style="background:#ef4444"></span>#ef4444</td><td><span class="preview" style="background:#dc2626"></span>#dc2626</td><td>Danger actions</td></tr>
+      <tr><td><code>--color-success</code></td><td><span class="preview" style="background:#22c55e"></span>#22c55e</td><td><span class="preview" style="background:#16a34a"></span>#16a34a</td><td>Success states</td></tr>
+      <tr><td><code>--color-warning</code></td><td><span class="preview" style="background:#eab308"></span>#eab308</td><td><span class="preview" style="background:#ca8a04"></span>#ca8a04</td><td>Warnings</td></tr>
+      <tr><td><code>--color-info</code></td><td><span class="preview" style="background:#3b82f6"></span>#3b82f6</td><td><span class="preview" style="background:#2563eb"></span>#2563eb</td><td>Informational</td></tr>
+      <tr><td><code>--color-sidebar</code></td><td><span class="preview" style="background:#1a1425"></span>#1a1425</td><td><span class="preview" style="background:#f5f3f8"></span>#f5f3f8</td><td>Sidebar panel</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Breakpoints</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Width</th><th>Usage</th></tr></thead>
+    <tbody>
+      <tr><td><code>sm</code></td><td>640px</td><td>Phone landscape, 2-column grids</td></tr>
+      <tr><td><code>md</code></td><td>768px</td><td>Tablet portrait, sidebar visible</td></tr>
+      <tr><td><code>lg</code></td><td>1024px</td><td>Tablet landscape, 3-4 column grids</td></tr>
+      <tr><td><code>xl</code></td><td>1280px</td><td>Desktop, full feature layout</td></tr>
+      <tr><td><code>2xl</code></td><td>1536px</td><td>Wide desktop, max content width</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:40px;font-size:11px;color:var(--muted-fg);text-align:center">
+    LiteDuck Design System &middot; Generated 2026-04-14 &middot; Bemind Technology Co., Ltd.
+  </p>
+</div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "━━━ pre-commit quality gate ━━━"
+
+# 1. Rust: cargo check + fmt
+echo ""
+echo "[1/4] cargo check..."
+(cd src-tauri && cargo check --all-targets 2>&1) || { echo "FAIL: cargo check"; exit 1; }
+echo "  ✓ cargo check passed"
+
+echo "[2/4] cargo fmt..."
+(cd src-tauri && cargo fmt --check 2>&1) || { echo "FAIL: cargo fmt — run 'cd src-tauri && cargo fmt' to fix"; exit 1; }
+echo "  ✓ cargo fmt passed"
+
+# 2. Frontend: tsc + prettier + eslint
+echo "[3/4] tsc --noEmit..."
+npx tsc --noEmit -p tsconfig.app.json 2>&1 || { echo "FAIL: TypeScript errors"; exit 1; }
+echo "  ✓ tsc passed"
+
+echo "[4/4] prettier + eslint..."
+npm run format:check 2>&1 || { echo "FAIL: prettier — run 'npm run format' to fix"; exit 1; }
+npm run lint 2>&1 || { echo "FAIL: eslint — run 'npm run lint:fix' to fix"; exit 1; }
+echo "  ✓ format + lint passed"
+
+# 3. Version sync check
+PKG_VER=$(grep '"version"' package.json | head -1 | sed 's/.*"version": *"//;s/".*//')
+TAURI_VER=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": *"//;s/".*//')
+CARGO_VER=$(grep '^version' src-tauri/Cargo.toml | sed 's/.*= *"//;s/".*//')
+
+if [ "$PKG_VER" != "$TAURI_VER" ] || [ "$PKG_VER" != "$CARGO_VER" ]; then
+  echo ""
+  echo "FAIL: Version mismatch!"
+  echo "  package.json:    $PKG_VER"
+  echo "  tauri.conf.json: $TAURI_VER"
+  echo "  Cargo.toml:      $CARGO_VER"
+  exit 1
+fi
+
+echo ""
+echo "━━━ pre-commit: all checks passed (v$PKG_VER) ━━━"

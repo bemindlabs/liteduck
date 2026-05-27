@@ -1,0 +1,450 @@
+@import "tailwindcss";
+@source not "../src-tauri";
+
+@theme inline {
+  /* Yellow pastel "duck" tone — warm dark mode defaults for Tailwind utility generation */
+  --color-background: oklch(0.17 0.015 95);
+  --color-foreground: oklch(0.96 0.015 95);
+  --color-card: oklch(0.21 0.02 95);
+  --color-card-foreground: oklch(0.96 0.015 95);
+  --color-popover: oklch(0.23 0.025 95);
+  --color-popover-foreground: oklch(0.96 0.015 95);
+  --color-primary: oklch(0.85 0.13 92);
+  --color-primary-foreground: oklch(0.26 0.045 92);
+  --color-secondary: oklch(0.25 0.03 95);
+  --color-secondary-foreground: oklch(0.92 0.02 95);
+  --color-muted: oklch(0.25 0.025 95);
+  --color-muted-foreground: oklch(0.76 0.035 95);
+  --color-accent: oklch(0.28 0.05 92);
+  --color-accent-foreground: oklch(0.96 0.015 95);
+  --color-destructive: oklch(0.65 0.2 25);
+  --color-destructive-foreground: oklch(0.98 0 0);
+  --color-success: oklch(0.696 0.17 162.48);
+  --color-success-foreground: oklch(0.98 0 0);
+  --color-warning: oklch(0.78 0.15 70);
+  --color-warning-foreground: oklch(0.2 0.04 70);
+  --color-info: oklch(0.623 0.214 259.815);
+  --color-info-foreground: oklch(0.98 0 0);
+  --color-border: oklch(0.32 0.03 95);
+  --color-input: oklch(0.32 0.03 95);
+  --color-ring: oklch(0.78 0.13 92);
+  --color-sidebar: oklch(0.14 0.015 95);
+  --color-sidebar-foreground: oklch(0.96 0.015 95);
+  --color-sidebar-border: oklch(0.3 0.03 95);
+  --color-sidebar-accent: oklch(0.26 0.045 92);
+  --color-sidebar-accent-foreground: oklch(0.96 0.015 95);
+  --color-sidebar-primary: oklch(0.85 0.13 92);
+  --color-sidebar-primary-foreground: oklch(0.26 0.045 92);
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+/* ── Light mode — Yellow pastel (buttery cream) ─────────────────────────────── */
+/* Uses html.light for higher specificity than @theme inline (:root) */
+html.light {
+  --color-background: oklch(0.985 0.025 95) !important;
+  --color-foreground: oklch(0.25 0.04 80) !important;
+  --color-card: oklch(0.995 0.014 95) !important;
+  --color-card-foreground: oklch(0.25 0.04 80) !important;
+  --color-popover: oklch(0.995 0.012 95) !important;
+  --color-popover-foreground: oklch(0.25 0.04 80) !important;
+  --color-primary: oklch(0.82 0.14 90) !important;
+  --color-primary-foreground: oklch(0.28 0.05 80) !important;
+  --color-secondary: oklch(0.95 0.035 95) !important;
+  --color-secondary-foreground: oklch(0.3 0.04 80) !important;
+  --color-muted: oklch(0.95 0.03 95) !important;
+  --color-muted-foreground: oklch(0.5 0.04 85) !important;
+  --color-accent: oklch(0.93 0.05 92) !important;
+  --color-accent-foreground: oklch(0.3 0.04 80) !important;
+  --color-destructive: oklch(0.55 0.22 25) !important;
+  --color-destructive-foreground: oklch(0.98 0 0) !important;
+  --color-success: oklch(0.518 0.16 163.22) !important;
+  --color-success-foreground: oklch(0.98 0 0) !important;
+  --color-warning: oklch(0.62 0.14 70) !important;
+  --color-warning-foreground: oklch(0.98 0 0) !important;
+  --color-info: oklch(0.488 0.243 264.376) !important;
+  --color-info-foreground: oklch(0.98 0 0) !important;
+  --color-border: oklch(0.9 0.03 92) !important;
+  --color-input: oklch(0.9 0.03 92) !important;
+  --color-ring: oklch(0.78 0.14 90) !important;
+  --color-sidebar: oklch(0.97 0.03 95) !important;
+  --color-sidebar-foreground: oklch(0.25 0.04 80) !important;
+  --color-sidebar-border: oklch(0.9 0.03 92) !important;
+  --color-sidebar-accent: oklch(0.94 0.045 92) !important;
+  --color-sidebar-accent-foreground: oklch(0.3 0.04 80) !important;
+  --color-sidebar-primary: oklch(0.82 0.14 90) !important;
+  --color-sidebar-primary-foreground: oklch(0.28 0.05 80) !important;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── color-mix utility classes ───────────────────────────────────────────────
+   Replace inline style={{ backgroundColor: "color-mix(...)" }} patterns.
+   Naming: bg-{token}-subtle[-{percent}] where percent defaults to 15.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.bg-destructive-subtle-5 {
+  background-color: color-mix(in oklch, var(--color-destructive) 5%, var(--color-background));
+}
+.bg-destructive-subtle-10 {
+  background-color: color-mix(in oklch, var(--color-destructive) 10%, var(--color-background));
+}
+.bg-destructive-subtle {
+  background-color: color-mix(in oklch, var(--color-destructive) 15%, var(--color-background));
+}
+.bg-warning-subtle {
+  background-color: color-mix(in oklch, var(--color-warning) 15%, var(--color-background));
+}
+.bg-success-subtle-10 {
+  background-color: color-mix(in oklch, var(--color-success) 10%, var(--color-background));
+}
+.bg-success-subtle {
+  background-color: color-mix(in oklch, var(--color-success) 15%, var(--color-background));
+}
+.bg-info-subtle {
+  background-color: color-mix(in oklch, var(--color-info) 15%, var(--color-background));
+}
+.bg-primary-subtle {
+  background-color: color-mix(in oklch, var(--color-primary) 15%, var(--color-background));
+}
+.bg-muted-subtle-10 {
+  background-color: color-mix(in oklch, var(--color-muted-foreground) 10%, var(--color-background));
+}
+.bg-muted-subtle {
+  background-color: color-mix(in oklch, var(--color-muted-foreground) 15%, var(--color-background));
+}
+.bg-blue-400-subtle {
+  background-color: color-mix(in oklch, #60a5fa 15%, var(--color-background));
+}
+.bg-green-400-subtle {
+  background-color: color-mix(in oklch, #4ade80 15%, var(--color-background));
+}
+.bg-green-500-subtle-10 {
+  background-color: color-mix(in oklch, #22c55e 10%, var(--color-background));
+}
+
+/* ── MiniDuck animations ─────────────────────────────────────────────────────
+   Used by AgentsWorkingView and AgentCard grid items.
+   All animations are CSS-only — no JS timers.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@keyframes duck-bob {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes duck-work {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-3deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(3deg);
+  }
+  75% {
+    transform: translateY(-2px) rotate(-2deg);
+  }
+}
+
+@keyframes wing-left {
+  0%,
+  100% {
+    transform: rotate(0deg);
+    transform-origin: right center;
+  }
+  50% {
+    transform: rotate(-18deg);
+    transform-origin: right center;
+  }
+}
+
+@keyframes wing-right {
+  0%,
+  100% {
+    transform: rotate(0deg);
+    transform-origin: left center;
+  }
+  50% {
+    transform: rotate(18deg);
+    transform-origin: left center;
+  }
+}
+
+@keyframes eye-glow {
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 2px #52e7ff);
+  }
+  50% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 6px #52e7ff);
+  }
+}
+
+@keyframes loop-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float-code {
+  0% {
+    opacity: 0;
+    transform: translateY(0px);
+  }
+  20% {
+    opacity: 0.35;
+  }
+  80% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+}
+
+/* Utility animation classes */
+.animate-duck-bob {
+  animation: duck-bob 3s ease-in-out infinite;
+}
+.animate-duck-work {
+  animation: duck-work 0.6s ease-in-out infinite;
+}
+.animate-wing-left {
+  animation: wing-left 1.8s ease-in-out infinite;
+}
+.animate-wing-right {
+  animation: wing-right 1.8s ease-in-out infinite;
+}
+.animate-eye-glow {
+  animation: eye-glow 2.4s ease-in-out infinite;
+}
+.animate-loop-spin {
+  animation: loop-spin 8s linear infinite;
+}
+.animate-float-code {
+  animation: float-code linear infinite;
+}
+
+/* Progress bar shimmer */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── AgentCard grid hover effects ───────────────────────────────────────────
+   Hover: gentle scale + border glow.
+   Active-agent card: ambient eye-glow pulse applied via parent class.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.agent-card {
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+}
+
+.agent-card:hover {
+  transform: scale(1.015);
+  box-shadow: 0 4px 20px color-mix(in oklch, var(--color-ring) 30%, transparent);
+}
+
+/* Wing-wave on hover — targets the .duck-wing class inside .agent-card */
+.agent-card:hover .duck-wing-left {
+  animation: wing-left 0.7s ease-in-out 2;
+}
+
+.agent-card:hover .duck-wing-right {
+  animation: wing-right 0.7s ease-in-out 2;
+}
+
+/* Eye-glow for active agents: always-on pulse */
+.agent-card.agent-active .duck-eye {
+  animation: eye-glow 2.4s ease-in-out infinite;
+}
+
+/* Eye-glow for inactive agents: only on hover */
+.agent-card:not(.agent-active):hover .duck-eye {
+  animation: eye-glow 1.2s ease-in-out 2;
+}
+
+/* ── iOS / Mobile safe area and adaptations ───────────────────────────── */
+
+/* Anchor the height chain — use fixed positioning for guaranteed full-screen on iOS */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-background, #0f0b16);
+  /* iOS: extend background into safe area beyond fixed elements */
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* #root fills the entire viewport edge-to-edge.
+   Safe area insets are handled by individual pages/layout via Tailwind
+   padding utilities so there is no gap between #root and the screen edge.
+   Safe area insets are handled by individual pages/layout via Tailwind
+   padding utilities so there is no gap between #root and the screen edge. */
+#root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background-color: var(--color-background, #0f0b16);
+  overflow: hidden;
+}
+
+/* Safe area padding — uses CSS env() with a JS-set fallback variable.
+   On Tauri iOS, the native layer sets --sat/--sab via a script tag
+   if env() returns 0. Desktop uses 0px (no safe area needed). */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+.safe-area-pad {
+  padding-top: var(--sat);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
+}
+.safe-area-bottom {
+  padding-bottom: var(--sab);
+}
+
+/* Prevent text size inflation on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ── iPad / Tablet (769px–1024px) ─────────────────────────────────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ── Phone (max-width: 768px) ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent footer from wrapping awkwardly */
+  footer {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: center !important;
+    text-align: center;
+  }
+
+  /* Disable hover effects on touch devices */
+  @media (hover: none) {
+    .agent-card:hover {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+  }
+
+  /* Prevent any fixed-width element from causing horizontal scroll */
+  .overflow-hidden {
+    max-width: 100%;
+  }
+}
+
+/* ── Small iPhone (max-width: 390px) — extra narrow tweaks ──────────── */
+@media (max-width: 390px) {
+  /* Reduce main content padding on very small screens */
+  main {
+    padding: 0.375rem !important;
+  }
+
+  /* Compact modal dialogs to near-full-width */
+  [role="dialog"],
+  .dialog-panel {
+    max-width: 95vw !important;
+    width: 95vw !important;
+  }
+
+  /* Scrum board: reduce column width minimum so more columns fit in scroll view */
+  .kanban-column {
+    min-width: 240px !important;
+  }
+}
+
+/* ── Touch-device target sizing (WCAG 2.5.5) ──────────────────────────────── */
+/* On coarse-pointer devices (touch), enforce 44px minimum tap targets on
+   buttons and interactive controls. Uses pointer:coarse so desktop mice are
+   not affected. The min-height/min-width expand the hit area without changing
+   the visual size of the element. */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  [role="tab"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Navigation links need adequate tap targets on touch devices */
+  nav a {
+    min-height: 44px;
+  }
+}
+
+/* ── Reduced motion (WCAG 2.3.3) ──────────────────────────────────────────── */
+/* Users who prefer reduced motion (vestibular disorders, motion sensitivity)
+   get all animations and transitions shortened to near-instant. Keeps layout
+   changes functional (opacity, transform) but removes the motion component.
+   Spin animations (loading indicators) are fully disabled. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

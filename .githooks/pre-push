@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "━━━ pre-push quality gate ━━━"
+
+# 1. Frontend build (tsc + vite)
+echo ""
+echo "[1/4] frontend build (tsc + vite)..."
+npm run build 2>&1 || { echo "FAIL: frontend build"; exit 1; }
+echo "  ✓ frontend build passed"
+
+# 2. Frontend tests + coverage gate
+echo "[2/4] vitest coverage gate..."
+npm run test:ci 2>&1 || { echo "FAIL: vitest coverage gate"; exit 1; }
+echo "  ✓ vitest coverage gate passed"
+
+# 3. Rust tests
+echo "[3/4] cargo test..."
+(cd src-tauri && cargo test 2>&1) || { echo "FAIL: cargo test"; exit 1; }
+echo "  ✓ cargo test passed"
+
+# 4. Clippy
+echo "[4/4] cargo clippy..."
+(cd src-tauri && cargo clippy -- -D warnings 2>&1) || { echo "FAIL: cargo clippy"; exit 1; }
+echo "  ✓ cargo clippy passed"
+
+echo ""
+echo "━━━ pre-push: all checks passed ━━━"

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mac App Store entitlements.
+  Used when signing with "Apple Distribution: Pituk Kaewsuksai (944QFC9G5N)"
+  for MAS submission via Transporter.
+  MAS does not use notarization; the hardened-runtime CS flags are omitted.
+-->
+<plist version="1.0">
+<dict>
+	<!-- App Sandbox (mandatory for MAS) -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- Network access -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+
+	<!-- File access -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
+
+	<!-- Bluetooth (btleplug) -->
+	<key>com.apple.security.device.bluetooth</key>
+	<true/>
+</dict>
+</plist>

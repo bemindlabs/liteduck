@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+permissions:
+  contents: read
+  # actions/cache + upload-artifact require this when workflow permissions are explicit
+  actions: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Frontend: type-check + lint + format + unit tests with coverage
+  # ---------------------------------------------------------------------------
+  frontend-check:
+    name: Frontend (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ["22"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (tsc --noEmit)
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Check formatting (Prettier)
+        run: npm run format:check
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Run Vitest unit tests with coverage
+        run: npm run test:ci
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Rust: cargo check + fmt + clippy + test
+  # ---------------------------------------------------------------------------
+  rust-check:
+    name: Rust (stable)
+    runs-on: ubuntu-latest
+
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo apt-get clean
+          df -h /
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and build artefacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install system dependencies (Tauri on Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            pkg-config
+
+      - name: cargo fmt --check
+        working-directory: .
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy (includes check)
+        working-directory: .
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Clean build artifacts to reclaim disk space
+        run: |
+          cargo clean -p bemind-liteduck -p bemind-liteduck-lib -p liteduck-core 2>/dev/null || true
+          rm -rf target/debug/deps/librussh* target/debug/deps/libbollard* target/debug/deps/libgit2* 2>/dev/null || true
+          df -h /
+
+      - name: cargo test
+        working-directory: .
+        run: cargo test --workspace

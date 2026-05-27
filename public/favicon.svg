@@ -1,0 +1,30 @@
+<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lite Duck code editor icon">
+  <defs>
+    <filter id="icon-shadow" x="8" y="10" width="104" height="104" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#101828" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#icon-shadow)">
+    <path d="M29 71C29 53 42 39 61 39H66C82 39 95 52 95 68C95 86 80 99 61 99H48C37 99 29 91 29 80V71Z" fill="#F7C948" stroke="#D29A14" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M37 42C37 26 49 15 64 15C78 15 88 25 88 39C88 52 78 61 64 61H52C43 61 37 53 37 42Z" fill="#FFE173" stroke="#D29A14" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M84 38H102C106 38 108 42 105 45L96 53C93 56 88 55 86 51L81 43C79 40 81 38 84 38Z" fill="#FFB020" stroke="#C76B0E" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M84 46C89 47.5 96 47.5 103 45" stroke="#C76B0E" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M87 51C91 53 95 53 98 51" stroke="#F97316" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="67" cy="36" r="3.7" fill="#111827"/>
+    <circle cx="68.4" cy="34.8" r="1.1" fill="white"/>
+    <path d="M50 27C54 23 60 21 66 22" stroke="#FFF7C2" stroke-width="3" stroke-linecap="round"/>
+
+    <rect x="20" y="61" width="73" height="39" rx="9" fill="#111827" stroke="#263349" stroke-width="3"/>
+    <path d="M20 72H93" stroke="#263349" stroke-width="3"/>
+    <circle cx="31" cy="67" r="2.4" fill="#FF5F57"/>
+    <circle cx="39" cy="67" r="2.4" fill="#FFBD2E"/>
+    <circle cx="47" cy="67" r="2.4" fill="#28C840"/>
+
+    <path d="M40 82L32 88L40 94" stroke="#7DD3FC" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M56 79L50 97" stroke="#FDE68A" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M64 82L72 88L64 94" stroke="#7DD3FC" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M79 82H84" stroke="#34D399" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M79 92H87" stroke="#34D399" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+</svg>

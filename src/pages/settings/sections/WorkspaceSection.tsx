@@ -1,0 +1,71 @@
+import { FolderTree } from "lucide-react";
+import { SettingField, type FieldDef } from "../components/SettingField";
+
+const FIELDS: FieldDef[] = [
+  {
+    key: "workspace_directory",
+    label: "Workspace Directory",
+    placeholder: "/path/to/your/project",
+    helpText:
+      "The root directory for your development project. Used as the default working directory for terminals, agent sessions, and agent profile storage.",
+    browseFolder: true,
+  },
+  {
+    key: "clone_parent_directory",
+    label: "Clone parent folder",
+    placeholder: "/path/to/projects",
+    helpText:
+      "Parent directory for Git clones from the landing page (`git clone` creates a repository folder inside this path). Optional; you can still pick a folder each time.",
+    browseFolder: true,
+  },
+];
+
+interface WorkspaceSectionProps {
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  onDeleteSecret: (key: string) => void;
+}
+
+export function WorkspaceSection({ values, onChange, onDeleteSecret }: WorkspaceSectionProps) {
+  return (
+    <section
+      id="section-workspace"
+      className="scroll-mt-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-5 space-y-5"
+    >
+      <div className="border-b border-[var(--color-border)] pb-3">
+        <h3 className="flex items-center gap-2 text-base font-medium text-[var(--color-foreground)]">
+          <FolderTree className="h-4 w-4 text-[var(--color-muted-foreground)]" />
+          Workspace
+          <span className="ml-1 rounded bg-[var(--color-muted)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
+            Global
+          </span>
+        </h3>
+        <p className="mt-0.5 text-sm text-[var(--color-muted-foreground)]">
+          Set the active project root and default clone folder. These settings are global and
+          persist across workspaces. Stored in{" "}
+          <code className="rounded bg-[var(--color-accent)] px-1 py-0.5 text-[10px] font-mono">
+            ~/.LiteDuck/
+          </code>
+          .
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {FIELDS.map((field) => (
+          <div key={field.key} className="space-y-1.5">
+            <SettingField def={field} value={values[field.key] ?? ""} onChange={onChange} />
+            {field.isSecret && values[field.key] && (
+              <button
+                type="button"
+                onClick={() => onDeleteSecret(field.key)}
+                className="text-xs text-[var(--color-destructive)] hover:underline"
+              >
+                Clear stored secret
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

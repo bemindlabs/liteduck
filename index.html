@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0f0b16" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f3f8" media="(prefers-color-scheme: light)" />
+    <title>LiteDuck - Code Editor</title>
+  </head>
+  <body style="margin: 0; overflow: hidden; background-color: #0f0b16">
+    <div id="root"></div>
+    <script>
+      // Detect safe area insets on iOS — env() may return 0 in Tauri WebView.
+      // If so, read the actual insets from a probe element and set CSS vars.
+      (function() {
+        var probe = document.createElement('div');
+        probe.style.cssText = 'position:fixed;top:env(safe-area-inset-top,0px);height:0;width:0;visibility:hidden';
+        document.body.appendChild(probe);
+        requestAnimationFrame(function() {
+          var top = probe.offsetTop;
+          document.body.removeChild(probe);
+          // If env() returned 0 but we're on a touch device, use window.screen to estimate
+          if (top === 0 && 'ontouchstart' in window) {
+            var h = window.screen.height;
+            var w = window.screen.width;
+            var dpr = window.devicePixelRatio || 1;
+            // iPhone with Dynamic Island (>900pt tall, narrow)
+            if (w < 500 && h > 850) {
+              document.documentElement.style.setProperty('--sat', '59px');
+              document.documentElement.style.setProperty('--sab', '34px');
+            }
+            // iPhone with notch (>800pt tall)
+            else if (w < 500 && h > 730) {
+              document.documentElement.style.setProperty('--sat', '47px');
+              document.documentElement.style.setProperty('--sab', '34px');
+            }
+            // iPad
+            else if (w >= 500) {
+              document.documentElement.style.setProperty('--sat', '24px');
+              document.documentElement.style.setProperty('--sab', '20px');
+            }
+          } else if (top > 0) {
+            // env() works — CSS handles it, no JS override needed
+          }
+        });
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,128 @@
+name: Regression
+
+# Regression testing — runs the Playwright end-to-end suite against the Vite
+# dev server with mocked Tauri IPC.  Separate workflow from CI because:
+#   - CI runs on every push/PR; this is heavier and runs on a schedule + main.
+#   - E2E flakiness should not block PR merges; failures here surface as a
+#     standalone signal.
+#
+# Triggers:
+#   - workflow_dispatch  : on-demand run from the Actions UI
+#   - schedule           : nightly at 02:00 UTC
+#   - push to main       : every release-candidate merge
+#   - pull_request       : only when files that affect runtime UI behaviour change
+#                          (kept narrow so we don't double-run with `ci.yml`)
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Nightly at 02:00 UTC.  Picked off-peak so artifacts are ready by morning.
+    - cron: "0 2 * * *"
+
+  push:
+    branches:
+      - main
+
+  # Note: pull_request trigger intentionally omitted. The Playwright suite
+  # currently has pre-existing test rot (most tests assume the first-run
+  # wizard has been completed but don't pre-skip it), so it's not a useful
+  # PR gate yet. Once the wizard-skip helper lands, re-add a path-filtered
+  # pull_request trigger here. The summary job below stays so this workflow
+  # is still required-checkable from branch protection on main pushes.
+
+permissions:
+  contents: read
+  actions: write
+
+# Don't pile up nightly runs if a previous run is still going.
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Playwright E2E regression suite
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: Playwright E2E (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    # 45 min: playwright.config.ts pins workers=1 on CI for stability +
+    # retries=2, so 9 spec files * up to 3 attempts each can comfortably
+    # run 25-35 min on a cold runner. The first-ever run hit the previous
+    # 25-min cap mid-suite. Bump to 45 to leave headroom.
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers (chromium + system deps)
+        # `--with-deps` pulls the apt packages chromium needs on Ubuntu runners.
+        # Skipped on cache hit unless the install would fail; the cmd is idempotent.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E suite
+        # webServer block in playwright.config.ts auto-starts `npm run dev` and
+        # reuses any existing server.  CI=true triggers retries=2 + workers=1
+        # per the same config.
+        env:
+          CI: "true"
+        run: npm run test:e2e
+
+      - name: Upload Playwright HTML report
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report-node-${{ matrix.node-version }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload Playwright traces and screenshots
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-artifacts-node-${{ matrix.node-version }}
+          path: |
+            test-results/
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Aggregator — single required check for branch protection rules.
+  # ---------------------------------------------------------------------------
+  regression-summary:
+    name: Regression summary
+    runs-on: ubuntu-latest
+    needs: [e2e]
+    if: always()
+    steps:
+      - name: Report
+        run: |
+          if [[ "${{ needs.e2e.result }}" != "success" ]]; then
+            echo "::error::Regression suite failed (e2e: ${{ needs.e2e.result }})"
+            exit 1
+          fi
+          echo "All regression jobs passed."
