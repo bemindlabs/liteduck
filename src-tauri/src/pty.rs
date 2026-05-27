@@ -181,7 +181,12 @@ impl PtyManager {
             // instead of creating a new one.  This is the reattachment path
             // that fires when the app restarts or the user opens a tab whose
             // name matches a surviving session.
-            let tmux_bin = tmux_path.unwrap();
+            let tmux_bin = match tmux_path {
+                Some(bin) => bin,
+                // Unreachable while `use_tmux == tmux_path.is_some()`, but return
+                // a clean error rather than panicking if that invariant ever drifts.
+                None => return Err("tmux was selected but its binary path is unavailable".to_string()),
+            };
             if tmux_session_exists(&tmux_bin, &resolved_name) {
                 // Reuse the existing session — drop into attach-session mode.
                 tmux_session_name = Some(resolved_name.clone());

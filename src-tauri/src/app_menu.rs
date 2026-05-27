@@ -3,15 +3,13 @@ use tauri::{AppHandle, Emitter, Wry};
 
 /// Build the native application menu bar.
 ///
-/// LiteDuck menu includes app-level items (e.g. GitHub page); Navigate mirrors
-/// the sidebar where applicable:
+/// Navigate mirrors the sidebar where applicable:
 ///   LiteDuck  |  File  |  Navigate  |  View  |  Window  |  Help
 pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri::Error> {
     // ── LiteDuck (app) menu ──────────────────────────────────────────────────
     let about = MenuItemBuilder::with_id("about", "About LiteDuck").build(app)?;
     let check_update =
         MenuItemBuilder::with_id("check_update", "Check for Updates...").build(app)?;
-    let github_page = MenuItemBuilder::with_id("nav_github", "GitHub...").build(app)?;
     let settings = MenuItemBuilder::with_id("nav_settings", "Settings...")
         .accelerator("CmdOrCtrl+,")
         .build(app)?;
@@ -22,8 +20,6 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
     let app_menu = SubmenuBuilder::new(app, "LiteDuck")
         .item(&about)
         .item(&check_update)
-        .separator()
-        .item(&github_page)
         .separator()
         .item(&settings)
         .separator()
@@ -66,54 +62,30 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
     let nav_terminal = MenuItemBuilder::with_id("nav_terminal", "Terminal")
         .accelerator("CmdOrCtrl+Shift+T")
         .build(app)?;
-    let nav_browser = MenuItemBuilder::with_id("nav_browser", "Browser")
-        .accelerator("CmdOrCtrl+Shift+B")
-        .build(app)?;
 
     // Source Control
     let nav_git = MenuItemBuilder::with_id("nav_git", "Git")
         .accelerator("CmdOrCtrl+Shift+G")
         .build(app)?;
-    // Collaboration
-    let nav_agents = MenuItemBuilder::with_id("nav_agents", "Agents").build(app)?;
-    let nav_chat = MenuItemBuilder::with_id("nav_chat", "Team Chat").build(app)?;
-    let nav_scrum = MenuItemBuilder::with_id("nav_scrum", "Board").build(app)?;
-
-    // Operations
-    let nav_automations = MenuItemBuilder::with_id("nav_automations", "Automations").build(app)?;
-    let nav_docker = MenuItemBuilder::with_id("nav_docker", "Docker").build(app)?;
 
     // Utility
-    let nav_get_started = MenuItemBuilder::with_id("nav_get_started", "Get Started").build(app)?;
+    let nav_notifications =
+        MenuItemBuilder::with_id("nav_notifications", "Notifications").build(app)?;
 
     let dev_submenu = SubmenuBuilder::new(app, "Development")
         .item(&nav_terminal)
         .item(&nav_files)
-        .item(&nav_browser)
         .build()?;
 
     let source_submenu = SubmenuBuilder::new(app, "Source Control")
         .item(&nav_git)
         .build()?;
 
-    let collab_submenu = SubmenuBuilder::new(app, "Collaboration")
-        .item(&nav_agents)
-        .item(&nav_chat)
-        .item(&nav_scrum)
-        .build()?;
-
-    let ops_submenu = SubmenuBuilder::new(app, "Operations")
-        .item(&nav_automations)
-        .item(&nav_docker)
-        .build()?;
-
     let navigate_menu = SubmenuBuilder::new(app, "Navigate")
         .item(&dev_submenu)
         .item(&source_submenu)
-        .item(&collab_submenu)
-        .item(&ops_submenu)
         .separator()
-        .item(&nav_get_started)
+        .item(&nav_notifications)
         .item(&settings)
         .build()?;
 
@@ -223,15 +195,8 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, event_id: &str) {
             let route = match id {
                 "nav_files" => "/files",
                 "nav_terminal" => "/terminal",
-                "nav_browser" => "/browser",
                 "nav_git" => "/git",
-                "nav_github" => "/github",
-                "nav_agents" => "/agents",
-                "nav_chat" => "/chat",
-                "nav_scrum" => "/scrum",
-                "nav_automations" => "/automations",
-                "nav_docker" => "/docker",
-                "nav_get_started" => "/get-started",
+                "nav_notifications" => "/notifications",
                 "nav_settings" => "/settings",
                 _ => return,
             };

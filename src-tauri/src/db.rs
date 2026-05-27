@@ -61,9 +61,16 @@ static DB_CONN: OnceLock<Mutex<Connection>> = OnceLock::new();
 /// Returns `Err(String)` if the initial `open()` fails or if the mutex is
 /// poisoned (which only happens after a panic while holding the lock).
 pub fn get_conn() -> std::result::Result<MutexGuard<'static, Connection>, String> {
-    let mutex = DB_CONN.get_or_init(|| {
-        let conn = open().expect("Failed to open shared database connection");
-        Mutex::new(conn)
-    });
+    // Fast path: the connection has already been opened.
+    if let Some(mutex) = DB_CONN.get() {
+        return mutex.lock().map_err(|e| format!("DB lock error: {e}"));
+    }
+
+    // Slow path: open the database, propagating any IO/SQLite error as
+    // `Err(String)` instead of panicking inside the `OnceLock` initialiser.
+    // Under a rare first-call race two callers may each open a connection;
+    // `get_or_init` keeps the first and drops (closes) the extra one.
+    let conn = open().map_err(|e| format!("Failed to open shared database connection: {e}"))?;
+    let mutex = DB_CONN.get_or_init(|| Mutex::new(conn));
     mutex.lock().map_err(|e| format!("DB lock error: {e}"))
 }

@@ -1,13 +1,22 @@
-# LiteDuck
+<p align="center">
+  <img src="public/liteduck.svg" alt="LiteDuck mascot" width="128" height="128" />
+</p>
 
-**A lightweight code editor** — fast, focused, and out of your way.
+<h1 align="center">LiteDuck</h1>
 
-LiteDuck is a lightweight code editor built with Tauri v2. It brings a file browser + editor, an integrated terminal, and Git into a single fast native desktop app for macOS (Windows & Linux planned) — no AI, no clutter.
+<p align="center"><strong>A lightweight code editor</strong> — fast, focused, and out of your way.</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Mac App Store](https://img.shields.io/badge/Mac_App_Store-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/liteduck/id6744428938)
-[![Homebrew](https://img.shields.io/badge/Homebrew-FBB040?logo=homebrew&logoColor=black)](https://github.com/bemindlabs/homebrew-liteduck)
-[![Website](https://img.shields.io/badge/Website-buildonclaw.cloud-818cf8)](https://buildonclaw.cloud/products/liteduck)
+<p align="center">
+  A file browser + editor, an integrated terminal, and Git in a single fast native desktop app
+  for macOS (Windows &amp; Linux planned) — no AI, no clutter.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  <a href="https://apps.apple.com/app/liteduck/id6744428938"><img src="https://img.shields.io/badge/Mac_App_Store-0D96F6?logo=apple&logoColor=white" alt="Mac App Store" /></a>
+  <a href="https://github.com/bemindlabs/homebrew-liteduck"><img src="https://img.shields.io/badge/Homebrew-FBB040?logo=homebrew&logoColor=black" alt="Homebrew" /></a>
+  <a href="https://buildonclaw.cloud/products/liteduck"><img src="https://img.shields.io/badge/Website-buildonclaw.cloud-818cf8" alt="Website" /></a>
+</p>
 
 ## Install
 
