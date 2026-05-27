@@ -74,13 +74,20 @@ export function TerminalPane({
       // Canvas renderer remains active as fallback.
     }
 
-    requestAnimationFrame(() => {
+    // Initial fit. Deferred across two animation frames so the flex layout has
+    // settled before measuring, and re-run once the monospace web font finishes
+    // loading — the font swap changes cell metrics, which would otherwise leave
+    // the terminal sized to the fallback font and under-filling its container
+    // (nothing re-fits afterward because the container's pixel size is stable).
+    const initialFit = () => {
       try {
         fitAddon.fit();
       } catch {
-        /* not yet visible */
+        /* container not measurable yet */
       }
-    });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(initialFit));
+    void document.fonts.ready.then(initialFit);
 
     // Custom key handler: decides which keys xterm.js processes vs browser.
     // Return true -> xterm handles (sends to PTY).
