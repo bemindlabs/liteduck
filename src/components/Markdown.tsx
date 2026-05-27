@@ -3,23 +3,35 @@ import remarkGfm from "remark-gfm";
 import { useState, useEffect, useRef, useId } from "react";
 import { Copy, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import mermaid from "mermaid";
+import type { Mermaid } from "mermaid";
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "dark",
-  securityLevel: "strict",
-  themeVariables: {
-    primaryColor: "#3b82f6",
-    primaryTextColor: "#e5e7eb",
-    primaryBorderColor: "#4b5563",
-    lineColor: "#6b7280",
-    secondaryColor: "#1f2937",
-    tertiaryColor: "#111827",
-    fontFamily: "ui-monospace, monospace",
-    fontSize: "12px",
-  },
-});
+// Mermaid (and its transitive cytoscape/katex deps, ~1MB) is loaded lazily —
+// only when a `mermaid` code block is actually rendered — so it lands in a
+// separate async chunk instead of the initial bundle. The dynamic import is
+// cached and `initialize` runs exactly once.
+let mermaidPromise: Promise<Mermaid> | null = null;
+
+function loadMermaid(): Promise<Mermaid> {
+  mermaidPromise ??= import("mermaid").then(({ default: mermaid }) => {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "dark",
+      securityLevel: "strict",
+      themeVariables: {
+        primaryColor: "#3b82f6",
+        primaryTextColor: "#e5e7eb",
+        primaryBorderColor: "#4b5563",
+        lineColor: "#6b7280",
+        secondaryColor: "#1f2937",
+        tertiaryColor: "#111827",
+        fontFamily: "ui-monospace, monospace",
+        fontSize: "12px",
+      },
+    });
+    return mermaid;
+  });
+  return mermaidPromise;
+}
 
 // ── CopyButton for code blocks ───────────────────────────────────────────────
 
@@ -55,14 +67,16 @@ function MermaidDiagram({ chart }: { chart: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    void mermaid.render(`mermaid-${id}`, chart.trim()).then(
-      ({ svg: result }) => {
-        if (!cancelled) setSvg(result);
-      },
-      (err: unknown) => {
-        if (!cancelled) setError(String(err));
-      },
-    );
+    void loadMermaid()
+      .then((mermaid) => mermaid.render(`mermaid-${id}`, chart.trim()))
+      .then(
+        ({ svg: result }) => {
+          if (!cancelled) setSvg(result);
+        },
+        (err: unknown) => {
+          if (!cancelled) setError(String(err));
+        },
+      );
     return () => {
       cancelled = true;
     };

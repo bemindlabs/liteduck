@@ -83,13 +83,15 @@ Tauri managed state: `PtyManager`, `EventSink`, `SecretStore` (keyring), `Biomet
 
 ### Storage
 
+LiteDuck stores everything **globally**, in a single user-level home directory.
+There is no per-workspace data directory — nothing is written into the project folder.
+
 ```
-User:      ~/.LoopDuck/ → config.json, profile.md, templates/, memory/   (home dir name kept from upstream)
-Workspace: <ws>/.LoopDuck/ → config.json, templates/
+~/.liteduck/ → config.json, profile.md, workspaces.json, templates/, memory/, logs/
 ```
 
-> Note: the on-disk home/workspace data directory is still named `.LoopDuck` (the upstream
-> convention) to avoid a churny data-path migration. Everything user-visible is "LiteDuck".
+> Overridable with `$LITEDUCK_HOME`. On first launch, a legacy `~/.LiteDuck` directory
+> (the previous PascalCase name) is migrated to `~/.liteduck` automatically.
 
 ## Version Bumping
 
