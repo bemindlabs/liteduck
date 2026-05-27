@@ -21,7 +21,6 @@ import { filesReadText, filesWriteText } from "@/lib/files";
 import { createLogger } from "@/lib/logger";
 import { markWizardCompletedForWorkspace } from "@/lib/wizard";
 import { WorkspaceStep } from "@/components/wizard/WorkspaceStep";
-import { DevModeStep } from "@/components/wizard/DevModeStep";
 import { InitialProjectStep } from "@/components/wizard/InitialProjectStep";
 
 const logger = createLogger("Wizard");
@@ -110,11 +109,6 @@ function SummaryStep({ onNext, skippedSteps, setWorkspace }: SummaryStepProps) {
   const [addGitignore, setAddGitignore] = useState(true);
 
   const services = [
-    {
-      id: "dev-mode",
-      label: "Development Mode",
-      icon: CheckCircle2,
-    },
     {
       id: "workspace",
       label: "Workspace Directory",
@@ -273,12 +267,6 @@ const STEPS: WizardStep[] = [
     title: "Welcome",
     description: "Introduction to LiteDuck",
     component: WelcomeStep,
-  },
-  {
-    id: "dev-mode",
-    title: "Dev Mode",
-    description: "Choose Solo or Team mode",
-    component: DevModeStep,
   },
   {
     id: "workspace",

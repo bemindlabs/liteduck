@@ -9,8 +9,6 @@ import {
   ArrowRightLeft,
   Sun,
   Moon,
-  Code,
-  Users,
   Loader2,
   Menu,
 } from "lucide-react";
@@ -20,8 +18,6 @@ import { Button } from "@/components/ui/button";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { CreateWorkspaceDialog } from "@/components/CreateWorkspaceDialog";
 import { useWorkspace, MAX_RECENT_WORKSPACES } from "@/contexts/WorkspaceContext";
-import { useAppMode } from "@/contexts/AppModeContext";
-import type { AppMode } from "@/contexts/AppModeContext";
 import { workspaceInit } from "@/lib/workspace";
 import { truncatePath } from "@/lib/truncate-path";
 import { hasNativeCapabilities } from "@/lib/platform";
@@ -253,50 +249,6 @@ export function WorkspaceSwitcher() {
   );
 }
 
-// ── ModeSwitcher ──────────────────────────────────────────────────────────────
-
-const MODE_OPTIONS: {
-  value: AppMode;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-}[] = [
-  { value: "solo", icon: Code, label: "SOLO" },
-  { value: "team", icon: Users, label: "TEAM" },
-];
-
-export function ModeSwitcher() {
-  const { mode, setMode } = useAppMode();
-
-  return (
-    <div
-      className={cn(
-        "flex items-center rounded-md border border-[var(--color-border)]",
-        "bg-[var(--color-muted)] p-0.5",
-      )}
-      role="radiogroup"
-      aria-label="App mode"
-    >
-      {MODE_OPTIONS.map(({ value, icon: Icon, label }) => (
-        <button
-          key={value}
-          role="radio"
-          aria-checked={mode === value}
-          onClick={() => setMode(value)}
-          className={cn(
-            "flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium transition-all",
-            mode === value
-              ? "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-sm"
-              : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]",
-          )}
-        >
-          <Icon className="h-3 w-3" />
-          <span>{label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ── Header ────────────────────────────────────────────────────────────────────
 
 export interface HeaderProps {
@@ -332,10 +284,6 @@ export function Header({
           </Button>
         )}
         <WorkspaceSwitcher />
-        {/* Mode switcher — hidden on very small screens, always in command palette */}
-        <div className="hidden sm:block">
-          <ModeSwitcher />
-        </div>
       </div>
 
       {/* Center — reserved */}

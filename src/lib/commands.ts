@@ -135,20 +135,6 @@ export const COMMANDS: Command[] = [
     icon: "Sun",
     keywords: ["theme", "light", "dark", "appearance"],
   },
-  {
-    id: "action-mode-solo",
-    title: "Switch to Solo Mode",
-    category: "Actions",
-    icon: "Terminal",
-    keywords: ["mode", "developer", "coding"],
-  },
-  {
-    id: "action-mode-team",
-    title: "Switch to Team Mode",
-    category: "Actions",
-    icon: "KanbanSquare",
-    keywords: ["mode", "project", "management", "collaboration"],
-  },
 ];
 
 // ── Route map ─────────────────────────────────────────────────────────────────

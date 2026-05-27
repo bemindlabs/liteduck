@@ -55,8 +55,7 @@ All commands return `Result<T, String>`.
   `/git`, `/notifications`, `/settings`, plus full-screen `/wizard` and `/landing`.
 - **Layout:** `src/App.tsx` owns the sidebar + header + command palette. The **Terminal page is
   always mounted** (CSS visibility toggle) to preserve PTY sessions.
-- **State:** React Context — `WorkspaceContext` (current/recent workspaces), `AppModeContext`
-  (solo/team toggle), `BiometricContext`.
+- **State:** React Context — `WorkspaceContext` (current/recent workspaces), `BiometricContext`.
 - **Command palette:** Cmd+K. Registry in `src/lib/commands.ts`.
 - **Keyboard shortcuts:** `useKeyboardShortcuts` hook (Cmd+1 Terminal, Cmd+3 Git, Cmd+, Settings,
   Cmd+K palette, Cmd+T/W terminal tabs, Cmd+Shift+F focus mode).

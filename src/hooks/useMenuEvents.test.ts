@@ -35,7 +35,6 @@ function makeHandlers(overrides: Partial<Parameters<typeof useMenuEvents>[0]> = 
     onNewTerminalTab: vi.fn(),
     onCloseTerminalTab: vi.fn(),
     onOpenShortcutsHelp: vi.fn(),
-    onSetMode: vi.fn(),
     ...overrides,
   };
 }
@@ -149,21 +148,6 @@ describe("useMenuEvents — menu-action", () => {
   it("shortcuts_help calls onOpenShortcutsHelp", () => {
     act(() => fireAction("shortcuts_help"));
     expect(handlers.onOpenShortcutsHelp).toHaveBeenCalledTimes(1);
-  });
-
-  it("set_mode_dev calls onSetMode('solo')", () => {
-    act(() => fireAction("set_mode_dev"));
-    expect(handlers.onSetMode).toHaveBeenCalledWith("solo");
-  });
-
-  it("set_mode_pm calls onSetMode('team')", () => {
-    act(() => fireAction("set_mode_pm"));
-    expect(handlers.onSetMode).toHaveBeenCalledWith("team");
-  });
-
-  it("set_mode_docs calls onSetMode('solo')", () => {
-    act(() => fireAction("set_mode_docs"));
-    expect(handlers.onSetMode).toHaveBeenCalledWith("solo");
   });
 
   it("about action navigates to /settings", () => {

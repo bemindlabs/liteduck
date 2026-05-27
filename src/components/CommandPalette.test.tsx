@@ -44,7 +44,6 @@ function makeProps(overrides: Partial<React.ComponentProps<typeof CommandPalette
     onNavigate: vi.fn(),
     onToggleDark: vi.fn(),
     onToggleSidebar: vi.fn(),
-    onSetMode: vi.fn(),
     onToggleFocusMode: vi.fn(),
     ...overrides,
   };
@@ -184,16 +183,6 @@ describe("CommandPalette", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(props.onToggleSidebar).toHaveBeenCalledOnce();
-  });
-
-  it("calls onSetMode with 'solo' when Switch to Solo Mode is executed", async () => {
-    const { props } = renderPalette();
-    const input = screen.getByPlaceholderText(/search commands/i);
-
-    await userEvent.type(input, "switch to solo");
-    fireEvent.keyDown(input, { key: "Enter" });
-
-    expect(props.onSetMode).toHaveBeenCalledWith("solo");
   });
 
   it("navigates with ArrowDown and ArrowUp keys", () => {

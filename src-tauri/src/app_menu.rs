@@ -100,15 +100,6 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
     let toggle_focus = MenuItemBuilder::with_id("toggle_focus", "Toggle Focus Mode")
         .accelerator("CmdOrCtrl+Shift+Z")
         .build(app)?;
-    let mode_dev = MenuItemBuilder::with_id("mode_dev", "DEV Mode").build(app)?;
-    let mode_docs = MenuItemBuilder::with_id("mode_docs", "DOCS Mode").build(app)?;
-    let mode_pm = MenuItemBuilder::with_id("mode_pm", "PM Mode").build(app)?;
-
-    let mode_submenu = SubmenuBuilder::new(app, "App Mode")
-        .item(&mode_dev)
-        .item(&mode_docs)
-        .item(&mode_pm)
-        .build()?;
 
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(&toggle_sidebar)
@@ -116,8 +107,6 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
         .separator()
         .item(&toggle_dark)
         .item(&toggle_focus)
-        .separator()
-        .item(&mode_submenu)
         .build()?;
 
     // ── Window menu ──────────────────────────────────────────────────────────
@@ -215,10 +204,6 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, event_id: &str) {
         }
         "toggle_focus" => {
             let _ = app.emit("menu-action", "toggle_focus");
-        }
-        "mode_dev" | "mode_docs" | "mode_pm" => {
-            let mode = event_id.strip_prefix("mode_").unwrap_or("dev");
-            let _ = app.emit("menu-action", format!("set_mode_{mode}"));
         }
 
         // ── Window menu ──────────────────────────────────────────────────────

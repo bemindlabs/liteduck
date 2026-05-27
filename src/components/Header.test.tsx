@@ -30,7 +30,6 @@ vi.mock("@/lib/settings", () => ({
 
 import { Header } from "./Header";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
-import { AppModeProvider } from "@/contexts/AppModeContext";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,9 +51,7 @@ function renderHeader(overrides?: Partial<React.ComponentProps<typeof Header>>) 
   const result = render(
     <MemoryRouter>
       <WorkspaceProvider>
-        <AppModeProvider>
-          <Header {...props} />
-        </AppModeProvider>
+        <Header {...props} />
       </WorkspaceProvider>
     </MemoryRouter>,
   );
@@ -121,17 +118,6 @@ describe("Header", () => {
     const { props } = renderHeader({ sidebarHidden: true });
     fireEvent.click(screen.getByRole("button", { name: /open sidebar/i }));
     expect(props.onToggleSidebar).toHaveBeenCalledOnce();
-  });
-
-  it("renders the mode switcher radio group", () => {
-    renderHeader();
-    expect(screen.getByRole("radiogroup", { name: /app mode/i })).toBeInTheDocument();
-  });
-
-  it("renders SOLO and TEAM mode options", () => {
-    renderHeader();
-    expect(screen.getByRole("radio", { name: /solo/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /team/i })).toBeInTheDocument();
   });
 
   it("renders the notification center bell button", () => {

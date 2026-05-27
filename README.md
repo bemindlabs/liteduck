@@ -130,7 +130,7 @@ src/                          # Frontend (React + TypeScript)
   components/                 # Reusable UI components (incl. ui/ shadcn primitives)
   hooks/                      # Custom React hooks (useConfig, useKeyboardShortcuts, …)
   lib/                        # Tauri IPC wrappers and utilities (one file per domain)
-  contexts/                   # React contexts (Workspace, AppMode, Biometric)
+  contexts/                   # React contexts (Workspace, Biometric)
 src-tauri/                    # Backend (Rust, Tauri v2)
   src/
     lib.rs                    #   Tauri builder + command registration

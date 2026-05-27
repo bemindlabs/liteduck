@@ -11,7 +11,6 @@ interface MenuEventHandlers {
   onNewTerminalTab: () => void;
   onCloseTerminalTab: () => void;
   onOpenShortcutsHelp: () => void;
-  onSetMode: (mode: string) => void;
   onCheckUpdate?: () => void;
 }
 
@@ -28,7 +27,6 @@ export function useMenuEvents({
   onNewTerminalTab,
   onCloseTerminalTab,
   onOpenShortcutsHelp,
-  onSetMode,
   onCheckUpdate,
 }: MenuEventHandlers) {
   // Navigation events — menu items that navigate to a route
@@ -89,15 +87,6 @@ export function useMenuEvents({
         case "toggle_focus":
           onToggleFocusMode?.();
           break;
-        case "set_mode_dev":
-          onSetMode("solo");
-          break;
-        case "set_mode_docs":
-          onSetMode("solo");
-          break;
-        case "set_mode_pm":
-          onSetMode("team");
-          break;
 
         // Window menu
         case "minimize":
@@ -141,7 +130,6 @@ export function useMenuEvents({
     onNewTerminalTab,
     onCloseTerminalTab,
     onOpenShortcutsHelp,
-    onSetMode,
     onCheckUpdate,
   ]);
 }

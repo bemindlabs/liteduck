@@ -62,7 +62,6 @@ export interface CommandPaletteProps {
   onNavigate: (path: string) => void;
   onToggleDark: () => void;
   onToggleSidebar?: () => void;
-  onSetMode?: (mode: "solo" | "team") => void;
   onToggleFocusMode?: () => void;
 }
 
@@ -123,7 +122,6 @@ export function CommandPalette({
   onNavigate,
   onToggleDark,
   onToggleSidebar,
-  onSetMode,
   onToggleFocusMode,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
@@ -195,17 +193,11 @@ export function CommandPalette({
         return;
       }
 
-      if (cmd.id.startsWith("action-mode-")) {
-        const mode = cmd.id.replace("action-mode-", "") as "solo" | "team";
-        onSetMode?.(mode);
-        return;
-      }
-
       // Agent launches and remaining actions delegate to the injected action
       // callback if one was bound, otherwise they are silent no-ops until wired.
       cmd.action?.();
     },
-    [onClose, onNavigate, onToggleDark, onToggleSidebar, onSetMode, onToggleFocusMode],
+    [onClose, onNavigate, onToggleDark, onToggleSidebar, onToggleFocusMode],
   );
 
   const handleKeyDown = useCallback(

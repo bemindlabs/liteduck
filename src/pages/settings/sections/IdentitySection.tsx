@@ -134,8 +134,8 @@ export function IdentitySection() {
               </Button>
             </div>
             <p className="text-xs text-[var(--color-muted-foreground)]">
-              Your name in P2P team chat. Leave blank to use device ID prefix. Changes are broadcast
-              to connected peers immediately.
+              A display name for this device. Leave blank to use device ID prefix. Changes are
+              broadcast to connected peers immediately.
             </p>
           </div>
 

@@ -42,7 +42,6 @@ import { getSetting, saveSetting } from "@/lib/settings";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/WorkspaceContext";
 import { BiometricProvider } from "@/contexts/BiometricContext";
 import { BiometricLockScreen } from "@/components/BiometricLockScreen";
-import { AppModeProvider, useAppMode } from "@/contexts/AppModeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { UpdateChecker } from "@/components/UpdateChecker";
@@ -59,7 +58,6 @@ import { useWindowSize, BREAKPOINTS } from "@/hooks/useWindowSize";
 function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setMode } = useAppMode();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -215,7 +213,6 @@ function Layout() {
     onNewTerminalTab: handleNewTerminalTab,
     onCloseTerminalTab: handleCloseTerminalTab,
     onOpenShortcutsHelp: handleOpenShortcutsHelp,
-    onSetMode: setMode as (mode: string) => void,
     onCheckUpdate: handleCheckUpdate,
   });
 
@@ -387,7 +384,6 @@ function Layout() {
         onToggleSidebar={() =>
           isMobileLayout ? setMobileSidebarOpen((v) => !v) : setSidebarCollapsed((v) => !v)
         }
-        onSetMode={setMode}
         onToggleFocusMode={handleToggleFocusMode}
       />
 
@@ -462,73 +458,71 @@ export default function App() {
       <BiometricProvider>
         <BiometricLockScreen />
         <WorkspaceProvider>
-          <AppModeProvider>
-            <BrowserRouter>
-              <Routes>
-                {/* Full-screen pages — no sidebar/header */}
+          <BrowserRouter>
+            <Routes>
+              {/* Full-screen pages — no sidebar/header */}
+              <Route
+                path={ROUTES.WIZARD}
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <WizardPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path={ROUTES.LANDING}
+                element={
+                  <Suspense fallback={<PageLoading />}>
+                    <LandingPage />
+                  </Suspense>
+                }
+              />
+
+              <Route
+                path={ROUTES.HOME}
+                element={
+                  <WorkspaceGate>
+                    <Layout />
+                  </WorkspaceGate>
+                }
+              >
+                {/* Default route: terminal on native platforms, settings on iOS/Android */}
                 <Route
-                  path={ROUTES.WIZARD}
+                  index
                   element={
-                    <Suspense fallback={<PageLoading />}>
-                      <WizardPage />
-                    </Suspense>
+                    <Navigate
+                      to={hasNativeCapabilities() ? ROUTES.TERMINAL : ROUTES.SETTINGS}
+                      replace
+                    />
                   }
                 />
+
+                {/* Native-only routes — only registered on platforms with OS capabilities */}
+                {hasNativeCapabilities() && (
+                  <>
+                    <Route path="terminal" element={null} />
+                    <Route path="files" element={<FilesPage />} />
+                    <Route path="git" element={<GitPage />} />
+                  </>
+                )}
+
+                {/* Routes available on all platforms */}
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+
+                {/* Catch-all: fall back to the appropriate default */}
                 <Route
-                  path={ROUTES.LANDING}
+                  path="*"
                   element={
-                    <Suspense fallback={<PageLoading />}>
-                      <LandingPage />
-                    </Suspense>
+                    <Navigate
+                      to={hasNativeCapabilities() ? ROUTES.TERMINAL : ROUTES.SETTINGS}
+                      replace
+                    />
                   }
                 />
-
-                <Route
-                  path={ROUTES.HOME}
-                  element={
-                    <WorkspaceGate>
-                      <Layout />
-                    </WorkspaceGate>
-                  }
-                >
-                  {/* Default route: terminal on native platforms, settings on iOS/Android */}
-                  <Route
-                    index
-                    element={
-                      <Navigate
-                        to={hasNativeCapabilities() ? ROUTES.TERMINAL : ROUTES.SETTINGS}
-                        replace
-                      />
-                    }
-                  />
-
-                  {/* Native-only routes — only registered on platforms with OS capabilities */}
-                  {hasNativeCapabilities() && (
-                    <>
-                      <Route path="terminal" element={null} />
-                      <Route path="files" element={<FilesPage />} />
-                      <Route path="git" element={<GitPage />} />
-                    </>
-                  )}
-
-                  {/* Routes available on all platforms */}
-                  <Route path="notifications" element={<NotificationsPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-
-                  {/* Catch-all: fall back to the appropriate default */}
-                  <Route
-                    path="*"
-                    element={
-                      <Navigate
-                        to={hasNativeCapabilities() ? ROUTES.TERMINAL : ROUTES.SETTINGS}
-                        replace
-                      />
-                    }
-                  />
-                </Route>
-              </Routes>
-            </BrowserRouter>
-          </AppModeProvider>
+              </Route>
+            </Routes>
+          </BrowserRouter>
         </WorkspaceProvider>
       </BiometricProvider>
     </ErrorBoundary>

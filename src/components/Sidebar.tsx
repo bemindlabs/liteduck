@@ -2,8 +2,8 @@
  * Application sidebar navigation.
  *
  * Extracted from App.tsx to reduce the main layout file's complexity.
- * Groups are filtered by the current AppMode (SOLO/TEAM) and native
- * capability detection (hides desktop-only routes on mobile platforms).
+ * Groups are filtered by native capability detection (hides desktop-only
+ * routes on mobile platforms).
  */
 
 import { NavLink } from "react-router-dom";
@@ -19,24 +19,20 @@ import {
 import { cn } from "@/lib/utils";
 import { ROUTES, NATIVE_ONLY_ROUTES } from "@/lib/routes";
 import { hasNativeCapabilities } from "@/lib/platform";
-import { useAppMode, type AppMode } from "@/contexts/AppModeContext";
 import { LiteDuckLogo } from "@/components/LiteDuckLogo";
 
 // ── Nav items config ──────────────────────────────────────────────────────────
 
 const NAV_GROUPS: {
   title: string;
-  modes: AppMode[];
   items: { to: string; icon: React.ComponentType<{ className?: string }>; label: string }[];
 }[] = [
   {
     title: "Dev Mode",
-    modes: ["solo", "team"],
     items: [{ to: ROUTES.TERMINAL, icon: Terminal, label: "Terminal" }],
   },
   {
     title: "Source Control",
-    modes: ["solo", "team"],
     items: [
       { to: ROUTES.GIT, icon: GitBranch, label: "Git" },
       { to: ROUTES.FILES, icon: FolderTree, label: "Files" },
@@ -57,15 +53,12 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
-  const { mode } = useAppMode();
   const nativeCapable = hasNativeCapabilities();
 
-  const filteredGroups = NAV_GROUPS.filter((g) => g.modes.includes(mode))
-    .map((g) => ({
-      ...g,
-      items: nativeCapable ? g.items : g.items.filter((item) => !NATIVE_ONLY_ROUTES.has(item.to)),
-    }))
-    .filter((g) => g.items.length > 0);
+  const filteredGroups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: nativeCapable ? g.items : g.items.filter((item) => !NATIVE_ONLY_ROUTES.has(item.to)),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <aside
