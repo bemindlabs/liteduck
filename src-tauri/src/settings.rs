@@ -438,12 +438,6 @@ fn config_key_to_value(key: &str, cfg: &home::Config) -> Option<String> {
         "font_size" => Some(cfg.appearance.font_size.to_string()),
         "sidebar_position" => Some(cfg.appearance.sidebar_position.clone()),
         "sidebar_collapsed" => Some(cfg.appearance.sidebar_collapsed.to_string()),
-        // ── AI / gateway ──────────────────────────────────────────────────────
-        "openclaw_gateway_url" | "gateway_url" => Some(cfg.ai.gateway_url.clone()),
-        "default_model" | "ai_model" => Some(cfg.ai.default_model.clone()),
-        "ai_streaming" | "streaming" => Some(cfg.ai.streaming.to_string()),
-        "ai_temperature" | "temperature" => Some(cfg.ai.temperature.to_string()),
-        "ai_max_tokens" | "max_tokens" => Some(cfg.ai.max_tokens.to_string()),
         // ── Terminal ──────────────────────────────────────────────────────────
         "terminal_shell" | "shell" => Some(cfg.terminal.shell.clone()),
         "terminal_scrollback" | "scrollback" => Some(cfg.terminal.scrollback.to_string()),
@@ -453,14 +447,6 @@ fn config_key_to_value(key: &str, cfg: &home::Config) -> Option<String> {
         "git_fetch_interval" | "fetch_interval_secs" => {
             Some(cfg.git.fetch_interval_secs.to_string())
         }
-        // ── Agents ────────────────────────────────────────────────────────────
-        "agents_max_concurrent" | "max_concurrent" => Some(cfg.agents.max_concurrent.to_string()),
-        "agents_a2a_discovery" | "a2a_discovery" => Some(cfg.agents.a2a_discovery.to_string()),
-        "agents_a2a_port" | "a2a_port" => Some(cfg.agents.a2a_port.to_string()),
-        // ── Network ───────────────────────────────────────────────────────────
-        "lan_chat_enabled" => Some(cfg.network.lan_chat_enabled.to_string()),
-        "ble_enabled" => Some(cfg.network.ble_enabled.to_string()),
-        "mesh_enabled" => Some(cfg.network.mesh_enabled.to_string()),
         // ── Telemetry ─────────────────────────────────────────────────────────
         "telemetry_enabled" => Some(cfg.telemetry.enabled.to_string()),
         // Unknown / not-yet-migrated key — caller should try SQLite.

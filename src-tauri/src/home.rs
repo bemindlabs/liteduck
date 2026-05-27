@@ -61,49 +61,6 @@ impl Default for AppearanceConfig {
     }
 }
 
-/// AI model and gateway settings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiConfig {
-    #[serde(default = "default_ai_model")]
-    pub default_model: String,
-    #[serde(default = "default_gateway_url")]
-    pub gateway_url: String,
-    #[serde(default = "default_streaming")]
-    pub streaming: bool,
-    #[serde(default = "default_temperature")]
-    pub temperature: f64,
-    #[serde(default = "default_max_tokens")]
-    pub max_tokens: u32,
-}
-
-fn default_ai_model() -> String {
-    "claude-sonnet-4-6".to_string()
-}
-fn default_gateway_url() -> String {
-    "http://127.0.0.1:18789".to_string()
-}
-fn default_streaming() -> bool {
-    true
-}
-fn default_temperature() -> f64 {
-    0.7
-}
-fn default_max_tokens() -> u32 {
-    4096
-}
-
-impl Default for AiConfig {
-    fn default() -> Self {
-        Self {
-            default_model: default_ai_model(),
-            gateway_url: default_gateway_url(),
-            streaming: default_streaming(),
-            temperature: default_temperature(),
-            max_tokens: default_max_tokens(),
-        }
-    }
-}
-
 /// Terminal emulator settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalConfig {
@@ -165,71 +122,6 @@ impl Default for GitConfig {
     }
 }
 
-/// Agent runtime settings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentsConfig {
-    #[serde(default = "default_max_concurrent")]
-    pub max_concurrent: u32,
-    #[serde(default = "default_ai_model")]
-    pub default_model: String,
-    #[serde(default = "default_auto_collect_memory")]
-    pub auto_collect_memory: bool,
-    #[serde(default = "default_a2a_discovery")]
-    pub a2a_discovery: bool,
-    #[serde(default = "default_a2a_port")]
-    pub a2a_port: u16,
-}
-
-fn default_max_concurrent() -> u32 {
-    3
-}
-fn default_auto_collect_memory() -> bool {
-    true
-}
-fn default_a2a_discovery() -> bool {
-    true
-}
-fn default_a2a_port() -> u16 {
-    41000
-}
-
-impl Default for AgentsConfig {
-    fn default() -> Self {
-        Self {
-            max_concurrent: default_max_concurrent(),
-            default_model: default_ai_model(),
-            auto_collect_memory: default_auto_collect_memory(),
-            a2a_discovery: default_a2a_discovery(),
-            a2a_port: default_a2a_port(),
-        }
-    }
-}
-
-/// Network / connectivity settings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NetworkConfig {
-    #[serde(default = "default_lan_chat_enabled")]
-    pub lan_chat_enabled: bool,
-    #[serde(default)]
-    pub ble_enabled: bool,
-    #[serde(default)]
-    pub mesh_enabled: bool,
-}
-
-fn default_lan_chat_enabled() -> bool {
-    true
-}
-
-impl Default for NetworkConfig {
-    fn default() -> Self {
-        Self {
-            lan_chat_enabled: default_lan_chat_enabled(),
-            ble_enabled: false,
-            mesh_enabled: false,
-        }
-    }
-}
-
 /// Telemetry and diagnostics settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelemetryConfig {
@@ -262,15 +154,9 @@ pub struct Config {
     #[serde(default)]
     pub appearance: AppearanceConfig,
     #[serde(default)]
-    pub ai: AiConfig,
-    #[serde(default)]
     pub terminal: TerminalConfig,
     #[serde(default)]
     pub git: GitConfig,
-    #[serde(default)]
-    pub agents: AgentsConfig,
-    #[serde(default)]
-    pub network: NetworkConfig,
     #[serde(default)]
     pub telemetry: TelemetryConfig,
 }
@@ -1332,35 +1218,6 @@ fn apply_setting_key(key: &str, value: &str, config: &mut Config) -> bool {
             config.appearance.sidebar_collapsed = value == "true" || value == "1";
             true
         }
-        // ── AI / gateway ──────────────────────────────────────────────────────
-        "openclaw_gateway_url" | "gateway_url" => {
-            config.ai.gateway_url = value.to_string();
-            true
-        }
-        "default_model" | "ai_model" => {
-            config.ai.default_model = value.to_string();
-            true
-        }
-        "ai_streaming" | "streaming" => {
-            config.ai.streaming = value == "true" || value == "1";
-            true
-        }
-        "ai_temperature" | "temperature" => {
-            if let Ok(f) = value.parse::<f64>() {
-                config.ai.temperature = f;
-                true
-            } else {
-                false
-            }
-        }
-        "ai_max_tokens" | "max_tokens" => {
-            if let Ok(n) = value.parse::<u32>() {
-                config.ai.max_tokens = n;
-                true
-            } else {
-                false
-            }
-        }
         // ── Terminal ──────────────────────────────────────────────────────────
         "terminal_shell" | "shell" => {
             config.terminal.shell = value.to_string();
@@ -1390,40 +1247,6 @@ fn apply_setting_key(key: &str, value: &str, config: &mut Config) -> bool {
             } else {
                 false
             }
-        }
-        // ── Agents ────────────────────────────────────────────────────────────
-        "agents_max_concurrent" | "max_concurrent" => {
-            if let Ok(n) = value.parse::<u32>() {
-                config.agents.max_concurrent = n;
-                true
-            } else {
-                false
-            }
-        }
-        "agents_a2a_discovery" | "a2a_discovery" => {
-            config.agents.a2a_discovery = value == "true" || value == "1";
-            true
-        }
-        "agents_a2a_port" | "a2a_port" => {
-            if let Ok(n) = value.parse::<u16>() {
-                config.agents.a2a_port = n;
-                true
-            } else {
-                false
-            }
-        }
-        // ── Network ───────────────────────────────────────────────────────────
-        "lan_chat_enabled" => {
-            config.network.lan_chat_enabled = value == "true" || value == "1";
-            true
-        }
-        "ble_enabled" => {
-            config.network.ble_enabled = value == "true" || value == "1";
-            true
-        }
-        "mesh_enabled" => {
-            config.network.mesh_enabled = value == "true" || value == "1";
-            true
         }
         // ── Telemetry ─────────────────────────────────────────────────────────
         "telemetry_enabled" => {
@@ -1936,11 +1759,8 @@ mod tests {
         let config = read_config().expect("should succeed without file");
 
         assert_eq!(config.appearance.theme, "system");
-        assert_eq!(config.ai.default_model, "claude-sonnet-4-6");
         assert_eq!(config.terminal.shell, "/bin/zsh");
         assert!(config.git.auto_fetch);
-        assert_eq!(config.agents.max_concurrent, 3);
-        assert!(config.network.lan_chat_enabled);
         assert!(!config.telemetry.enabled);
 
         std::env::remove_var("LITEDUCK_HOME");
@@ -1955,11 +1775,8 @@ mod tests {
 
         let json = r#"{
   "appearance": { "theme": "dark", "font_size": 16, "font_family": "JetBrains Mono", "sidebar_position": "left", "sidebar_collapsed": false },
-  "ai": { "default_model": "claude-opus-4", "gateway_url": "http://127.0.0.1:18789", "streaming": true, "temperature": 0.5, "max_tokens": 8192 },
   "terminal": { "shell": "/bin/bash", "env": {}, "scrollback": 5000 },
   "git": { "auto_fetch": false, "fetch_interval_secs": 600, "sign_commits": true },
-  "agents": { "max_concurrent": 5, "default_model": "claude-sonnet-4-6", "auto_collect_memory": false, "a2a_discovery": true, "a2a_port": 41000 },
-  "network": { "lan_chat_enabled": false, "ble_enabled": true, "mesh_enabled": false },
   "telemetry": { "enabled": true, "anonymous": false }
 }"#;
         fs::write(tmp.path().join("config.json"), json).unwrap();
@@ -1968,18 +1785,11 @@ mod tests {
 
         assert_eq!(config.appearance.theme, "dark");
         assert_eq!(config.appearance.font_size, 16);
-        assert_eq!(config.ai.default_model, "claude-opus-4");
-        assert!((config.ai.temperature - 0.5).abs() < f64::EPSILON);
-        assert_eq!(config.ai.max_tokens, 8192);
         assert_eq!(config.terminal.shell, "/bin/bash");
         assert_eq!(config.terminal.scrollback, 5000);
         assert!(!config.git.auto_fetch);
         assert_eq!(config.git.fetch_interval_secs, 600);
         assert!(config.git.sign_commits);
-        assert_eq!(config.agents.max_concurrent, 5);
-        assert!(!config.agents.auto_collect_memory);
-        assert!(!config.network.lan_chat_enabled);
-        assert!(config.network.ble_enabled);
         assert!(config.telemetry.enabled);
         assert!(!config.telemetry.anonymous);
 
@@ -1994,21 +1804,17 @@ mod tests {
         std::env::set_var("LITEDUCK_HOME", tmp.path().to_str().unwrap());
 
         // Only override a single nested field; everything else should default.
-        let json = r#"{ "ai": { "default_model": "opus" } }"#;
+        let json = r#"{ "terminal": { "shell": "/bin/fish" } }"#;
         fs::write(tmp.path().join("config.json"), json).unwrap();
 
         let config = read_config().expect("should parse partial JSON");
 
-        assert_eq!(config.ai.default_model, "opus");
-        // All other ai fields should be defaulted.
-        assert_eq!(config.ai.gateway_url, "http://127.0.0.1:18789");
-        assert!(config.ai.streaming);
+        assert_eq!(config.terminal.shell, "/bin/fish");
+        // All other terminal fields should be defaulted.
+        assert_eq!(config.terminal.scrollback, 10000);
         // Other top-level sections should also be fully defaulted.
         assert_eq!(config.appearance.theme, "system");
-        assert_eq!(config.terminal.shell, "/bin/zsh");
         assert!(config.git.auto_fetch);
-        assert_eq!(config.agents.max_concurrent, 3);
-        assert!(config.network.lan_chat_enabled);
         assert!(!config.telemetry.enabled);
 
         std::env::remove_var("LITEDUCK_HOME");
@@ -2035,7 +1841,7 @@ mod tests {
         let parsed: serde_json::Value =
             serde_json::from_str(&content).expect("written file must be valid JSON");
         assert!(parsed.get("appearance").is_some());
-        assert!(parsed.get("ai").is_some());
+        assert!(parsed.get("terminal").is_some());
 
         std::env::remove_var("LITEDUCK_HOME");
     }
@@ -2077,11 +1883,6 @@ mod tests {
 
         assert_eq!(restored.appearance.theme, original.appearance.theme);
         assert_eq!(restored.appearance.font_size, original.appearance.font_size);
-        assert_eq!(restored.ai.default_model, original.ai.default_model);
-        assert_eq!(restored.ai.gateway_url, original.ai.gateway_url);
-        assert_eq!(restored.ai.streaming, original.ai.streaming);
-        assert!((restored.ai.temperature - original.ai.temperature).abs() < f64::EPSILON);
-        assert_eq!(restored.ai.max_tokens, original.ai.max_tokens);
         assert_eq!(restored.terminal.shell, original.terminal.shell);
         assert_eq!(restored.terminal.scrollback, original.terminal.scrollback);
         assert_eq!(restored.git.auto_fetch, original.git.auto_fetch);
@@ -2090,23 +1891,6 @@ mod tests {
             original.git.fetch_interval_secs
         );
         assert_eq!(restored.git.sign_commits, original.git.sign_commits);
-        assert_eq!(
-            restored.agents.max_concurrent,
-            original.agents.max_concurrent
-        );
-        assert_eq!(restored.agents.default_model, original.agents.default_model);
-        assert_eq!(
-            restored.agents.auto_collect_memory,
-            original.agents.auto_collect_memory
-        );
-        assert_eq!(restored.agents.a2a_discovery, original.agents.a2a_discovery);
-        assert_eq!(restored.agents.a2a_port, original.agents.a2a_port);
-        assert_eq!(
-            restored.network.lan_chat_enabled,
-            original.network.lan_chat_enabled
-        );
-        assert_eq!(restored.network.ble_enabled, original.network.ble_enabled);
-        assert_eq!(restored.network.mesh_enabled, original.network.mesh_enabled);
         assert_eq!(restored.telemetry.enabled, original.telemetry.enabled);
         assert_eq!(restored.telemetry.anonymous, original.telemetry.anonymous);
 
@@ -2763,11 +2547,8 @@ mod tests {
         let config = resolve_config(None).expect("should succeed with no files");
 
         assert_eq!(config.appearance.theme, "system");
-        assert_eq!(config.ai.default_model, "claude-sonnet-4-6");
         assert_eq!(config.terminal.shell, "/bin/zsh");
         assert!(config.git.auto_fetch);
-        assert_eq!(config.agents.max_concurrent, 3);
-        assert!(config.network.lan_chat_enabled);
         assert!(!config.telemetry.enabled);
 
         std::env::remove_var("LITEDUCK_HOME");
@@ -2781,12 +2562,13 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         std::env::set_var("LITEDUCK_HOME", tmp.path().to_str().unwrap());
 
-        let json = r#"{ "ai": { "default_model": "claude-opus-4", "gateway_url": "http://127.0.0.1:18789", "streaming": true, "temperature": 0.7, "max_tokens": 4096 } }"#;
+        let json = r#"{ "git": { "auto_fetch": false, "fetch_interval_secs": 600, "sign_commits": true } }"#;
         fs::write(tmp.path().join("config.json"), json).unwrap();
 
         let config = resolve_config(None).expect("should succeed with global config only");
 
-        assert_eq!(config.ai.default_model, "claude-opus-4");
+        assert!(!config.git.auto_fetch);
+        assert_eq!(config.git.fetch_interval_secs, 600);
         // All other sections should still reflect defaults.
         assert_eq!(config.appearance.theme, "system");
         assert_eq!(config.terminal.shell, "/bin/zsh");
@@ -2810,7 +2592,7 @@ mod tests {
 
         assert_eq!(config.appearance.theme, "light");
         // Defaults preserved for everything else.
-        assert_eq!(config.ai.default_model, "claude-sonnet-4-6");
+        assert_eq!(config.terminal.shell, "/bin/zsh");
 
         std::env::remove_var("LITEDUCK_HOME");
     }
@@ -2892,10 +2674,10 @@ mod tests {
             conn.execute_batch(
                 "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                  INSERT INTO settings VALUES ('theme', 'dark');
-                 INSERT INTO settings VALUES ('gateway_url', 'http://localhost:9000');
+                 INSERT INTO settings VALUES ('terminal_shell', '/bin/bash');
                  INSERT INTO settings VALUES ('font_size', '16');
-                 INSERT INTO settings VALUES ('streaming', 'false');
-                 INSERT INTO settings VALUES ('lan_chat_enabled', '0');
+                 INSERT INTO settings VALUES ('git_auto_fetch', 'false');
+                 INSERT INTO settings VALUES ('sidebar_collapsed', 'true');
                  INSERT INTO settings VALUES ('some_api_key', 'should_be_skipped');",
             )
             .unwrap();
@@ -2917,17 +2699,18 @@ mod tests {
             "unexpected errors: {:?}",
             result.errors
         );
-        // 5 known keys (theme, gateway_url, font_size, streaming, lan_chat_enabled).
-        // some_api_key is skipped because it ends with `_api_key`.
+        // 5 known keys (theme, terminal_shell, font_size, git_auto_fetch,
+        // sidebar_collapsed). some_api_key is skipped because it ends with
+        // `_api_key`.
         assert_eq!(result.settings_migrated, 5);
 
         // Verify config.json was written with correct values.
         let config = read_config().expect("config.json should be readable");
         assert_eq!(config.appearance.theme, "dark");
-        assert_eq!(config.ai.gateway_url, "http://localhost:9000");
+        assert_eq!(config.terminal.shell, "/bin/bash");
         assert_eq!(config.appearance.font_size, 16);
-        assert!(!config.ai.streaming);
-        assert!(!config.network.lan_chat_enabled);
+        assert!(!config.git.auto_fetch);
+        assert!(config.appearance.sidebar_collapsed);
 
         std::env::remove_var("LITEDUCK_HOME");
     }
