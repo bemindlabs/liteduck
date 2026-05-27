@@ -1,18 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 
-/** Returns the resolved `~/.LiteDuck` path. */
+/** Returns the resolved `~/.liteduck` path. */
 export const homeDir = () => invoke<string>("home_dir_path");
 
 /**
- * Creates the `~/.LiteDuck` directory structure if it does not already exist.
+ * Creates the `~/.liteduck` directory structure if it does not already exist.
  * Idempotent — safe to call on every app startup.
  */
 export const homeEnsure = () => invoke<undefined>("home_ensure");
 
-/** Reads the user profile markdown from `~/.LiteDuck/profile.md`. */
+/** Reads the user profile markdown from `~/.liteduck/profile.md`. */
 export const homeProfileRead = () => invoke<string>("home_profile_read");
 
-/** Writes user profile markdown to `~/.LiteDuck/profile.md`. */
+/** Writes user profile markdown to `~/.liteduck/profile.md`. */
 export const homeProfileWrite = (content: string) =>
   invoke<undefined>("home_profile_write", { content });
 
@@ -52,16 +52,16 @@ export interface Config {
 
 // ── Config commands ───────────────────────────────────────────────────────────
 
-/** Reads the application config from `~/.LiteDuck/config.json`. */
+/** Reads the application config from `~/.liteduck/config.json`. */
 export const homeConfigRead = () => invoke<Config>("home_config_read");
 
-/** Writes the application config to `~/.LiteDuck/config.json`. */
+/** Writes the application config to `~/.liteduck/config.json`. */
 export const homeConfigWrite = (config: Config) =>
   invoke<undefined>("home_config_write", { config });
 
 /**
  * Resolve the effective config by merging:
- *   global `~/.LiteDuck/config.json` → built-in defaults.
+ *   global `~/.liteduck/config.json` → built-in defaults.
  *
  * The `workspace` argument is accepted for backwards compatibility but no
  * longer changes the result — config is global-only. A missing global config
@@ -88,16 +88,16 @@ export interface WorkspaceRegistry {
 
 // ── Workspace registry commands ───────────────────────────────────────────────
 
-/** Reads the workspace registry from `~/.LiteDuck/workspaces.json`. */
+/** Reads the workspace registry from `~/.liteduck/workspaces.json`. */
 export const homeWorkspacesList = () => invoke<WorkspaceRegistry>("home_workspaces_list");
 
-/** Writes the workspace registry to `~/.LiteDuck/workspaces.json`. */
+/** Writes the workspace registry to `~/.liteduck/workspaces.json`. */
 export const homeWorkspacesUpdate = (registry: WorkspaceRegistry) =>
   invoke<undefined>("home_workspaces_update", { registry });
 
 // ── Global memory types ───────────────────────────────────────────────────────
 
-/** A full global memory note read from `~/.LiteDuck/memory/<slug>.md`. */
+/** A full global memory note read from `~/.liteduck/memory/<slug>.md`. */
 export interface HomeMemoryNote {
   slug: string;
   title: string;
@@ -159,7 +159,7 @@ export const homeMemorySearch = (query: string) =>
  * Metadata for a single workspace template.
  *
  * `source` is `"user"` when the file comes from
- * `~/.LiteDuck/templates/workspace/` (user override), or `"bundled"` when it
+ * `~/.liteduck/templates/workspace/` (user override), or `"bundled"` when it
  * comes from the app's bundled resources.
  */
 export interface TemplateInfo {
@@ -171,7 +171,7 @@ export interface TemplateInfo {
 /**
  * List all known workspace templates together with their resolved source.
  *
- * User overrides in `~/.LiteDuck/templates/workspace/` are preferred over the
+ * User overrides in `~/.liteduck/templates/workspace/` are preferred over the
  * bundled defaults and are marked with `source: "user"`.
  */
 export const homeTemplatesList = () => invoke<TemplateInfo[]>("home_templates_list");
@@ -180,7 +180,7 @@ export const homeTemplatesList = () => invoke<TemplateInfo[]>("home_templates_li
 
 /**
  * Reports on the state of legacy SQLite databases and whether the migration
- * target (`~/.LiteDuck/config.json`) already exists.
+ * target (`~/.liteduck/config.json`) already exists.
  *
  * Safe to call at any time — read-only, no side effects.
  */
@@ -188,7 +188,7 @@ export interface MigrationStatus {
   settings_db_exists: boolean;
   automations_db_exists: boolean;
   mcp_db_exists: boolean;
-  /** `true` when `~/.LiteDuck/config.json` already exists. */
+  /** `true` when `~/.liteduck/config.json` already exists. */
   already_migrated: boolean;
   settings_count: number;
   automations_count: number;
@@ -214,8 +214,8 @@ export const homeMigrationCheck = () => invoke<MigrationStatus>("home_migration_
 
 /**
  * Runs the one-time migration:
- * 1. Maps known `settings.db` keys to `~/.LiteDuck/config.json`.
- * 2. Migrates `workspace_history` to `~/.LiteDuck/workspaces.json`.
+ * 1. Maps known `settings.db` keys to `~/.liteduck/config.json`.
+ * 2. Migrates `workspace_history` to `~/.liteduck/workspaces.json`.
  * 3. Archives (renames) `.db` files to `.db.bak.<timestamp>`.
  *
  * Returns a `MigrationResult` with counts and any non-fatal errors.

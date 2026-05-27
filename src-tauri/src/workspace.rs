@@ -270,12 +270,12 @@ const CLI_TEMPLATE_FILES: &[(&str, &str)] = &[];
 /// Resolve a template file path. Checks user templates first, then bundled resources.
 ///
 /// Resolution order:
-/// 1. `~/.LiteDuck/templates/workspace/<template_name>` (user override)
+/// 1. `~/.liteduck/templates/workspace/<template_name>` (user override)
 /// 2. `<resource_dir>/<template_name>` (bundled default)
 ///
 /// Returns `None` if neither location contains the file.
 fn resolve_template(resource_dir: &Path, template_name: &str) -> Option<PathBuf> {
-    // 1. Check user override: ~/.LiteDuck/templates/workspace/<template_name>
+    // 1. Check user override: ~/.liteduck/templates/workspace/<template_name>
     let user_template = home::home_dir()
         .join("templates")
         .join("workspace")
@@ -299,7 +299,7 @@ fn resolve_template(resource_dir: &Path, template_name: &str) -> Option<PathBuf>
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TemplateInfo {
     pub name: String,
-    /// `"user"` when the file comes from `~/.LiteDuck/templates/workspace/`,
+    /// `"user"` when the file comes from `~/.liteduck/templates/workspace/`,
     /// `"bundled"` when it comes from the app resources.
     pub source: String,
     pub path: String,
@@ -308,7 +308,7 @@ pub struct TemplateInfo {
 /// List all known workspace templates together with their resolved source.
 ///
 /// For each entry in `CLI_TEMPLATE_FILES` the function checks whether a user
-/// override exists in `~/.LiteDuck/templates/workspace/` and marks it
+/// override exists in `~/.liteduck/templates/workspace/` and marks it
 /// accordingly.  If neither the user file nor the bundled file exists the
 /// entry is omitted from the result.
 #[tauri::command]

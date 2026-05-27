@@ -92,7 +92,7 @@ export function IdentitySection() {
 
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-[var(--color-foreground)]">
-              Chat Display Name
+              Display Name
             </label>
             <div className="flex items-center gap-2">
               <input

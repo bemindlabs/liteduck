@@ -46,8 +46,8 @@ brew install --cask bemindlabs/liteduck/liteduck
 | **File Manager** | Tree view, preview (code, images, markdown), inline editing, new file/folder, open in VS Code |
 | **Terminal** | Tabs, split panes, tmux sessions, PTY |
 | **Git** | Branch management, status, commits, diffs, worktrees |
-| **Setup Wizard** | First-run wizard: dev mode, workspace, initial project |
-| **Settings** | Modular sections, config (user/workspace), auto-save, biometric lock |
+| **Setup Wizard** | First-run wizard: welcome, workspace, initial project |
+| **Settings** | Modular sections, config (global), auto-save, biometric lock |
 
 ## Tech Stack
 
@@ -124,7 +124,7 @@ src/                          # Frontend (React + TypeScript)
     TerminalPage.tsx          #   Terminal with tabs and splits (always mounted)
     GitPage.tsx               #   Git operations and diff viewer (Changes/History/Worktrees)
     NotificationsPage.tsx     #   In-app notification center
-    WizardPage.tsx            #   First-run setup wizard (welcome, dev mode, workspace, project)
+    WizardPage.tsx            #   First-run setup wizard (welcome, workspace, project)
     LandingPage.tsx           #   Landing / workspace picker
     settings/SettingsPage.tsx #   App settings (modular sections)
   components/                 # Reusable UI components (incl. ui/ shadcn primitives)
@@ -139,7 +139,7 @@ src-tauri/                    # Backend (Rust, Tauri v2)
     settings.rs               #   Settings with keychain storage
     keychain.rs / keyring_store.rs  # System keychain abstraction
     workspace.rs              #   Workspace init and templates
-    home.rs                   #   ~/.LiteDuck home: config, profile, memory notes
+    home.rs                   #   ~/.liteduck home: config, profile, memory notes
     agent_memory.rs           #   Markdown note store backing home memory
     app_menu.rs               #   Native application menu
     updater.rs                #   Auto-updater

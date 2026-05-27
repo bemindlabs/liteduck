@@ -7,7 +7,7 @@ const FIELDS: FieldDef[] = [
     label: "Workspace Directory",
     placeholder: "/path/to/your/project",
     helpText:
-      "The root directory for your development project. Used as the default working directory for terminals, agent sessions, and agent profile storage.",
+      "The root directory for your development project. Used as the default working directory for terminals and Git.",
     browseFolder: true,
   },
   {
@@ -44,7 +44,7 @@ export function WorkspaceSection({ values, onChange, onDeleteSecret }: Workspace
           Set the active project root and default clone folder. These settings are global and
           persist across workspaces. Stored in{" "}
           <code className="rounded bg-[var(--color-accent)] px-1 py-0.5 text-[10px] font-mono">
-            ~/.LiteDuck/
+            ~/.liteduck/
           </code>
           .
         </p>

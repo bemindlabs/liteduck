@@ -11,8 +11,8 @@
 //!   with `is_secret = true` remain the canonical path for tokens and passwords.
 //! - **Legacy migration support** — `home::migrate_settings_db` reads from the
 //!   SQLite store once and writes values into `config.json`.
-//! - **Scrum data** — the scrum module shares the same SQLite database; the
-//!   connection returned by `db::get_conn()` is still used there.
+//! - **Shared SQLite database** — other modules share the same SQLite database;
+//!   the connection returned by `db::get_conn()` is still used there.
 //!
 //! New non-secret reads should call [`get_setting_v2`], which prefers
 //! `config.json` and falls back to SQLite only for keys not yet migrated.
@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 // ── In-memory cache for secret settings ───────────────────────────────────────
 //
 // Avoids repeated OS keychain roundtrips (10-50 ms each) for hot paths such as
-// the OpenClaw token that is read on every API call.
+// a stored API token that is read on every API call.
 //
 // Cache entry semantics:
 //   key absent                → not yet fetched; go to keychain

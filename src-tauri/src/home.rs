@@ -1,9 +1,9 @@
-//! `~/.LiteDuck` home directory management.
+//! `~/.liteduck` home directory management.
 //!
 //! Provides path resolution, directory bootstrapping, user profile
 //! management, and typed application config (config.json) for the
 //! user-level application home. Uses `$LITEDUCK_HOME` if set, otherwise
-//! `~/.LiteDuck`.
+//! `~/.liteduck`.
 
 use crate::agent_memory::{
     find_relevant_notes_at, parse_note_pub as parse_note, rebuild_index_at,
@@ -252,7 +252,7 @@ impl Default for TelemetryConfig {
     }
 }
 
-/// Top-level application configuration stored at `~/.LiteDuck/config.json`.
+/// Top-level application configuration stored at `~/.liteduck/config.json`.
 ///
 /// Every field uses `#[serde(default)]` so partial JSON (or a missing file)
 /// always deserialises successfully, filling in the defaults for any absent
@@ -328,7 +328,7 @@ pub fn invalidate_config_cache() {
 
 // ── Config read / write / resolve ────────────────────────────────────────────
 
-/// Reads `~/.LiteDuck/config.json`.
+/// Reads `~/.liteduck/config.json`.
 ///
 /// Returns `Config::default()` when the file does not exist. Missing keys
 /// within an existing file are filled with their defaults via `#[serde(default)]`.
@@ -360,7 +360,7 @@ pub fn read_config() -> Result<Config, String> {
     Ok(config)
 }
 
-/// Writes `config` to `~/.LiteDuck/config.json` as pretty-printed JSON.
+/// Writes `config` to `~/.liteduck/config.json` as pretty-printed JSON.
 ///
 /// The parent directory is created if needed. On Unix the file is set to
 /// `0o600` (owner read/write only).
@@ -388,7 +388,7 @@ pub fn write_config(config: &Config) -> Result<(), String> {
 /// Missing global config falls through to built-in defaults.
 ///
 /// Resolution chain:
-///   1. `~/.LiteDuck/config.json` (global config)
+///   1. `~/.liteduck/config.json` (global config)
 ///   2. Built-in `Default` (hardcoded)
 ///
 /// Resolved configs are cached in memory for [`CONFIG_TTL`], keyed by the
@@ -476,7 +476,7 @@ fn default_version() -> u32 {
     1
 }
 
-/// The full workspace registry stored at `~/.LiteDuck/workspaces.json`.
+/// The full workspace registry stored at `~/.liteduck/workspaces.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceRegistry {
     #[serde(default = "default_version")]
@@ -512,7 +512,7 @@ pub struct WorkspaceEntry {
 
 // ── Workspace registry read / write ──────────────────────────────────────────
 
-/// Reads `~/.LiteDuck/workspaces.json`.
+/// Reads `~/.liteduck/workspaces.json`.
 ///
 /// Returns `WorkspaceRegistry::default()` when the file does not exist.
 /// Missing fields within an existing file are filled with their defaults via
@@ -527,7 +527,7 @@ pub fn read_workspaces() -> Result<WorkspaceRegistry, String> {
     serde_json::from_str(&content).map_err(|e| format!("Failed to parse workspaces: {e}"))
 }
 
-/// Writes `registry` to `~/.LiteDuck/workspaces.json` as pretty-printed JSON.
+/// Writes `registry` to `~/.liteduck/workspaces.json` as pretty-printed JSON.
 ///
 /// The parent directory is created if needed. On Unix the file is set to
 /// `0o600` (owner read/write only).
@@ -727,13 +727,13 @@ fn write_file_with_perms(path: &Path, content: &str) -> Result<(), String> {
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
-/// Returns the resolved `~/.LiteDuck` path as a string.
+/// Returns the resolved `~/.liteduck` path as a string.
 #[tauri::command]
 pub fn home_dir_path() -> String {
     home_dir().to_string_lossy().to_string()
 }
 
-/// Creates the `~/.LiteDuck` directory structure if it does not already exist.
+/// Creates the `~/.liteduck` directory structure if it does not already exist.
 ///
 /// Idempotent — safe to call on every startup.
 #[tauri::command]
@@ -741,7 +741,7 @@ pub fn home_ensure() -> Result<(), String> {
     ensure_home()
 }
 
-/// Reads the user profile markdown from `~/.LiteDuck/profile.md`.
+/// Reads the user profile markdown from `~/.liteduck/profile.md`.
 ///
 /// Returns the raw markdown string. If the file does not exist, returns
 /// the default skeleton so the caller always receives valid markdown.
@@ -754,7 +754,7 @@ pub fn home_profile_read() -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| format!("Failed to read profile: {e}"))
 }
 
-/// Writes user profile markdown to `~/.LiteDuck/profile.md`.
+/// Writes user profile markdown to `~/.liteduck/profile.md`.
 ///
 /// The `updated` timestamp in the YAML frontmatter is automatically
 /// refreshed to today's date before writing. The file is created (including
@@ -784,7 +784,7 @@ pub fn home_profile_write(content: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Reads the application config from `~/.LiteDuck/config.json`.
+/// Reads the application config from `~/.liteduck/config.json`.
 ///
 /// Returns all defaults when the file does not exist or a key is absent.
 #[tauri::command]
@@ -792,7 +792,7 @@ pub fn home_config_read() -> Result<Config, String> {
     read_config()
 }
 
-/// Writes the application config to `~/.LiteDuck/config.json`.
+/// Writes the application config to `~/.liteduck/config.json`.
 ///
 /// The file is created (including parent directories) if it does not exist.
 /// File permissions are set to `0o600` on Unix platforms.
@@ -823,7 +823,7 @@ pub fn home_workspaces_list() -> Result<WorkspaceRegistry, String> {
     read_workspaces()
 }
 
-/// Writes the workspace registry to `~/.LiteDuck/workspaces.json`.
+/// Writes the workspace registry to `~/.liteduck/workspaces.json`.
 ///
 /// The file is created (including parent directories) if it does not exist.
 /// File permissions are set to `0o600` on Unix platforms.
@@ -838,7 +838,7 @@ fn default_true() -> bool {
     true
 }
 
-/// A single MCP server entry in `~/.LiteDuck/mcp/servers.json`.
+/// A single MCP server entry in `~/.liteduck/mcp/servers.json`.
 ///
 /// `env` values may contain `${keychain:key_name}` references which are
 /// resolved at runtime via [`resolve_keychain_refs`]. Secrets are never stored
@@ -858,7 +858,7 @@ pub struct McpServerConfig {
     pub global: bool,
 }
 
-/// The full MCP server registry stored at `~/.LiteDuck/mcp/servers.json`.
+/// The full MCP server registry stored at `~/.liteduck/mcp/servers.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpServerRegistry {
     #[serde(default = "default_version")]
@@ -876,7 +876,7 @@ impl Default for McpServerRegistry {
     }
 }
 
-/// Reads `~/.LiteDuck/mcp/servers.json`.
+/// Reads `~/.liteduck/mcp/servers.json`.
 ///
 /// Returns `McpServerRegistry::default()` when the file does not exist.
 /// Missing fields within an existing file are filled with their defaults via
@@ -891,7 +891,7 @@ pub fn read_mcp_servers() -> Result<McpServerRegistry, String> {
     serde_json::from_str(&content).map_err(|e| format!("Failed to parse MCP servers: {e}"))
 }
 
-/// Writes `registry` to `~/.LiteDuck/mcp/servers.json` as pretty-printed JSON.
+/// Writes `registry` to `~/.liteduck/mcp/servers.json` as pretty-printed JSON.
 ///
 /// The `mcp/` directory is created if needed. On Unix the file is set to
 /// `0o600` (owner read/write only).
@@ -938,7 +938,7 @@ pub fn resolve_keychain_refs(env: &HashMap<String, String>) -> HashMap<String, S
 
 // ── MCP server registry Tauri commands ────────────────────────────────────────
 
-/// Returns the full MCP server registry from `~/.LiteDuck/mcp/servers.json`.
+/// Returns the full MCP server registry from `~/.liteduck/mcp/servers.json`.
 ///
 /// Returns all defaults when the file does not exist.
 #[tauri::command]
@@ -946,7 +946,7 @@ pub fn home_mcp_servers_list() -> Result<McpServerRegistry, String> {
     read_mcp_servers()
 }
 
-/// Writes the MCP server registry to `~/.LiteDuck/mcp/servers.json`.
+/// Writes the MCP server registry to `~/.liteduck/mcp/servers.json`.
 ///
 /// The file (and its parent `mcp/` directory) are created if they do not
 /// exist. File permissions are set to `0o600` on Unix platforms.
@@ -957,7 +957,7 @@ pub fn home_mcp_servers_save(registry: McpServerRegistry) -> Result<(), String> 
 
 // ── Home memory ──────────────────────────────────────────────────────────────
 
-/// Returns the `~/.LiteDuck/memory/` directory path.
+/// Returns the `~/.liteduck/memory/` directory path.
 pub fn home_memory_dir() -> PathBuf {
     home_dir().join("memory")
 }
@@ -1096,7 +1096,7 @@ pub fn home_memory_find_relevant(title: &str, max: usize) -> Vec<MemoryNote> {
     find_relevant_notes_at(&home_memory_dir(), title, max)
 }
 
-// ── Migration wizard (SQLite → ~/.LiteDuck JSON) ─────────────────────────────
+// ── Migration wizard (SQLite → ~/.liteduck JSON) ─────────────────────────────
 //
 // One-time, one-direction migration (LD-36).
 //
@@ -1110,7 +1110,7 @@ pub struct MigrationStatus {
     pub settings_db_exists: bool,
     pub automations_db_exists: bool,
     pub mcp_db_exists: bool,
-    /// `true` when `~/.LiteDuck/config.json` already exists (migration done or
+    /// `true` when `~/.liteduck/config.json` already exists (migration done or
     /// the user started fresh with the new format).
     pub already_migrated: bool,
     pub settings_count: usize,
@@ -1208,9 +1208,9 @@ pub fn home_migration_check() -> Result<MigrationStatus, String> {
 /// Runs the full one-time migration:
 ///
 /// 1. Reads flat key/value pairs from `settings.db` and maps known keys to
-///    `Config` fields, writing `~/.LiteDuck/config.json`.
+///    `Config` fields, writing `~/.liteduck/config.json`.
 /// 2. Reads the `workspace_history` setting from `settings.db` and appends
-///    any new paths to `~/.LiteDuck/workspaces.json`.
+///    any new paths to `~/.liteduck/workspaces.json`.
 /// 3. Renames each `.db` file to `.db.bak.<timestamp>` (archive step).
 ///
 /// The function is **idempotent with respect to the target**: if
@@ -1437,7 +1437,7 @@ fn apply_setting_key(key: &str, value: &str, config: &mut Config) -> bool {
 }
 
 /// Reads `workspace_history` from `settings.db` (a JSON array of path strings)
-/// and merges any new paths into `~/.LiteDuck/workspaces.json`.
+/// and merges any new paths into `~/.liteduck/workspaces.json`.
 fn migrate_workspace_history(app_data: &Path, result: &mut MigrationResult) {
     let db_path = app_data.join("settings.db");
     if !db_path.exists() {
@@ -2309,7 +2309,7 @@ mod tests {
         std::env::remove_var("LITEDUCK_HOME");
     }
 
-    /// `home_memory_write()` creates a markdown file in `~/.LiteDuck/memory/`.
+    /// `home_memory_write()` creates a markdown file in `~/.liteduck/memory/`.
     #[test]
     fn home_memory_write_creates_file() {
         let _guard = ENV_LOCK.lock().unwrap();
@@ -2483,7 +2483,7 @@ mod tests {
         std::env::remove_var("LITEDUCK_HOME");
     }
 
-    /// Writing a note rebuilds the `index.md` in `~/.LiteDuck/memory/`.
+    /// Writing a note rebuilds the `index.md` in `~/.liteduck/memory/`.
     #[test]
     fn home_memory_index_rebuilt_on_write() {
         let _guard = ENV_LOCK.lock().unwrap();

@@ -253,7 +253,7 @@ pub fn run() {
             workspace::workspace_check_templates,
             workspace::workspace_init_template,
             workspace::workspace_scaffold,
-            // Home directory (~/.LiteDuck)
+            // Home directory (~/.liteduck)
             home::home_dir_path,
             home::home_ensure,
             home::home_profile_read,
@@ -264,16 +264,16 @@ pub fn run() {
             // Workspace registry (~/.liteduck/workspaces.json)
             home::home_workspaces_list,
             home::home_workspaces_update,
-            // Global cross-workspace memory notes (~/.LiteDuck/memory/)
+            // Global cross-workspace memory notes (~/.liteduck/memory/)
             home::home_memory_list,
             home::home_memory_read,
             home::home_memory_write,
             home::home_memory_delete,
             home::home_memory_search,
-            // Migration wizard: SQLite → ~/.LiteDuck JSON
+            // Migration wizard: SQLite → ~/.liteduck JSON
             home::home_migration_check,
             home::home_migration_run,
-            // Template resolution (~/.LiteDuck/templates/workspace/)
+            // Template resolution (~/.liteduck/templates/workspace/)
             workspace::home_templates_list,
             // BWOC integration (optional)
             bwoc::bwoc_detect,
@@ -310,7 +310,7 @@ pub fn run() {
             workspace::workspace_check_templates,
             workspace::workspace_init_template,
             workspace::workspace_scaffold,
-            // Home directory (~/.LiteDuck)
+            // Home directory (~/.liteduck)
             home::home_dir_path,
             home::home_ensure,
             home::home_profile_read,

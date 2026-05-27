@@ -138,8 +138,8 @@ export function WorkspaceStep({ onNext }: WizardStepProps) {
           This is your project directory
         </p>
         <p className="text-xs text-[var(--color-muted-foreground)]">
-          Your code and files live here. LiteDuck keeps its own settings, preferences, and
-          templates globally in{" "}
+          Your code and files live here. LiteDuck keeps its own settings, preferences, and templates
+          globally in{" "}
           <code className="rounded bg-[var(--color-background)] px-1 py-0.5 text-[10px] font-mono">
             ~/.liteduck
           </code>

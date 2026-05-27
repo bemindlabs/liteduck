@@ -85,10 +85,8 @@ export async function deleteSetting(key: string, isSecret = false): Promise<void
  * Factory-reset all global settings.
  *
  * Deletes every keychain secret in the canonical secret-key list, resets
- * `~/.LiteDuck/config.json` to defaults, truncates the SQLite `settings`
+ * `~/.liteduck/config.json` to defaults, truncates the SQLite `settings`
  * table, and wipes the in-memory secret cache.
- *
- * Chat history is NOT affected.
  *
  * Requires biometric authentication on the backend; rejects with an
  * "Biometric authentication required" error if the gate is locked.

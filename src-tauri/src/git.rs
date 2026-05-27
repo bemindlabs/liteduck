@@ -219,7 +219,7 @@ fn diff_to_result(diff: git2::Diff<'_>) -> Result<GitDiffResult, String> {
     Ok(GitDiffResult { files, hunks })
 }
 
-// ── Inner functions (used by both Tauri commands and Internal MCP providers) ──
+// ── Inner functions (Tauri-independent business logic) ───────────────────────
 
 /// Get git status for a repository (business logic, no Tauri dependency).
 pub fn git_status_inner(repo_path: &str) -> Result<GitStatus, String> {

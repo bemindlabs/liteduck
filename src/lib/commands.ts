@@ -30,7 +30,7 @@ export interface Command {
   keywords?: string[];
   /**
    * Runtime action.  Undefined until the palette injects navigate / toggleDark
-   * at call time; agent/action stubs are no-ops until wired up.
+   * at call time; action stubs are no-ops until wired up.
    */
   action?: () => void;
 }

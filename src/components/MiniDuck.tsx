@@ -12,7 +12,7 @@ export interface MiniDuckProps {
   animated?: boolean;
   /**
    * When true, replaces Tailwind animate-* classes with plain CSS class names
-   * (duck-wing-left / duck-wing-right / duck-eye) so the parent .agent-card
+   * (duck-wing-left / duck-wing-right / duck-eye) so a parent container's
    * hover selectors in index.css can control the animations.
    */
   cardMode?: boolean;
@@ -40,7 +40,7 @@ export function MiniDuck({
       height={size * 1.17}
       className={className}
       role="img"
-      aria-label="Agent duck character"
+      aria-label="LiteDuck mascot"
     >
       {/* Body */}
       <ellipse
