@@ -115,17 +115,8 @@ jobs:
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
 
-          # Windows (64-bit)
-          - platform: windows
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            args: ""
-
-          # Linux (64-bit)
-          - platform: linux
-            os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            args: ""
+          # macOS-only for now. Windows & Linux build jobs are deferred (planned);
+          # re-add windows-latest / ubuntu-latest matrix entries when those ship.
 
     steps:
       - name: Checkout repository
@@ -151,21 +142,6 @@ jobs:
         uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: "./src-tauri -> target"
-
-      # ── Linux system dependencies ─────────────────────────────────────────────
-      - name: Install Linux system dependencies
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            libdbus-1-dev \
-            pkg-config
 
       # ── macOS code signing ────────────────────────────────────────────────────
       # Requires secrets:
@@ -222,22 +198,6 @@ jobs:
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$APPLE_TEAM_ID"
 
-      # ── Windows version workaround ─────────────────────────────────────────
-      # WiX MSI requires version components <= 255. CalVer 2026.x.y has
-      # major=2026 which exceeds the limit. Strip the century: 2026.4.2 → 26.4.2
-      - name: Patch Windows MSI version
-        if: matrix.platform == 'windows'
-        shell: bash
-        run: |
-          APP_VER=$(jq -r '.version' src-tauri/tauri.conf.json)
-          MAJOR=$(echo "$APP_VER" | cut -d. -f1)
-          if [ "$MAJOR" -gt 255 ]; then
-            WIN_VER="$(( MAJOR % 100 )).$(echo "$APP_VER" | cut -d. -f2-)"
-            echo "Patching WiX version: $APP_VER → $WIN_VER"
-            jq --arg v "$WIN_VER" '.bundle.windows.wix.version = $v' \
-              src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
-          fi
-
       # ── Conditionally export signing env vars ───────────────────────────────
       # Secrets that resolve to empty strings must NOT be set as env vars,
       # otherwise Tauri attempts codesign with identity "" and fails.
@@ -263,18 +223,6 @@ jobs:
           _APPLE_ID: ${{ secrets.APPLE_ID }}
           _APPLE_ID_PWD: ${{ secrets.APPLE_ID_PASSWORD }}
           _APPLE_TEAM: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Set signing environment (Windows)
-        if: matrix.platform == 'windows'
-        shell: bash
-        run: |
-          if [ -n "$_WIN_CERT" ]; then
-            echo "WINDOWS_CERTIFICATE=$_WIN_CERT" >> "$GITHUB_ENV"
-            echo "WINDOWS_CERTIFICATE_PASSWORD=$_WIN_CERT_PWD" >> "$GITHUB_ENV"
-          fi
-        env:
-          _WIN_CERT: ${{ secrets.WINDOWS_CERTIFICATE }}
-          _WIN_CERT_PWD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
 
       # ── Build & sign & notarize ───────────────────────────────────────────────
       # tauri-action calls `cargo tauri build` which:
@@ -347,15 +295,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p artifacts
+          # macOS-only for now: mirror the DMGs and updater tarballs.
           gh release download "${{ github.ref_name }}" \
             --repo bemindlabs/openclaw-loop-duck-app \
             --dir artifacts \
             --pattern "*.dmg" \
-            --pattern "*.exe" \
-            --pattern "*.msi" \
-            --pattern "*.deb" \
-            --pattern "*.rpm" \
-            --pattern "*.AppImage" \
             --pattern "*.tar.gz"
 
       - name: Create public release with assets
@@ -382,35 +326,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download macOS DMG and update cask
+      - name: Download macOS DMGs and update cask
         env:
           GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
 
-          # Download the aarch64 DMG from the public releases repo
+          # Download both architecture DMGs from the public releases repo
           gh release download "$TAG" \
             --repo bemindlabs/liteduck-releases \
             --pattern "LiteDuck_${VERSION}_aarch64.dmg" \
+            --pattern "LiteDuck_${VERSION}_x64.dmg" \
             --dir .
 
-          # Compute SHA-256
-          SHA256=$(shasum -a 256 "LiteDuck_${VERSION}_aarch64.dmg" | awk '{print $1}')
+          # Compute SHA-256 for each architecture
+          SHA256_ARM=$(shasum -a 256 "LiteDuck_${VERSION}_aarch64.dmg" | awk '{print $1}')
+          SHA256_INTEL=$(shasum -a 256 "LiteDuck_${VERSION}_x64.dmg" | awk '{print $1}')
 
           # Clone the Homebrew tap
           git clone "https://x-access-token:${GH_TOKEN}@github.com/bemindlabs/homebrew-liteduck.git" tap
           cd tap
 
-          # Update the cask formula
+          # Update the cask formula (dual-arch: Apple Silicon + Intel)
           cat > Casks/liteduck.rb << 'CASK_EOF'
           cask "liteduck" do
-            version "VERSION_PLACEHOLDER"
-            sha256 "SHA256_PLACEHOLDER"
+            arch arm: "aarch64", intel: "x64"
 
-            url "https://github.com/bemindlabs/liteduck-releases/releases/download/v#{version}/LiteDuck_#{version}_aarch64.dmg"
+            version "VERSION_PLACEHOLDER"
+            sha256 arm:   "SHA256_ARM_PLACEHOLDER",
+                   intel: "SHA256_INTEL_PLACEHOLDER"
+
+            url "https://github.com/bemindlabs/liteduck-releases/releases/download/v#{version}/LiteDuck_#{version}_#{arch}.dmg"
             name "LiteDuck"
-            desc "AI Coding workflow desktop app"
+            desc "Lightweight code editor with file browser, terminal, and Git"
             homepage "https://buildonclaw.cloud/products/liteduck"
 
             depends_on macos: ">= :ventura"
@@ -434,7 +383,8 @@ jobs:
 
           # Replace placeholders
           sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" Casks/liteduck.rb
-          sed -i "s/SHA256_PLACEHOLDER/${SHA256}/g" Casks/liteduck.rb
+          sed -i "s/SHA256_ARM_PLACEHOLDER/${SHA256_ARM}/g" Casks/liteduck.rb
+          sed -i "s/SHA256_INTEL_PLACEHOLDER/${SHA256_INTEL}/g" Casks/liteduck.rb
 
           # Remove leading whitespace from heredoc
           sed -i 's/^          //' Casks/liteduck.rb

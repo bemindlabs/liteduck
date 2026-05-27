@@ -13,6 +13,7 @@ import {
   Fingerprint,
   ScanFace,
   Shield,
+  Boxes,
   Download,
   TriangleAlert,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import { GitSection } from "./sections/GitSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { IdentitySection } from "./sections/IdentitySection";
 import { BiometricSection } from "./sections/BiometricSection";
+import { IntegrationsSection } from "./sections/IntegrationsSection";
 import { PermissionsSection } from "./sections/PermissionsSection";
 import { AboutSection } from "./sections/AboutSection";
 import { DangerZoneSection } from "./sections/DangerZoneSection";
@@ -65,6 +67,7 @@ const NAV_ITEMS = [
   { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
   { id: "identity", label: "Device Identity", icon: Fingerprint },
   { id: "biometric", label: "Biometric Lock", icon: ScanFace },
+  { id: "integrations", label: "Integrations", icon: Boxes },
   { id: "permissions", label: "Permissions", icon: Shield },
   { id: "about", label: "About", icon: Download },
   { id: "danger", label: "Danger Zone", icon: TriangleAlert },
@@ -398,6 +401,7 @@ export default function SettingsPage() {
           <ShortcutsSection onSaved={() => setSaveStatus("saved")} />
           <IdentitySection />
           <BiometricSection />
+          <IntegrationsSection />
           <PermissionsSection />
           <AboutSection />
           <DangerZoneSection />

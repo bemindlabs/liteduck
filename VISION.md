@@ -1,122 +1,98 @@
 # LiteDuck Vision
 
-> **The Way of the Duck** — AI operates, humans govern. Calm on the surface, relentless underneath.
+> **The Way of the Duck** — calm, fast, and out of your way.
 
 ## Mission
 
-LiteDuck is the **AI-first software development workspace** where autonomous agents drive the full development loop and humans govern at the gates. We are not building a better IDE. We are building a new paradigm: a deliberative AI council that plans, codes, reviews, and ships — while you stay in control of every consequential decision.
+LiteDuck is a **lightweight, focused code editor**: a file browser + editor, an integrated
+terminal, Git, and Settings in one fast native desktop app. It does one thing well — give
+you a calm place to read, edit, and ship code — and deliberately stops there. No AI, no
+agents, no chat, no cloud. Just your files and the tools you reach for every minute.
+
+LiteDuck was carved out of "LoopDuck", a heavier AI-first workspace. We removed the agents,
+the AI council, the scrum pipeline, the chat, and the remote integrations, and kept the fast
+native editor underneath. The result is smaller, quieter, and entirely yours.
 
 ## Core Pillars
 
-### 1. AI Operates, Humans Govern
+### 1. Lightweight and Fast
 
-The fundamental shift: AI is the operator, not the assistant. Specialist agents decompose requirements, estimate work, write code, run tests, and open pull requests. Humans approve, modify, or reject at defined gates — never micromanage the in-between.
+A native Tauri v2 app with a Rust backend and a small footprint. Cold start is quick, memory
+stays low, and the UI never gets in your way.
 
-Every gate is explicit. Every approval is meaningful. Nothing ships silently.
+### 2. Focused Scope
 
-### 2. AgentsCouncil — A Deliberative AI Council
+Four capabilities, done well: **file browser + editor**, **integrated terminal**, **Git**,
+and **Settings**. We say no to scope creep. Anything that would pull LiteDuck back toward an
+AI platform — agents, LLM chat, orchestration, always-on cloud — is out of charter.
 
-Before a single line of code is written, a council of specialist agents runs full SCRUM ceremonies autonomously:
+### 3. Local-First and Private
 
-- **Decomposition:** Break epics into stories and tasks with clear acceptance criteria.
-- **Refinement:** Challenge assumptions, surface risks, propose alternatives.
-- **Estimation:** Independent sizing from each agent, debated to consensus.
-- **Voting:** Unanimous agreement required before parallel autonomous development begins.
+Everything runs on your machine. No accounts, no telemetry, no inference calls, no network
+dependency to open a file. The cloud is never required.
 
-No lone agent acts unilaterally. Consensus is the unlock.
+### 4. Your Files Are the Source of Truth
 
-### 3. Markdown + JSON as Source of Truth
+A workspace is just a directory. Settings live in human-readable JSON (`~/.LiteDuck` and
+`<workspace>/.LiteDuck`); SQLite is only a rebuildable runtime index. Move the folder and
+everything moves with it. Lose the app and your work survives.
 
-All persistent data — stories, sprint boards, agent memory, workspace config — lives as human-readable files. Git-friendly, portable, inspectable without a database client.
+### 5. Keyboard-Driven
 
-SQLite is used only as a runtime index for fast queries. The files are always the authority. If you delete the index, it rebuilds. If you lose the app, your data survives.
+A command palette (Cmd+K) and consistent shortcuts put every action a keystroke away.
+Terminal tabs, Git, settings, focus mode — all reachable without the mouse.
 
-### 4. Universal Impact Analysis
+### 6. Secure by Default
 
-Every modification — by an agent or a human — triggers impact analysis before it is applied. Dependency graphs are walked. Affected tests are identified. Risk surfaces are surfaced. No change is silent, and no change is surprising.
+Secrets live in the OS keychain (Apple Keychain, Windows Credential Manager, Linux Secret
+Service). An optional biometric lock guards the app, and a per-machine device identity is
+generated locally.
 
-### 5. Quality Gate + Security Gate
+### 7. macOS-First, Native Everywhere (Windows & Linux planned)
 
-Automated verification is a first-class citizen, not an afterthought:
-
-- **Quality Gate:** Lint, type-check, test coverage thresholds, build validation — configurable per phase.
-- **Security Gate:** OWASP review, dependency audit, secret scanning — runs before any code reaches a human gate.
-- **Auto-fix pipeline:** Agents attempt remediation before escalating to a human.
-
-Gates are tunable. Teams define what "done" means.
-
-### 6. Five-Layer Memory
-
-Knowledge is cumulative and flows deliberately:
-
-```
-Agent → Workspace → Group → Global → Shared
-```
-
-An agent learns from a task. That learning can promote to workspace, then to a group of related workspaces, then to your global profile at `~/.LiteDuck`, then — with your consent — to shared team memory. No knowledge is siloed by default. No knowledge escapes without intent.
-
-### 7. ~/.LiteDuck Application Home
-
-A user-level persistent home that travels with the developer, not the project:
-
-- Cross-workspace agent memory and profiles
-- Global provider registry (models, API keys, fallback chains)
-- Tool registry for composable pipeline stages
-- Workspace groups for managing related projects as a fleet
-
-Your intelligence, your configuration, your rules — portable across every machine you work on.
-
-### 8. Flexible LLM Providers
-
-No vendor lock-in at the model layer. Every agent can be assigned its own model. Fallback chains handle outages gracefully. Cost tracking surfaces spending before it becomes a surprise.
-
-Supported providers: Anthropic, OpenAI, Google, Ollama, Bedrock, Azure — and any provider that speaks a compatible API.
-
-### 9. Dynamic Customization
-
-LiteDuck is a platform, not a fixed workflow:
-
-- Composable pipeline builder: add, remove, or reorder phases.
-- Custom phases: inject your own scripts, tools, or agents.
-- Tunable agent behaviors: adjust verbosity, risk tolerance, consensus rules.
-- Swappable CLI tools: bring the tools your team already trusts.
-
-The default pipeline is opinionated. The system is not.
+LiteDuck is a native macOS app today; Windows and Linux are planned. The foundation stays
+platform-neutral — native window chrome, native keychain, native menus — so parity is the
+goal, not a lowest common denominator.
 
 ## Enduring Principles
 
-**Local-First, Always.** Sensitive data, credentials, and workspace state stay on your machine. The cloud is optional and explicit.
+**Calm on the surface.** The editor should feel quiet and predictable. Nothing happens that
+you didn't ask for.
 
-**Radical Simplicity at the Surface.** The complexity of a multi-agent council should be invisible during normal flow. What the developer sees is calm, clear, and decisive.
+**Do less, better.** Three sharp tools beat thirty dull ones. When in doubt, we cut.
 
-**Privacy and Portability.** Your agents, your memory, your models. LiteDuck never owns your workflow.
+**Own your workflow.** Your files, your settings, your machine. LiteDuck never owns your data
+or your process.
 
-**Open Standards.** A2A (Agent-to-Agent) and MCP (Model Context Protocol) are first-class. LiteDuck participates in the ecosystem; it does not try to replace it. The Internal MCP system makes every module a discoverable, callable service — and exposes the same tools to external AI agents via a standard MCP bridge.
+**Honest about scope.** LiteDuck is an editor. It is not an IDE, not an AI assistant, not a
+project-management suite. When a request would change what LiteDuck *is*, the answer is
+usually no — and that's the point.
 
-## Realized
+## What LiteDuck Is Not
 
-**Coding Workflow.** AI-powered multi-step plan generation and execution with persistence — the first concrete expression of agents driving the development loop.
+To keep the charter clear, LiteDuck deliberately has **no**:
 
-**iOS App.** Tauri v2 iOS app with edge-to-edge WebView, mobile-optimized UI, swipe gestures, and haptic feedback. The duck glides on mobile too.
+- AI / LLM features, code generation, or chat
+- Autonomous agents, an AI council, or scrum / pipeline orchestration
+- Agent-to-Agent (A2A) or MCP servers / bridges
+- Docker, SSH/SFTP, or remote-execution panels
+- GitHub / Jira integrations or cloud sync
 
-**Skills and Plugins.** Browse and install OpenClaw skills. Enable and disable gateway plugins. The extensibility layer is live.
-
-**Setup Wizard with Scrum Process.** Six-step first-run wizard that configures workspace directory, AI gateway, GitHub, and scrum process defaults — sprint duration, Definition of Done checklist, and team members. All scrum settings editable post-setup in a dedicated Settings section. The duck is opinionated about process from the first launch.
-
-**Internal MCP — Inter-Module Communication.** All 11 backend modules expose their capabilities as MCP tools through a unified in-process registry. Any module can discover and call tools from any other module. A pub/sub bus propagates state changes across modules in real time. An external MCP bridge on port 18790 exposes all 41 internal tools to external AI agents — Claude Desktop, Cursor, or any MCP-compatible client connects and operates LiteDuck programmatically. This is the nervous system that makes the duck's paddle strokes coordinated.
-
-**AI-Powered Scrum Generation.** Generate epics, stories, and backlogs from natural language prompts. The AI generators bridge human intent to structured scrum artifacts — describe what you want, and the council has material to deliberate on.
-
-**Dev Task Runner.** Council-approved stories flow into a background parallel executor with bounded concurrency. Progress animations — shimmer bars, pulsing indicators, elapsed timers — surface the work as it happens. Stale lock detection and auto-reset ensure the pipeline never gets stuck. The first concrete bridge between deliberation and execution.
+These existed in LoopDuck and were intentionally removed. See [ADR-001](docs/adr-001-single-direction.md).
 
 ## Future Horizons
 
-**Fleet Mode.** Manage a group of related workspaces as a single coordinated fleet. Cross-workspace impact analysis. Shared sprint boards. One council governing many repos.
+Within the editor-only charter:
 
-**Collaborative Autonomy.** Shared agent councils for distributed teams. Peer-to-peer LAN coordination. Scrum boards that live in the repo and sync across machines.
+**Windows & Linux (planned).** First-class Windows and Linux parity alongside macOS-first —
+native chrome and shortcuts on every OS.
 
-**Cross-Platform Mastery.** The Way of the Duck is available to every developer on every OS. macOS and iOS today, Windows and Linux on the horizon, without compromise.
+**A Better Editor.** Multi-file tabs, find/replace and project-wide search, richer previews.
+
+**Themes and Customization.** Make the editor yours without making it heavy.
+
+**Performance as a Feature.** Cold-start and memory budgets tracked over time.
 
 ---
 
-*LiteDuck: The duck glides. The agents paddle furiously beneath. You watch, decide, and ship.*
+*LiteDuck: your files, a terminal, and Git. Nothing you didn't ask for.*

@@ -2,7 +2,7 @@
 
 **A lightweight code editor** — fast, focused, and out of your way.
 
-LiteDuck is a lightweight code editor built with Tauri v2. It brings a file browser + editor, an integrated terminal, and Git into a single fast native desktop app for macOS, Windows, and Linux — no AI, no clutter.
+LiteDuck is a lightweight code editor built with Tauri v2. It brings a file browser + editor, an integrated terminal, and Git into a single fast native desktop app for macOS (Windows & Linux planned) — no AI, no clutter.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Mac App Store](https://img.shields.io/badge/Mac_App_Store-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/liteduck/id6744428938)
@@ -21,12 +21,14 @@ LiteDuck is a lightweight code editor built with Tauri v2. It brings a file brow
 brew install --cask bemindlabs/liteduck/liteduck
 ```
 
-### Direct Download
+### Direct Download (macOS)
 
 - [macOS (Apple Silicon)](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck_2026.4.22_aarch64.dmg)
 - [macOS (Intel)](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck_2026.4.22_x64.dmg)
-- [Windows (.exe)](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck_2026.4.22_x64-setup.exe)
-- [Linux (.deb)](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck_2026.4.22_amd64.deb) | [.AppImage](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck_2026.4.22_amd64.AppImage) | [.rpm](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck-2026.4.22-1.x86_64.rpm)
+
+> **Planned: Windows & Linux.** LiteDuck is macOS-only for now. Direct downloads for
+> Windows (`.exe`) and Linux (`.deb` / `.AppImage` / `.rpm`) will return once those
+> platforms ship.
 
 ## Features
 

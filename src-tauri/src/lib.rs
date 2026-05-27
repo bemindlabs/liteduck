@@ -5,6 +5,8 @@ pub mod agent_memory;
 pub mod app_menu;
 pub mod bash_validator;
 pub mod biometric;
+#[cfg(not(target_os = "ios"))]
+pub mod bwoc;
 pub mod db;
 pub mod device_identity;
 pub mod event_sink;
@@ -276,6 +278,9 @@ pub fn run() {
             home::home_migration_run,
             // Template resolution (~/.LiteDuck/templates/workspace/)
             workspace::home_templates_list,
+            // BWOC integration (optional)
+            bwoc::bwoc_detect,
+            bwoc::bwoc_list,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
