@@ -185,7 +185,9 @@ impl PtyManager {
                 Some(bin) => bin,
                 // Unreachable while `use_tmux == tmux_path.is_some()`, but return
                 // a clean error rather than panicking if that invariant ever drifts.
-                None => return Err("tmux was selected but its binary path is unavailable".to_string()),
+                None => {
+                    return Err("tmux was selected but its binary path is unavailable".to_string())
+                }
             };
             if tmux_session_exists(&tmux_bin, &resolved_name) {
                 // Reuse the existing session — drop into attach-session mode.

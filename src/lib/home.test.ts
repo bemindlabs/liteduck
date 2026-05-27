@@ -13,8 +13,6 @@ import {
   homeConfigRead,
   homeConfigWrite,
   homeResolveConfig,
-  workspaceConfigRead,
-  workspaceConfigWrite,
   homeWorkspacesList,
   homeWorkspacesUpdate,
   homeMemoryList,
@@ -241,58 +239,6 @@ describe("home IPC wrappers", () => {
       mockInvokeError("home_resolve_config", "config merge error");
 
       await expect(homeResolveConfig("/ws")).rejects.toThrow("config merge error");
-    });
-  });
-
-  // ── workspaceConfigRead ────────────────────────────────────────────────────
-
-  describe("workspaceConfigRead", () => {
-    it("returns partial config object when override exists", async () => {
-      const partial = { appearance: { theme: "light" } };
-      mockInvokeResponse("workspace_config_read", partial);
-
-      const result = await workspaceConfigRead("/home/user/project");
-
-      expect(mockInvoke).toHaveBeenCalledWith("workspace_config_read", {
-        workspace: "/home/user/project",
-      });
-      expect(result).toEqual(partial);
-    });
-
-    it("returns null when no workspace override file exists", async () => {
-      mockInvokeResponse("workspace_config_read", null);
-
-      const result = await workspaceConfigRead("/home/user/new-project");
-
-      expect(result).toBeNull();
-    });
-
-    it("propagates errors", async () => {
-      mockInvokeError("workspace_config_read", "permission denied");
-
-      await expect(workspaceConfigRead("/restricted")).rejects.toThrow("permission denied");
-    });
-  });
-
-  // ── workspaceConfigWrite ───────────────────────────────────────────────────
-
-  describe("workspaceConfigWrite", () => {
-    it("invokes workspace_config_write with workspace and config", async () => {
-      const partial = { appearance: { theme: "solarized" } };
-      mockInvokeResponse("workspace_config_write", undefined);
-
-      await workspaceConfigWrite("/home/user/project", partial);
-
-      expect(mockInvoke).toHaveBeenCalledWith("workspace_config_write", {
-        workspace: "/home/user/project",
-        config: partial,
-      });
-    });
-
-    it("propagates errors", async () => {
-      mockInvokeError("workspace_config_write", "write error");
-
-      await expect(workspaceConfigWrite("/ws", {})).rejects.toThrow("write error");
     });
   });
 

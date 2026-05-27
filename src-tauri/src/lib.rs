@@ -261,10 +261,7 @@ pub fn run() {
             home::home_config_read,
             home::home_config_write,
             home::home_resolve_config,
-            // Workspace config override (<workspace>/.LiteDuck/config.json)
-            home::workspace_config_read,
-            home::workspace_config_write,
-            // Workspace registry (~/.LiteDuck/workspaces.json)
+            // Workspace registry (~/.liteduck/workspaces.json)
             home::home_workspaces_list,
             home::home_workspaces_update,
             // Global cross-workspace memory notes (~/.LiteDuck/memory/)
@@ -321,8 +318,6 @@ pub fn run() {
             home::home_config_read,
             home::home_config_write,
             home::home_resolve_config,
-            home::workspace_config_read,
-            home::workspace_config_write,
             home::home_workspaces_list,
             home::home_workspaces_update,
             home::home_memory_list,

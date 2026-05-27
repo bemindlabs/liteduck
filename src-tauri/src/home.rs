@@ -412,7 +412,7 @@ pub fn resolve_config(workspace: Option<&str>) -> Result<Config, String> {
     // Cache miss, stale, or home/workspace changed — build the resolved config.
     // Drop the lock before doing I/O so we don't hold it across blocking reads.
     drop(cache);
-    let resolved = resolve_config_from_disk(workspace)?;
+    let resolved = resolve_config_from_disk()?;
 
     // Re-acquire to store the result.
     let mut cache = lock_cache(config_cache());
@@ -420,12 +420,14 @@ pub fn resolve_config(workspace: Option<&str>) -> Result<Config, String> {
     Ok(resolved)
 }
 
-/// Internal helper: read and merge configs from disk without touching the cache.
-fn resolve_config_from_disk(workspace: Option<&str>) -> Result<Config, String> {
-    // Start with built-in defaults.
+/// Internal helper: read the global config from disk without touching the cache.
+///
+/// LiteDuck uses a single global config (`~/.liteduck/config.json`); there is no
+/// per-workspace override layer.
+fn resolve_config_from_disk() -> Result<Config, String> {
+    // Start with built-in defaults, then overlay the global config when present.
     let mut config = Config::default();
 
-    // Layer 1: Global config (~/.LiteDuck/config.json).
     let global_path = home_dir().join("config.json");
     if global_path.exists() {
         let content = fs::read_to_string(&global_path)
@@ -434,58 +436,13 @@ fn resolve_config_from_disk(workspace: Option<&str>) -> Result<Config, String> {
             .map_err(|e| format!("Failed to parse global config: {e}"))?;
     }
 
-    // Layer 2: Workspace config (<workspace>/.LiteDuck/config.json).
-    if let Some(ws) = workspace {
-        let ws_config_path = Path::new(ws).join(".LiteDuck").join("config.json");
-        if ws_config_path.exists() {
-            let content = fs::read_to_string(&ws_config_path)
-                .map_err(|e| format!("Failed to read workspace config: {e}"))?;
-            // Parse as a generic JSON value so we can deep-merge only the
-            // fields that are actually present in the workspace file.
-            let ws_partial: serde_json::Value = serde_json::from_str(&content)
-                .map_err(|e| format!("Failed to parse workspace config: {e}"))?;
-            let mut base = serde_json::to_value(&config).map_err(|e| e.to_string())?;
-            merge_json(&mut base, &ws_partial);
-            config = serde_json::from_value(base).map_err(|e| e.to_string())?;
-        }
-    }
-
     Ok(config)
-}
-
-/// Deep-merge `overlay` into `base`.
-///
-/// For object values, keys present in `overlay` overwrite or extend those in
-/// `base`; keys absent from `overlay` are left unchanged. For non-object
-/// (scalar / array) values the overlay simply replaces the base. Null overlay
-/// values are *not* written to the base, preserving the existing base value.
-fn merge_json(base: &mut serde_json::Value, overlay: &serde_json::Value) {
-    match (base, overlay) {
-        (serde_json::Value::Object(base_map), serde_json::Value::Object(overlay_map)) => {
-            for (key, overlay_val) in overlay_map {
-                if overlay_val.is_null() {
-                    // Null overlay means "don't touch this field".
-                    continue;
-                }
-                if let Some(base_val) = base_map.get_mut(key) {
-                    merge_json(base_val, overlay_val);
-                } else {
-                    base_map.insert(key.clone(), overlay_val.clone());
-                }
-            }
-        }
-        (base, overlay) => {
-            if !overlay.is_null() {
-                *base = overlay.clone();
-            }
-        }
-    }
 }
 
 /// Returns the LiteDuck home directory path.
 ///
 /// Uses `$LITEDUCK_HOME` if the environment variable is set; otherwise
-/// resolves `~/.LiteDuck` via the `dirs` crate, falling back to `./.LiteDuck`
+/// resolves `~/.liteduck` via the `dirs` crate, falling back to `./.liteduck`
 /// when the home directory cannot be determined.
 pub fn home_dir() -> PathBuf {
     if let Ok(custom) = std::env::var("LITEDUCK_HOME") {
@@ -493,7 +450,16 @@ pub fn home_dir() -> PathBuf {
     }
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".LiteDuck")
+        .join(".liteduck")
+}
+
+/// Legacy home directory (`~/.LiteDuck`) from before the lowercase rename.
+/// Used once by [`ensure_home`] to migrate existing data to [`home_dir`].
+fn legacy_home_dir() -> Option<PathBuf> {
+    if std::env::var("LITEDUCK_HOME").is_ok() {
+        return None;
+    }
+    dirs::home_dir().map(|h| h.join(".LiteDuck"))
 }
 
 /// Returns the path to the global memory index file.
@@ -583,30 +549,10 @@ pub fn write_workspaces(registry: &WorkspaceRegistry) -> Result<(), String> {
     Ok(())
 }
 
-/// All directories created under `~/.LiteDuck` on first launch.
-const HOME_DIRS: &[&str] = &[
-    "memory",
-    "agents",
-    "groups",
-    "templates/scrum",
-    "templates/agents",
-    "templates/workspace",
-    "mcp",
-    "automations",
-    "plugins",
-    "agents-council/pipelines",
-    "agents-council/presets",
-    "agents-council/phases",
-    "agents-council/prompts",
-    "agents-council/voting-rules",
-    "agents-council/gates",
-    "cache/avatars",
-    "cache/models",
-    "cache/github",
-    "logs",
-];
+/// All directories created under `~/.liteduck` on first launch.
+const HOME_DIRS: &[&str] = &["memory", "templates/workspace", "logs"];
 
-/// Creates the `~/.LiteDuck` directory structure if it does not already exist.
+/// Creates the `~/.liteduck` directory structure if it does not already exist.
 ///
 /// Safe to call on every application startup — only missing directories and
 /// files are created; existing content is never modified or overwritten.
@@ -615,6 +561,27 @@ const HOME_DIRS: &[&str] = &[
 /// Files created by this function are set to `0o600`.
 pub fn ensure_home() -> Result<(), String> {
     let home = home_dir();
+
+    // One-time migration: move legacy `~/.LiteDuck` to the new lowercase
+    // `~/.liteduck` location when the new directory does not exist yet.
+    if !home.exists() {
+        if let Some(legacy) = legacy_home_dir() {
+            if legacy != home && legacy.exists() {
+                match fs::rename(&legacy, &home) {
+                    Ok(()) => log::info!(
+                        "home: migrated legacy {} -> {}",
+                        legacy.display(),
+                        home.display()
+                    ),
+                    Err(e) => log::warn!(
+                        "home: could not migrate legacy {} -> {}: {e}",
+                        legacy.display(),
+                        home.display()
+                    ),
+                }
+            }
+        }
+    }
 
     create_dir_with_perms(&home)?;
     log::info!("home: ensured home directory at {}", home.display());
@@ -850,57 +817,7 @@ pub fn home_resolve_config(workspace: Option<String>) -> Result<Config, String> 
     resolve_config(workspace.as_deref())
 }
 
-// ── Workspace config override (LD-41) ────────────────────────────────────────
-
-/// Reads `<workspace>/.LiteDuck/config.json` as a raw JSON value.
-///
-/// Returns `None` when the file does not exist (i.e. no workspace-level
-/// override has been written yet). The caller can then fall through to the
-/// global config or built-in defaults. Returns an error only on genuine I/O or
-/// parse failures.
-///
-/// The config is intentionally typed as `serde_json::Value` (not `Config`) so
-/// callers can write and read back *partial* override documents without losing
-/// keys they did not set.
-#[tauri::command]
-pub fn workspace_config_read(workspace: String) -> Result<Option<serde_json::Value>, String> {
-    let path = Path::new(&workspace).join(".LiteDuck").join("config.json");
-    if !path.exists() {
-        return Ok(None);
-    }
-    let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace config: {e}"))?;
-    let value: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse workspace config: {e}"))?;
-    Ok(Some(value))
-}
-
-/// Writes a raw JSON value to `<workspace>/.LiteDuck/config.json`.
-///
-/// The `.LiteDuck/` directory is created if it does not exist. The file is
-/// written as pretty-printed JSON so it is human-readable and diff-friendly.
-/// File permissions are set to `0o600` on Unix platforms.
-///
-/// Accepts `serde_json::Value` (not a typed `Config`) so callers can persist
-/// only the keys they care about — the rest are inherited from the global
-/// config and built-in defaults at resolution time via `resolve_config`.
-#[tauri::command]
-pub fn workspace_config_write(workspace: String, config: serde_json::Value) -> Result<(), String> {
-    let dir = Path::new(&workspace).join(".LiteDuck");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join("config.json");
-    let content = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize workspace config: {e}"))?;
-    fs::write(&path, content).map_err(|e| format!("Failed to write workspace config: {e}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
-    }
-    Ok(())
-}
-
-/// Returns the full workspace registry from `~/.LiteDuck/workspaces.json`.
+/// Returns the full workspace registry from `~/.liteduck/workspaces.json`.
 ///
 /// Returns all defaults when the file does not exist.
 #[tauri::command]
@@ -2880,75 +2797,6 @@ mod tests {
         std::env::remove_var("LITEDUCK_HOME");
     }
 
-    /// Workspace config overrides global config for the fields it specifies.
-    #[test]
-    fn resolve_config_workspace_overrides_global() {
-        let _guard = ENV_LOCK.lock().unwrap();
-        let tmp = tempfile::tempdir().expect("tempdir");
-        std::env::set_var("LITEDUCK_HOME", tmp.path().to_str().unwrap());
-
-        // Write global config with a specific model.
-        let global_json = r#"{
-            "ai": { "default_model": "global-model", "gateway_url": "http://127.0.0.1:18789", "streaming": true, "temperature": 0.7, "max_tokens": 4096 },
-            "appearance": { "theme": "dark", "font_family": "JetBrains Mono", "font_size": 14, "sidebar_position": "left", "sidebar_collapsed": false }
-        }"#;
-        fs::write(tmp.path().join("config.json"), global_json).unwrap();
-
-        // Create a workspace directory with its own config overriding the model.
-        let ws_dir = tmp.path().join("my-workspace");
-        let ws_liteduck = ws_dir.join(".LiteDuck");
-        fs::create_dir_all(&ws_liteduck).unwrap();
-        let ws_json = r#"{ "ai": { "default_model": "opus" } }"#;
-        fs::write(ws_liteduck.join("config.json"), ws_json).unwrap();
-
-        let config = resolve_config(Some(ws_dir.to_str().unwrap())).expect("should merge configs");
-
-        // Workspace value wins for the overridden field.
-        assert_eq!(config.ai.default_model, "opus");
-        // Other ai fields not in workspace config should come from global.
-        assert_eq!(config.ai.gateway_url, "http://127.0.0.1:18789");
-        // Non-overridden top-level section should come from global.
-        assert_eq!(config.appearance.theme, "dark");
-
-        std::env::remove_var("LITEDUCK_HOME");
-    }
-
-    /// A workspace config with only a subset of keys merges cleanly — all other
-    /// fields fall through from global (or defaults when global is absent).
-    #[test]
-    fn resolve_config_partial_workspace_merge() {
-        let _guard = ENV_LOCK.lock().unwrap();
-        let tmp = tempfile::tempdir().expect("tempdir");
-        std::env::set_var("LITEDUCK_HOME", tmp.path().to_str().unwrap());
-
-        // No global config — only built-in defaults.
-        let ws_dir = tmp.path().join("my-workspace");
-        let ws_liteduck = ws_dir.join(".LiteDuck");
-        fs::create_dir_all(&ws_liteduck).unwrap();
-        // Workspace only specifies one nested ai field.
-        let ws_json = r#"{ "ai": { "default_model": "opus" } }"#;
-        fs::write(ws_liteduck.join("config.json"), ws_json).unwrap();
-
-        let config =
-            resolve_config(Some(ws_dir.to_str().unwrap())).expect("should merge partial config");
-
-        // Workspace override takes effect.
-        assert_eq!(config.ai.default_model, "opus");
-        // All remaining ai fields should be built-in defaults.
-        assert_eq!(config.ai.gateway_url, "http://127.0.0.1:18789");
-        assert!(config.ai.streaming);
-        assert_eq!(config.ai.max_tokens, 4096);
-        // All other top-level sections should be built-in defaults.
-        assert_eq!(config.appearance.theme, "system");
-        assert_eq!(config.terminal.shell, "/bin/zsh");
-        assert!(config.git.auto_fetch);
-        assert_eq!(config.agents.max_concurrent, 3);
-        assert!(config.network.lan_chat_enabled);
-        assert!(!config.telemetry.enabled);
-
-        std::env::remove_var("LITEDUCK_HOME");
-    }
-
     /// When `workspace` is `None`, only global config is used (no workspace
     /// lookup is attempted).
     #[test]
@@ -2968,52 +2816,6 @@ mod tests {
         assert_eq!(config.ai.default_model, "claude-sonnet-4-6");
 
         std::env::remove_var("LITEDUCK_HOME");
-    }
-
-    // ── merge_json tests ──────────────────────────────────────────────────────
-
-    /// `merge_json` performs a recursive deep merge for nested objects.
-    #[test]
-    fn merge_json_deep_merge() {
-        let mut base = serde_json::json!({
-            "ai": { "default_model": "base-model", "temperature": 0.7 },
-            "appearance": { "theme": "system" }
-        });
-        let overlay = serde_json::json!({
-            "ai": { "default_model": "overlay-model" }
-        });
-
-        merge_json(&mut base, &overlay);
-
-        // The overridden key wins.
-        assert_eq!(base["ai"]["default_model"], "overlay-model");
-        // The non-overridden key is preserved from base.
-        assert_eq!(base["ai"]["temperature"], 0.7);
-        // Sections not mentioned in overlay are untouched.
-        assert_eq!(base["appearance"]["theme"], "system");
-    }
-
-    /// `merge_json` treats null overlay values as "do not overwrite".
-    #[test]
-    fn merge_json_null_overlay_preserves_base() {
-        let mut base = serde_json::json!({ "key": "original" });
-        let overlay = serde_json::json!({ "key": null });
-
-        merge_json(&mut base, &overlay);
-
-        assert_eq!(base["key"], "original");
-    }
-
-    /// `merge_json` inserts overlay keys that are absent from base.
-    #[test]
-    fn merge_json_inserts_new_keys() {
-        let mut base = serde_json::json!({ "existing": "value" });
-        let overlay = serde_json::json!({ "new_key": "new_value" });
-
-        merge_json(&mut base, &overlay);
-
-        assert_eq!(base["existing"], "value");
-        assert_eq!(base["new_key"], "new_value");
     }
 
     // ── Migration tests ───────────────────────────────────────────────────────
@@ -3254,117 +3056,6 @@ mod tests {
         }
 
         std::env::remove_var("LITEDUCK_HOME");
-    }
-
-    // ── workspace_config_read / workspace_config_write tests (LD-41) ─────────
-
-    /// `workspace_config_read` returns `None` when `.LiteDuck/config.json` is absent.
-    #[test]
-    fn workspace_config_read_returns_none_when_missing() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let ws = tmp.path().to_str().unwrap().to_string();
-
-        let result = workspace_config_read(ws).expect("should succeed with no file");
-        assert!(
-            result.is_none(),
-            "expected None when config file does not exist"
-        );
-    }
-
-    /// `workspace_config_write` creates `.LiteDuck/config.json` with the given value.
-    #[test]
-    fn workspace_config_write_creates_file() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let ws = tmp.path().to_str().unwrap().to_string();
-
-        let config = serde_json::json!({ "ai": { "default_model": "opus" } });
-        workspace_config_write(ws.clone(), config).expect("write should succeed");
-
-        let path = tmp.path().join(".LiteDuck").join("config.json");
-        assert!(path.exists(), ".LiteDuck/config.json should be created");
-
-        let content = fs::read_to_string(&path).unwrap();
-        // Pretty-printed JSON should contain the key we wrote.
-        assert!(
-            content.contains("default_model"),
-            "file should contain the written key"
-        );
-        assert!(
-            content.contains("opus"),
-            "file should contain the written value"
-        );
-    }
-
-    /// Write then read returns the identical JSON value (round-trip).
-    #[test]
-    fn workspace_config_round_trip() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let ws = tmp.path().to_str().unwrap().to_string();
-
-        let config = serde_json::json!({
-            "ai": { "default_model": "claude-opus-4-5", "temperature": 0.3 },
-            "agents": { "max_concurrent": 5, "a2a_discovery": false }
-        });
-
-        workspace_config_write(ws.clone(), config.clone()).expect("write should succeed");
-        let read_back = workspace_config_read(ws)
-            .expect("read should succeed")
-            .expect("should be Some after write");
-
-        assert_eq!(
-            read_back["ai"]["default_model"],
-            serde_json::Value::String("claude-opus-4-5".to_string()),
-            "ai.default_model should survive round-trip"
-        );
-        assert_eq!(
-            read_back["ai"]["temperature"],
-            serde_json::json!(0.3),
-            "ai.temperature should survive round-trip"
-        );
-        assert_eq!(
-            read_back["agents"]["max_concurrent"],
-            serde_json::json!(5),
-            "agents.max_concurrent should survive round-trip"
-        );
-        assert_eq!(
-            read_back["agents"]["a2a_discovery"],
-            serde_json::json!(false),
-            "agents.a2a_discovery should survive round-trip"
-        );
-    }
-
-    /// A partial workspace config (only one nested key) reads back correctly —
-    /// only the keys written are present; no implicit defaults are added.
-    #[test]
-    fn workspace_config_partial_only() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let ws = tmp.path().to_str().unwrap().to_string();
-
-        // Write only a single nested field.
-        let config = serde_json::json!({ "ai": { "default_model": "opus" } });
-        workspace_config_write(ws.clone(), config).expect("write should succeed");
-
-        let read_back = workspace_config_read(ws)
-            .expect("read should succeed")
-            .expect("should be Some after write");
-
-        // The key we wrote must be present.
-        assert_eq!(
-            read_back["ai"]["default_model"],
-            serde_json::Value::String("opus".to_string()),
-            "written key should be present"
-        );
-
-        // Keys we did NOT write must be absent — the file stores only the override.
-        assert!(
-            read_back["ai"].get("gateway_url").is_none()
-                || read_back["ai"]["gateway_url"].is_null(),
-            "unwritten keys should not appear in the partial file"
-        );
-        assert!(
-            read_back.get("appearance").is_none() || read_back["appearance"].is_null(),
-            "unwritten top-level sections should not appear"
-        );
     }
 
     /// Duplicate workspace paths in `workspace_history` are not added twice.

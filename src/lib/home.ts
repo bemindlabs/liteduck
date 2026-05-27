@@ -70,31 +70,6 @@ export const homeConfigWrite = (config: Config) =>
 export const homeResolveConfig = (workspace?: string) =>
   invoke<Config>("home_resolve_config", { workspace: workspace ?? null });
 
-// ── Workspace config override (LD-41) ────────────────────────────────────────
-
-/**
- * Reads `<workspace>/.LiteDuck/config.json` as a raw JSON object.
- *
- * Returns `null` when the file does not exist (no workspace-level override
- * has been written yet). Only throws on genuine I/O or parse failures.
- *
- * The value is typed as `Record<string, unknown>` rather than `Config` because
- * workspace configs are intentionally partial — only the keys to override are
- * present. The full resolved config is obtained via `homeResolveConfig`.
- */
-export const workspaceConfigRead = (workspace: string) =>
-  invoke<Record<string, unknown> | null>("workspace_config_read", { workspace });
-
-/**
- * Writes a partial config object to `<workspace>/.LiteDuck/config.json`.
- *
- * Only the keys you include will be stored; absent keys are inherited from the
- * global config and built-in defaults at resolution time. The `.LiteDuck/`
- * directory is created automatically if it does not exist.
- */
-export const workspaceConfigWrite = (workspace: string, config: Record<string, unknown>) =>
-  invoke<undefined>("workspace_config_write", { workspace, config });
-
 // ── Workspace registry types ──────────────────────────────────────────────────
 
 export interface WorkspaceEntry {
