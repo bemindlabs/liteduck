@@ -239,7 +239,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "LiteDuck ${{ github.ref_name }}"
           releaseBody: |
-            See [CHANGELOG.md](https://github.com/bemindlabs/openclaw-loop-duck-app/blob/main/CHANGELOG.md) for details.
+            See [CHANGELOG.md](https://github.com/bemindlabs/liteduck/blob/main/CHANGELOG.md) for details.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
@@ -278,8 +278,11 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           draft: false
-          generate_release_notes: false
-          body_path: CHANGELOG.md
+          # Auto-generate notes from merged PRs / commits since the last tag.
+          # Cleaner and always valid — avoids pasting the entire CHANGELOG.md
+          # into every release. The full changelog is still linked from the
+          # release body that tauri-action set (releaseBody above).
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -297,7 +300,7 @@ jobs:
           mkdir -p artifacts
           # macOS-only for now: mirror the DMGs and updater tarballs.
           gh release download "${{ github.ref_name }}" \
-            --repo bemindlabs/openclaw-loop-duck-app \
+            --repo bemindlabs/liteduck \
             --dir artifacts \
             --pattern "*.dmg" \
             --pattern "*.tar.gz"
