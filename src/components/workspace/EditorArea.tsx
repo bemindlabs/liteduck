@@ -68,8 +68,9 @@ export function EditorArea({ tabs, activeTabId, onSelectTab, onCloseTab }: Edito
     sel?.addRange(range);
   }, []);
 
-  // FilePreview is read-only for non-markdown by default and we never expose
-  // Paste/Cut here — the menu stays honest about what actually works.
+  // FilePreview is directly editable for text files (VS Code-style); native
+  // textarea editing (incl. Paste/Cut) works via keyboard, so this custom menu
+  // intentionally omits Paste/Cut and stays honest about what it offers.
   const menuItems: ContextMenuItem[] = menu
     ? [
         { label: "Copy", onSelect: handleCopy, disabled: !menu.hasSelection },

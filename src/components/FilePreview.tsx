@@ -60,7 +60,6 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [mdViewMode, setMdViewMode] = useState<MdViewMode>(docsMode ? "write" : "preview");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -68,7 +67,11 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
 
   const ext = entry?.extension?.toLowerCase() ?? "";
   const isMd = ext === "md" || ext === "markdown" || ext === "mdx";
-  const isEditing = isMd ? mdViewMode === "edit" || mdViewMode === "split" : editing;
+  // Non-markdown text files are directly editable (VS Code-style), so editing
+  // is always on — except for truncated (>1 MB partial) buffers, which stay
+  // read-only to avoid clobbering the full file with a partial save.
+  const canEditCode = !isTruncated;
+  const isEditing = isMd ? mdViewMode === "edit" || mdViewMode === "split" : canEditCode;
   const isWriteMode = isMd && mdViewMode === "write";
   const hasChanges = (isEditing || isWriteMode) && editContent !== originalContent;
 
@@ -76,7 +79,6 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
     if (!entry || entry.is_dir) {
       setContent(null);
       setError(null);
-      setEditing(false);
       setMdViewMode(docsMode ? "write" : "preview");
       return;
     }
@@ -89,7 +91,6 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
       setError(null);
       setContent(null);
       setIsTruncated(false);
-      setEditing(false);
       setMdViewMode(docsMode ? "write" : "preview");
       setSaved(false);
 
@@ -255,8 +256,8 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
             </span>
           )}
 
-          {/* Markdown view mode switcher */}
-          {isMd ? (
+          {/* Markdown view mode switcher (non-markdown code is directly editable, no toggle) */}
+          {isMd && (
             <div
               className={cn(
                 "flex items-center rounded-md border border-[var(--color-border)]",
@@ -318,23 +319,6 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
                 Write
               </button>
             </div>
-          ) : (
-            <Button
-              variant={editing ? "default" : "ghost"}
-              size="sm"
-              onClick={() => {
-                if (!editing) {
-                  setEditing(true);
-                  requestAnimationFrame(() => editorRef.current?.focus());
-                } else {
-                  setEditing(false);
-                }
-              }}
-              className="h-7 gap-1.5 text-xs"
-            >
-              {editing ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-              {editing ? "Preview" : "Edit"}
-            </Button>
           )}
 
           {/* Revert */}
@@ -350,8 +334,8 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
             </Button>
           )}
 
-          {/* Save */}
-          {isEditing && (
+          {/* Save — always shown while editing markdown; code shows it only when dirty */}
+          {isEditing && (isMd || hasChanges) && (
             <Button
               variant="default"
               size="sm"
@@ -461,8 +445,8 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
             </div>
           </div>
         )
-      ) : editing ? (
-        /* Non-markdown editor */
+      ) : isEditing ? (
+        /* Non-markdown editor — directly editable (VS Code-style) with line-number gutter */
         <div className="flex-1 overflow-hidden relative">
           <textarea
             ref={editorRef}
