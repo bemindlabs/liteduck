@@ -3,7 +3,7 @@
 > A lightweight, focused code editor — fast, native, and out of your way.
 
 **Latest release:** 2026.5.2 (CalVer)
-**Platforms:** macOS-first (Mac App Store, Homebrew) — Windows & Linux planned
+**Platforms:** macOS-first (Homebrew) — Windows & Linux planned
 
 LiteDuck is an **editor-only** desktop app: a file browser + editor, an integrated
 terminal, Git, and Settings. It has no AI/LLM, agents, chat, or cloud services — and
@@ -126,7 +126,7 @@ Directions, not commitments — all within the editor-only charter.
 
 ### Platform & distribution
 
-- Tauri v2 desktop builds for macOS (DMG, App Store `.pkg`). Windows (NSIS/MSI) and
+- Tauri v2 desktop builds for macOS (DMG via Homebrew cask). Windows (NSIS/MSI) and
   Linux (deb/rpm/AppImage) packaging is planned.
 - Auto-updater against GitHub Releases; Homebrew cask; CalVer versioning.
 - Quality gate (TypeScript, ESLint, Prettier, Vitest, `cargo check`/`clippy`/`fmt`/`test`)

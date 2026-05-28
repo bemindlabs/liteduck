@@ -13,16 +13,11 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
-  <a href="https://apps.apple.com/app/liteduck/id6744428938"><img src="https://img.shields.io/badge/Mac_App_Store-0D96F6?logo=apple&logoColor=white" alt="Mac App Store" /></a>
   <a href="https://github.com/bemindlabs/homebrew-liteduck"><img src="https://img.shields.io/badge/Homebrew-FBB040?logo=homebrew&logoColor=black" alt="Homebrew" /></a>
   <a href="https://buildonclaw.cloud/products/liteduck"><img src="https://img.shields.io/badge/Website-buildonclaw.cloud-818cf8" alt="Website" /></a>
 </p>
 
 ## Install
-
-### Mac App Store
-
-[![Download on the Mac App Store](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://apps.apple.com/app/liteduck/id6744428938)
 
 ### Homebrew (macOS)
 
@@ -105,7 +100,6 @@ cd src-tauri && cargo fmt --check
 |--------|---------|
 | `scripts/build.sh` | Production build wrapper |
 | `scripts/bump-version.sh` | Bump version across package.json, Cargo.toml, tauri.conf.json |
-| `scripts/appstore-upload.sh` | Upload build to Mac App Store via Transporter |
 
 ### Quality Gates
 
