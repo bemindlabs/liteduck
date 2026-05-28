@@ -99,13 +99,26 @@ http_get() {
 }
 
 classify() {
+  case "$HTTP_STATUS" in 2*) return 0 ;; esac
+  if [ "$HTTP_STATUS" = "0" ]; then
+    err "$VERB: network/transport error reaching Jira"
+    exit 6
+  fi
+  # Surface Jira's own explanation (the error body carries errorMessages + a
+  # per-field errors map) so failures are actionable instead of a bare code —
+  # e.g. 400 "Unbounded JQL queries are not allowed here." rather than "HTTP 400".
+  detail="$(printf '%s' "$HTTP_BODY" | jq -r '
+    ((.errorMessages // []) + [((.errors // {}) | to_entries[] | "\(.key): \(.value)")]) | join("; ")
+  ' 2>/dev/null || true)"
+  [ "$detail" = "null" ] && detail=""
+  suffix=""
+  [ -n "$detail" ] && suffix=" — $detail"
   case "$HTTP_STATUS" in
-    2*) return 0 ;;
-    0)   err "$VERB: network/transport error reaching Jira"; exit 6 ;;
-    401|403) err "$VERB: authentication failed (HTTP $HTTP_STATUS) — rotate JIRA_TOKEN or check JIRA_EMAIL"; exit 3 ;;
-    404) err "$VERB: not found (HTTP 404)"; exit 5 ;;
-    429) err "$VERB: rate limited (HTTP 429) — retry later"; exit 4 ;;
-    *)   err "$VERB: Jira returned HTTP $HTTP_STATUS"; exit 6 ;;
+    401|403) err "$VERB: authentication failed (HTTP $HTTP_STATUS) — rotate JIRA_TOKEN or check JIRA_EMAIL$suffix"; exit 3 ;;
+    404)     err "$VERB: not found (HTTP 404)$suffix"; exit 5 ;;
+    429)     err "$VERB: rate limited (HTTP 429) — retry later$suffix"; exit 4 ;;
+    400)     err "$VERB: bad request (HTTP 400)$suffix"; exit 6 ;;
+    *)       err "$VERB: Jira returned HTTP $HTTP_STATUS$suffix"; exit 6 ;;
   esac
 }
 
@@ -113,7 +126,12 @@ classify() {
 
 do_list() {
   require_auth
-  jql="${LITEDUCK_PARAM_JQL:-order by updated DESC}"
+  # The enhanced /search/jql endpoint REJECTS unbounded queries (a bare
+  # `ORDER BY` with no restriction → HTTP 400 "Unbounded JQL queries are not
+  # allowed here"). The default therefore carries a bound (issues updated in the
+  # last 30 days); callers can override via the jql param with their own
+  # restriction.
+  jql="${LITEDUCK_PARAM_JQL:-updated >= -30d ORDER BY updated DESC}"
   max="${LITEDUCK_PARAM_MAX_RESULTS:-25}"
   case "$max" in (*[!0-9]*|'') max=25 ;; esac
   [ "$max" -gt "$MAX_PAGE" ] && max="$MAX_PAGE"

@@ -740,7 +740,7 @@ function prettifyArg(arg: string): string {
 
 /** Optional per-arg placeholder hints (sensible defaults shown to the user). */
 const ARG_PLACEHOLDERS: Record<string, string> = {
-  jql: "order by updated DESC",
+  jql: "updated >= -30d ORDER BY updated DESC",
   max_results: "25",
 };
 
