@@ -64,6 +64,21 @@ describe("FilePreview — code editor (non-markdown)", () => {
     await waitFor(() => expect(writeFile).toHaveBeenCalledWith("/tmp/app.ts", "const x = 2;"));
   });
 
+  it("renders a syntax-highlight overlay layer behind the editable textarea", async () => {
+    const readFile = vi.fn().mockResolvedValue("const x = 1;");
+    const { container } = render(
+      <FilePreview entry={makeEntry()} readFile={readFile} docsMode={false} />,
+    );
+
+    const textarea = await screen.findByRole("textbox");
+    // The transparent textarea sits over a colored <pre> overlay.
+    const overlay = container.querySelector("pre[aria-hidden='true']");
+    expect(overlay).toBeInTheDocument();
+    expect(overlay?.textContent).toContain("const x = 1;");
+    // Textarea text is transparent so the colored overlay shows through.
+    expect(textarea.className).toContain("text-transparent");
+  });
+
   it("keeps a truncated (>1 MB) file read-only — no textarea", async () => {
     const readFile = vi.fn().mockResolvedValue("partial buffer");
     render(
