@@ -110,8 +110,11 @@ gating, phasing — is specified in `notes/2026-05-28_plugin-ui-host-design.md`.
 - [x] Mark the no-JS-host rationale in the two plugin notes as superseded by this ADR.
 - [x] Phase 2 — `sandbox` attr (with explicit-scheme CSP), install-time "ships executable UI"
       consent, and the jira showcase bundle. Graceful `ready`-timeout fallback to declarative.
-- [ ] Phase 3 — capability grants (gated `open-external`), a typed `@liteduck/plugin-ui` SDK +
-      bundling recipe, bridge versioning, and (optional) bundle signing.
+- [x] Phase 3a — author SDK: typed `window.liteduck` bridge (`liteduck-plugins/sdk/bridge.d.ts`),
+      authoring guide, a copy-paste `templates/ui-plugin/`, the `ui` JSON-schema, and a bundling
+      recipe.
+- [ ] Phase 3b — capability grants (gated `open-external`), bridge versioning policy, and
+      (optional) bundle signing.
 
 ---
 
