@@ -228,6 +228,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
         onChange={setEditContent}
         onSave={handleSave}
         hasChanges={hasChanges}
+        docsMode={docsMode}
       />
     );
   }

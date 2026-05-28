@@ -9,6 +9,13 @@ interface WritingViewProps {
   onChange: (content: string) => void;
   onSave: () => Promise<void>;
   hasChanges: boolean;
+  /**
+   * Full-page docs surface (vs. a workspace editor pane). When true the
+   * typewriter top/bottom spacers are page-sized (40vh) so any line can sit at
+   * the true vertical center. In a short editor pane that much padding pushes
+   * content off-screen, so we use a small fixed gutter instead.
+   */
+  docsMode?: boolean;
 }
 
 /** Count words in text. */
@@ -21,7 +28,14 @@ function estimateReadingTime(words: number): number {
   return Math.max(1, Math.ceil(words / 200));
 }
 
-export function WritingView({ content, filename, onChange, onSave, hasChanges }: WritingViewProps) {
+export function WritingView({
+  content,
+  filename,
+  onChange,
+  onSave,
+  hasChanges,
+  docsMode = false,
+}: WritingViewProps) {
   const { settings } = useReadingSettings();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,13 +50,35 @@ export function WritingView({ content, filename, onChange, onSave, hasChanges }:
   const charCount = content.length;
   const readingTime = useMemo(() => estimateReadingTime(wordCount), [wordCount]);
 
+  // ── Auto-grow ─────────────────────────────────────────────────────────
+  // The textarea lives inside a scroll container; it must grow to its full
+  // content height so the container scrolls through the whole file rather than
+  // clipping at a fixed/min height. (A non-growing textarea inside an
+  // overflow-y-auto parent would hide everything past its own box.)
+
+  const autoGrow = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, []);
+
+  // Re-fit whenever the content or any size-affecting setting changes.
+  useEffect(() => {
+    autoGrow();
+  }, [autoGrow, content, settings.fontSize, settings.lineHeight, settings.maxWidth]);
+
   // ── Typewriter scrolling ──────────────────────────────────────────────
-  // Keep the cursor line vertically centered in the viewport.
+  // Keep the cursor line vertically centered in the viewport. Only acts while
+  // the textarea is focused, and clamps to the container's valid scroll range
+  // so it can never strand content in a short editor pane.
 
   const scrollCursorToCenter = useCallback(() => {
     const ta = textareaRef.current;
     const container = containerRef.current;
     if (!ta || !container) return;
+    // Don't hijack scroll position unless the user is actually editing.
+    if (document.activeElement !== ta) return;
 
     // Compute the line the cursor is on
     const cursorPos = ta.selectionStart;
@@ -52,15 +88,16 @@ export function WritingView({ content, filename, onChange, onSave, hasChanges }:
     // Get line height from computed style
     const style = window.getComputedStyle(ta);
     const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.8;
-    const paddingTop = parseFloat(style.paddingTop) || 0;
 
-    // Target: cursor line at vertical center of the container
-    const cursorY = paddingTop + (lineNumber - 1) * lineHeight;
+    // Cursor's vertical offset within the scroll container (textarea top +
+    // line offset), accounting for the spacer above the centered column.
+    const cursorY = ta.offsetTop + (lineNumber - 1) * lineHeight;
     const containerHeight = container.clientHeight;
+    const maxScroll = Math.max(0, container.scrollHeight - containerHeight);
     const targetScrollTop = cursorY - containerHeight / 2 + lineHeight / 2;
 
     container.scrollTo({
-      top: Math.max(0, targetScrollTop),
+      top: Math.min(maxScroll, Math.max(0, targetScrollTop)),
       behavior: "smooth",
     });
   }, [content]);
@@ -252,9 +289,10 @@ export function WritingView({ content, filename, onChange, onSave, hasChanges }:
 
       {/* Writing area with typewriter scrolling */}
       <div ref={containerRef} className="flex-1 overflow-y-auto">
-        {/* Top padding to allow first line at center */}
-        <div style={{ height: "40vh" }} />
-        <div className="mx-auto px-8" style={{ maxWidth: `${settings.maxWidth}px` }}>
+        {/* Top gutter — page-sized in docsMode so any line can hit center;
+            small in a short editor pane so content stays in view. */}
+        <div style={{ height: docsMode ? "40vh" : "1.5rem" }} />
+        <div className="mx-auto w-full px-8" style={{ maxWidth: `${settings.maxWidth}px` }}>
           <textarea
             ref={textareaRef}
             value={content}
@@ -263,23 +301,23 @@ export function WritingView({ content, filename, onChange, onSave, hasChanges }:
             onSelect={handleSelect}
             onClick={handleSelect}
             spellCheck
+            rows={1}
             className={cn(
-              "w-full resize-none border-none bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-ring)]",
+              "block w-full resize-none overflow-hidden border-none bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-ring)]",
               "text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]",
               "caret-emerald-500",
             )}
             style={{
               fontSize: `${settings.fontSize}px`,
               lineHeight: settings.lineHeight,
-              minHeight: "20vh",
               fontFamily:
                 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             }}
             placeholder="Start writing..."
           />
         </div>
-        {/* Bottom padding to allow last line at center */}
-        <div style={{ height: "40vh" }} />
+        {/* Bottom gutter — matches the top gutter rationale. */}
+        <div style={{ height: docsMode ? "40vh" : "1.5rem" }} />
       </div>
 
       {/* Stats bar */}
