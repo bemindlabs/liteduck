@@ -13,10 +13,13 @@
  *
  * AR = ActivityRail. The Outlet (for /settings, /notifications) replaces the
  * EditorArea when active so the page renders as a full-area view while the
- * activity rail, terminal dock, and status bar remain visible.
+ * activity rail, terminal dock, and status bar remain visible. The Git view
+ * follows the same full-area pattern: when the "git" panel is active GitPage
+ * renders in the editor-area slot (not the narrow side panel) so its internal
+ * two-column layout has room to breathe.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ActivityRail } from "./ActivityRail";
 import { SidePanel } from "./SidePanel";
@@ -27,6 +30,11 @@ import { type EditorTab } from "./EditorTabs";
 import { ROUTES, panelFromPath, type WorkspacePanel } from "@/lib/routes";
 import type { FileEntry } from "@/lib/files";
 import { PageLoading } from "@/components/ui/skeleton";
+
+// GitPage is heavy (multi-repo scan, large tabs) — keep lazy. It renders in the
+// editor area (full width) when the "git" panel is active, mirroring how the
+// settings / notifications Outlets replace the editor area.
+const GitPage = lazy(() => import("@/pages/GitPage"));
 
 // Re-export for parent forwarding refs of imperative actions (toggles).
 export interface WorkspaceShellHandle {
@@ -168,13 +176,18 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
   const showOutlet = routeOverridesEditor(location.pathname);
 
-  // The side panel only has a useful body for "files" / "git". For
-  // "settings" / "notifications" the editor area shows the full page, so
-  // the side panel stays collapsed even though the rail icon still
+  // Git renders full-width in the editor area (like settings / notifications),
+  // never in the narrow side panel — its internal file-list + diff two-column
+  // layout is unusable at ~240px. The rail icon still highlights via
+  // `activePanel`; the editor area shows GitPage when this is true.
+  const showGit = activePanel === "git";
+
+  // The side panel only has a useful body for "files". For
+  // "git" / "settings" / "notifications" the editor area shows the full page,
+  // so the side panel stays collapsed even though the rail icon still
   // highlights via `activePanel`. This is what makes Cmd+, behave like
   // clicking the rail Settings icon (no auto-expand of a vestigial pointer).
-  const sidePanelBody: "files" | "git" | null =
-    activePanel === "files" || activePanel === "git" ? activePanel : null;
+  const showFilesSidePanel = activePanel === "files";
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -183,9 +196,8 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <ActivityRail active={activePanel} onSelect={handleRailSelect} />
 
-        {sidePanelBody !== null && (
+        {showFilesSidePanel && (
           <SidePanel
-            panel={sidePanelBody}
             width={sidePanelWidth}
             onResize={setSidePanelWidth}
             selectedFilePath={activeTabId}
@@ -202,6 +214,12 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
                   <Outlet />
                 </Suspense>
               </div>
+            ) : showGit ? (
+              <Suspense fallback={<PageLoading />}>
+                <div className="h-full overflow-y-auto">
+                  <GitPage />
+                </div>
+              </Suspense>
             ) : (
               <EditorArea
                 tabs={tabs}

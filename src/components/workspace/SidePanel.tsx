@@ -3,27 +3,21 @@
  *
  * Renders the appropriate panel body for the active panel:
  *   - files → FilesTreePanel (tree only; editor area handles the preview)
- *   - git   → GitPage (its own self-contained UI)
  *
- * For settings / notifications the shell does not render the SidePanel at all
- * (those routes own the full editor area via Outlet); the rail icon highlights
- * via `activePanel` state, but no side column is shown.
+ * For git / settings / notifications the shell does not render the SidePanel at
+ * all — those views own the full editor area (git + settings + notifications
+ * render there directly / via Outlet). The rail icon still highlights via
+ * `activePanel` state, but no side column is shown.
  *
  * Width is user-adjustable via the drag handle on its right edge.
  */
 
-import { lazy, Suspense, useRef } from "react";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
-import { PageLoading } from "@/components/ui/skeleton";
 import type { FileEntry } from "@/lib/files";
-import type { WorkspacePanel } from "@/lib/routes";
 import { FilesTreePanel } from "./FilesTreePanel";
 
-// GitPage is heavy (multi-repo scan, large tabs) — keep lazy.
-const GitPage = lazy(() => import("@/pages/GitPage"));
-
 interface SidePanelProps {
-  panel: WorkspacePanel;
   width: number;
   onResize: (width: number) => void;
   /** Active file in the editor (for tree highlight). */
@@ -35,13 +29,7 @@ interface SidePanelProps {
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 600;
 
-export function SidePanel({
-  panel,
-  width,
-  onResize,
-  selectedFilePath,
-  onFileOpen,
-}: SidePanelProps) {
+export function SidePanel({ width, onResize, selectedFilePath, onFileOpen }: SidePanelProps) {
   const dragging = useRef(false);
 
   function onMouseDown(e: React.MouseEvent) {
@@ -69,22 +57,12 @@ export function SidePanel({
 
   return (
     <aside
-      aria-label={`${panel} panel`}
+      aria-label="files panel"
       className="flex h-full shrink-0"
       style={{ width, minWidth: width, maxWidth: width }}
     >
       <div className="flex-1 min-w-0 overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-background)]">
-        {panel === "files" && (
-          <FilesTreePanel selectedPath={selectedFilePath} onFileOpen={onFileOpen} />
-        )}
-
-        {panel === "git" && (
-          <Suspense fallback={<PageLoading />}>
-            <div className="h-full overflow-y-auto">
-              <GitPage />
-            </div>
-          </Suspense>
-        )}
+        <FilesTreePanel selectedPath={selectedFilePath} onFileOpen={onFileOpen} />
       </div>
 
       {/* Drag handle */}
