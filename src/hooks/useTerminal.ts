@@ -133,11 +133,15 @@ export function useTerminal(): UseTerminalReturn {
     let cancelled = false;
 
     // Safely call an unlisten function — swallow errors from listeners already
-    // removed by React StrictMode double-mount.  Tauri's unlisten may reject
-    // asynchronously; we attach a global rejection handler below.
+    // removed by React StrictMode double-mount.  Tauri types UnlistenFn as
+    // `() => void`, but at runtime it returns a promise that rejects when the
+    // listener is already gone; coerce to a promise so we catch both the
+    // synchronous throw and the asynchronous rejection.
     const safeUnlisten = (fn: UnlistenFn) => {
       try {
-        fn();
+        void Promise.resolve(fn() as unknown).catch(() => {
+          // Listener already removed — nothing to clean up.
+        });
       } catch {
         // Listener already removed — nothing to clean up.
       }
@@ -267,6 +271,19 @@ export function useTerminal(): UseTerminalReturn {
         // Replay any pty-closed event that arrived before the mapping was set.
         const closedEarly = pendingClosed.current.delete(sessionId);
 
+        // Sync PTY size to the xterm's current dimensions. FitAddon may have
+        // resized xterm before terminal_create resolved; that earlier resize
+        // callback was a no-op because sessionId was still null on the tab,
+        // leaving the PTY (and tmux inside it) stuck at the default 80x24.
+        const xtermNow = xtermRefs.current.get(tabId);
+        if (xtermNow) {
+          void invoke("terminal_resize", {
+            sessionId,
+            cols: xtermNow.cols,
+            rows: xtermNow.rows,
+          }).catch((err: unknown) => logger.error("initial terminal_resize failed:", err));
+        }
+
         setTabs((prev) =>
           prev.map((t) =>
             t.id === tabId
@@ -324,6 +341,17 @@ export function useTerminal(): UseTerminalReturn {
         sessionToTab.current.set(sessionId, tabId);
 
         const closedEarly = pendingClosed.current.delete(sessionId);
+
+        // See createTab — sync PTY to xterm dimensions in case FitAddon
+        // resized before terminal_attach resolved.
+        const xtermNow = xtermRefs.current.get(tabId);
+        if (xtermNow) {
+          void invoke("terminal_resize", {
+            sessionId,
+            cols: xtermNow.cols,
+            rows: xtermNow.rows,
+          }).catch((err: unknown) => logger.error("initial terminal_resize failed:", err));
+        }
 
         setTabs((prev) =>
           prev.map((t) => (t.id === tabId ? { ...t, sessionId, running: !closedEarly } : t)),

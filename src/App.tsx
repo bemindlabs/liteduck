@@ -305,7 +305,10 @@ function Layout() {
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <main
             id="main-content"
-            className="relative flex min-w-0 flex-1 flex-col overflow-hidden p-2 sm:p-4"
+            className={cn(
+              "relative flex min-w-0 flex-1 flex-col overflow-hidden",
+              isTerminalPage ? "p-2" : "p-2 sm:p-4",
+            )}
           >
             {/* Focus mode toggle button — top-right corner */}
             <button
