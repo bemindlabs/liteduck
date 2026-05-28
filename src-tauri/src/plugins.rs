@@ -195,6 +195,11 @@ pub struct RegistryEntry {
     pub tags: Vec<String>,
     #[serde(default)]
     pub verified: bool,
+    /// Whether the plugin ships an **executable UI** (ADR-002) — surfaced in the
+    /// install UI so the user consents to running plugin code (isolated, but
+    /// still third-party) before installing.
+    #[serde(default)]
+    pub ui: bool,
 }
 
 /// The parsed top-level `registry.json` document.

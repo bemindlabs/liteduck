@@ -871,6 +871,10 @@ function AvailableView({
   busy: string | null;
   onInstall: (entry: RegistryEntry) => void;
 }) {
+  // Installing an executable-UI plugin (ADR-002) runs third-party code — isolated
+  // in a `plugin://` sandbox, but still third-party — so gate it behind explicit
+  // consent. `confirmId` is the entry currently awaiting that confirmation.
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
       {/* Provenance line */}
@@ -930,6 +934,15 @@ function AvailableView({
                           verified
                         </span>
                       )}
+                      {entry.ui && (
+                        <span
+                          title="Ships an executable UI that runs in an isolated plugin:// sandbox"
+                          className="inline-flex items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-600 dark:text-violet-400"
+                        >
+                          <Boxes className="h-3 w-3" />
+                          UI
+                        </span>
+                      )}
                     </div>
                     {entry.author && (
                       <p className="mt-1 text-[10px] text-[var(--color-muted-foreground)]">
@@ -957,7 +970,7 @@ function AvailableView({
                   <Button
                     variant={installed ? "outline" : "default"}
                     size="sm"
-                    onClick={() => onInstall(entry)}
+                    onClick={() => (entry.ui ? setConfirmId(entry.id) : onInstall(entry))}
                     disabled={installing}
                     title={installed ? "Reinstall / upgrade" : "Install from registry"}
                   >
@@ -969,6 +982,33 @@ function AvailableView({
                     {installing ? "Installing…" : installed ? "Reinstall" : "Install"}
                   </Button>
                 </div>
+
+                {/* Executable-UI consent gate (ADR-002). */}
+                {confirmId === entry.id && (
+                  <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                    <p className="text-amber-700 dark:text-amber-300">
+                      <strong>{entry.name}</strong> ships an executable UI. It runs in an isolated{" "}
+                      <code>plugin://</code> sandbox (no access to your files or LiteDuck itself),
+                      but it is still third-party code. Install it?
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setConfirmId(null);
+                          onInstall(entry);
+                        }}
+                        disabled={installing}
+                      >
+                        <Download className="h-4 w-4" />
+                        {installed ? "Reinstall anyway" : "Install anyway"}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setConfirmId(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </li>
             );
           })}

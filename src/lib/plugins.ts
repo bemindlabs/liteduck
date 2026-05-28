@@ -126,6 +126,8 @@ export interface RegistryEntry {
   tags: string[];
   /** Whether the registry marks this plugin as verified. */
   verified: boolean;
+  /** Whether the plugin ships an executable UI (ADR-002) — drives install consent. */
+  ui: boolean;
 }
 
 // ── API wrappers ──────────────────────────────────────────────────────────────
