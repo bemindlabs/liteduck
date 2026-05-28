@@ -12,7 +12,9 @@ export type ShortcutAction =
   | "open-shortcuts-help"
   | "terminal-new-tab"
   | "terminal-close-tab"
-  | "toggle-focus-mode";
+  | "toggle-focus-mode"
+  | "toggle-side-panel"
+  | "toggle-terminal-dock";
 
 /**
  * Describes a single keyboard shortcut binding.
@@ -148,6 +150,21 @@ export const DEFAULT_BINDINGS: ShortcutBinding[] = [
     shift: true,
     globalOverride: true,
   },
+  {
+    action: "toggle-side-panel",
+    label: "Toggle Side Panel",
+    description: "Show or hide the workspace side panel (file tree / git / settings)",
+    key: "b",
+    mod: true,
+  },
+  {
+    action: "toggle-terminal-dock",
+    label: "Toggle Terminal",
+    description: "Show or hide the bottom terminal dock",
+    key: "`",
+    mod: true,
+    globalOverride: true,
+  },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -207,6 +224,10 @@ export interface KeyboardShortcutsConfig {
   onCloseTerminalTab: () => void;
   /** Called when "toggle-focus-mode" fires. */
   onToggleFocusMode?: () => void;
+  /** Called when "toggle-side-panel" (Cmd+B) fires. */
+  onToggleSidePanel?: () => void;
+  /** Called when "toggle-terminal-dock" (Cmd+`) fires. */
+  onToggleTerminalDock?: () => void;
   /** React Router (or similar) navigate function. */
   navigate: (path: string) => void | Promise<void>;
   /**
@@ -241,6 +262,8 @@ export function useKeyboardShortcuts({
   onNewTerminalTab,
   onCloseTerminalTab,
   onToggleFocusMode,
+  onToggleSidePanel,
+  onToggleTerminalDock,
   navigate,
   bindings = DEFAULT_BINDINGS,
 }: KeyboardShortcutsConfig) {
@@ -267,6 +290,12 @@ export function useKeyboardShortcuts({
         case "toggle-focus-mode":
           onToggleFocusMode?.();
           break;
+        case "toggle-side-panel":
+          onToggleSidePanel?.();
+          break;
+        case "toggle-terminal-dock":
+          onToggleTerminalDock?.();
+          break;
         default:
           break;
       }
@@ -278,6 +307,8 @@ export function useKeyboardShortcuts({
       onNewTerminalTab,
       onCloseTerminalTab,
       onToggleFocusMode,
+      onToggleSidePanel,
+      onToggleTerminalDock,
     ],
   );
 

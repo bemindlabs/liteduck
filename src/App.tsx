@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useEffect } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect, useRef } from "react";
 import {
   BrowserRouter,
   Navigate,
@@ -8,14 +8,17 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
-// Always-mounted page — must be eagerly loaded to preserve PTY state
-import TerminalPage from "@/pages/TerminalPage";
 import { shouldShowWizard, shouldShowWizardForWorkspace } from "@/lib/wizard";
+import {
+  WorkspaceShell,
+  type WorkspaceShellHandle,
+} from "@/components/workspace/WorkspaceShell";
 
-// Lazy-loaded pages — split into separate chunks for faster initial load
+// Lazy-loaded pages — split into separate chunks for faster initial load.
+// (FilesPage/GitPage are owned by WorkspaceShell on native; SidePanel imports
+// GitPage lazily there. On non-native they are not reachable so they aren't
+// referenced here anymore.)
 const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage"));
-const FilesPage = lazy(() => import("@/pages/FilesPage"));
-const GitPage = lazy(() => import("@/pages/GitPage"));
 const WizardPage = lazy(() => import("@/pages/WizardPage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const LandingPage = lazy(() => import("@/pages/LandingPage"));
@@ -139,11 +142,16 @@ function Layout() {
 
   const nativeCapable = hasNativeCapabilities();
 
-  const isTerminalPage =
-    nativeCapable && (location.pathname === ROUTES.TERMINAL || location.pathname === ROUTES.HOME);
-
   // Resolve user-customised bindings on first render (localStorage is sync).
   const [bindings] = useState(() => resolveBindings(loadShortcutOverrides()));
+
+  // Imperative handle on the workspace shell — wired up by the shell on mount
+  // so Cmd+B / Cmd+` can toggle the side panel and terminal dock without prop
+  // drilling through the keyboard-shortcuts hook.
+  const shellHandleRef = useRef<WorkspaceShellHandle | null>(null);
+  const registerShellHandle = useCallback((handle: WorkspaceShellHandle) => {
+    shellHandleRef.current = handle;
+  }, []);
 
   const toggleDark = useCallback(() => {
     setIsDark((prev) => {
@@ -182,6 +190,14 @@ function Layout() {
     setFocusMode((v) => !v);
   }, []);
 
+  const handleToggleSidePanel = useCallback(() => {
+    shellHandleRef.current?.toggleSidePanel();
+  }, []);
+
+  const handleToggleTerminalDock = useCallback(() => {
+    shellHandleRef.current?.toggleTerminalDock();
+  }, []);
+
   useKeyboardShortcuts({
     bindings,
     navigate,
@@ -190,6 +206,8 @@ function Layout() {
     onNewTerminalTab: handleNewTerminalTab,
     onCloseTerminalTab: handleCloseTerminalTab,
     onToggleFocusMode: handleToggleFocusMode,
+    onToggleSidePanel: handleToggleSidePanel,
+    onToggleTerminalDock: handleToggleTerminalDock,
   });
 
   const handleCheckUpdate = useCallback(() => {
@@ -204,8 +222,21 @@ function Layout() {
   useMenuEvents({
     navigate,
     onToggleSidebar: useCallback(
-      () => (isMobileLayout ? toggleMobileSidebar() : setSidebarCollapsed((v) => !v)),
-      [isMobileLayout, toggleMobileSidebar],
+      () => {
+        if (isMobileLayout) {
+          toggleMobileSidebar();
+          return;
+        }
+        // On native, the outer Sidebar is replaced by the WorkspaceShell's
+        // ActivityRail + SidePanel. Route "toggle sidebar" menu commands to the
+        // shell's collapse toggle so the View menu / Cmd+B do the same thing.
+        if (nativeCapable) {
+          shellHandleRef.current?.toggleSidePanel();
+          return;
+        }
+        setSidebarCollapsed((v) => !v);
+      },
+      [isMobileLayout, toggleMobileSidebar, nativeCapable],
     ),
     onOpenCommandPalette: handleOpenCommandPalette,
     onToggleDark: toggleDark,
@@ -239,8 +270,9 @@ function Layout() {
         Skip to main content
       </a>
 
-      {/* Sidebar — hidden on mobile, slides out in focus mode */}
-      {!isMobileLayout && (
+      {/* Sidebar — kept on non-native (mobile) builds only. On native the
+          WorkspaceShell's ActivityRail replaces it. Still slides out in focus mode. */}
+      {!isMobileLayout && !nativeCapable && (
         <div
           className={cn(
             "shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
@@ -305,10 +337,7 @@ function Layout() {
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <main
             id="main-content"
-            className={cn(
-              "relative flex min-w-0 flex-1 flex-col overflow-hidden",
-              isTerminalPage ? "p-2" : "p-2 sm:p-4",
-            )}
+            className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
           >
             {/* Focus mode toggle button — top-right corner */}
             <button
@@ -327,27 +356,16 @@ function Layout() {
               )}
             </button>
 
-            {/* Terminal page is always mounted (never unmounted) to preserve PTY sessions.
-                Only rendered on platforms with native OS capabilities. */}
-            {nativeCapable && (
+            {/* Native platforms: VS Code-style workspace shell. The shell stays
+                mounted across all native routes so the TerminalDock (and its
+                always-mounted TerminalPage) preserves PTY state. /settings and
+                /notifications render via Outlet inside the shell. */}
+            {nativeCapable ? (
+              <WorkspaceShell registerHandle={registerShellHandle} />
+            ) : (
               <div
                 className={cn(
-                  "flex h-full min-h-0 flex-1 flex-col",
-                  isTerminalPage
-                    ? "relative z-10"
-                    : "absolute inset-0 overflow-hidden opacity-0 pointer-events-none -z-10",
-                )}
-                aria-hidden={!isTerminalPage}
-              >
-                <TerminalPage />
-              </div>
-            )}
-
-            {/* Other pages render via Outlet (normal mount/unmount) */}
-            {!isTerminalPage && (
-              <div
-                className={cn(
-                  "relative z-10 flex h-full min-h-0 flex-1 flex-col overflow-y-auto",
+                  "relative z-10 flex h-full min-h-0 flex-1 flex-col overflow-y-auto p-2 sm:p-4",
                   focusMode && "mx-auto w-full max-w-4xl",
                 )}
               >
@@ -384,9 +402,15 @@ function Layout() {
         onClose={() => setPaletteOpen(false)}
         onNavigate={navigate}
         onToggleDark={toggleDark}
-        onToggleSidebar={() =>
-          isMobileLayout ? setMobileSidebarOpen((v) => !v) : setSidebarCollapsed((v) => !v)
-        }
+        onToggleSidebar={() => {
+          if (isMobileLayout) {
+            setMobileSidebarOpen((v) => !v);
+          } else if (nativeCapable) {
+            shellHandleRef.current?.toggleSidePanel();
+          } else {
+            setSidebarCollapsed((v) => !v);
+          }
+        }}
         onToggleFocusMode={handleToggleFocusMode}
       />
 
@@ -489,27 +513,29 @@ export default function App() {
                   </WorkspaceGate>
                 }
               >
-                {/* Default route: terminal on native platforms, settings on iOS/Android */}
+                {/* Default route — on native, just show the workspace shell at /.
+                    On non-native (iOS/Android), fall through to /settings. */}
                 <Route
                   index
                   element={
-                    <Navigate
-                      to={hasNativeCapabilities() ? ROUTES.TERMINAL : ROUTES.SETTINGS}
-                      replace
-                    />
+                    hasNativeCapabilities() ? null : <Navigate to={ROUTES.SETTINGS} replace />
                   }
                 />
 
-                {/* Native-only routes — only registered on platforms with OS capabilities */}
+                {/* Native-only routes. The WorkspaceShell owns the actual UI for
+                    terminal / files / git — these routes exist purely so the URL
+                    can drive which side panel is active. Elements are null on
+                    native so the shell's internal EditorArea/SidePanel renders. */}
                 {hasNativeCapabilities() && (
                   <>
                     <Route path="terminal" element={null} />
-                    <Route path="files" element={<FilesPage />} />
-                    <Route path="git" element={<GitPage />} />
+                    <Route path="files" element={null} />
+                    <Route path="git" element={null} />
                   </>
                 )}
 
-                {/* Routes available on all platforms */}
+                {/* Routes available on all platforms — these DO render via the
+                    shell's Outlet on native (replacing the editor area). */}
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
 
@@ -517,10 +543,7 @@ export default function App() {
                 <Route
                   path="*"
                   element={
-                    <Navigate
-                      to={hasNativeCapabilities() ? ROUTES.TERMINAL : ROUTES.SETTINGS}
-                      replace
-                    />
+                    <Navigate to={hasNativeCapabilities() ? ROUTES.HOME : ROUTES.SETTINGS} replace />
                   }
                 />
               </Route>
