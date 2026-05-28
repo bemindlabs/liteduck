@@ -126,12 +126,37 @@ classify() {
 
 do_list() {
   require_auth
-  # The enhanced /search/jql endpoint REJECTS unbounded queries (a bare
-  # `ORDER BY` with no restriction → HTTP 400 "Unbounded JQL queries are not
-  # allowed here"). The default therefore carries a bound (issues updated in the
-  # last 30 days); callers can override via the jql param with their own
-  # restriction.
-  jql="${LITEDUCK_PARAM_JQL:-updated >= -30d ORDER BY updated DESC}"
+
+  # Build the JQL. An explicit `jql` param is an advanced full-query override
+  # (used as-is); otherwise we AND together the simple filters:
+  #   • assignee — DEFAULTS to the current user ("me") so the list lands on *your*
+  #     issues. "unassigned" → IS EMPTY; "any"/"all"/empty → no assignee clause.
+  #   • project  — optional board/project scope (a Jira board maps to a project),
+  #     e.g. "ALE". Empty → no project clause.
+  # A restriction is mandatory: the enhanced /search/jql endpoint rejects
+  # unbounded queries (a bare ORDER BY → HTTP 400 "Unbounded JQL queries are not
+  # allowed here"). If no filter yields a clause we fall back to a time bound.
+  jql_override="${LITEDUCK_PARAM_JQL:-}"
+  assignee="$(printf '%s' "${LITEDUCK_PARAM_ASSIGNEE:-me}" | tr -d '"')"
+  project="$(printf '%s' "${LITEDUCK_PARAM_PROJECT:-}" | tr -d '"')"
+
+  if [ -n "$jql_override" ]; then
+    jql="$jql_override"
+  else
+    where=""
+    add_clause() { where="${where:+$where AND }$1"; }
+    case "$assignee" in
+      me|Me|ME|currentUser|currentuser)             add_clause "assignee = currentUser()" ;;
+      unassigned|Unassigned|UNASSIGNED|empty|EMPTY) add_clause "assignee IS EMPTY" ;;
+      ""|any|Any|ANY|all|All|ALL)                   : ;;
+      *)                                            add_clause "assignee = \"$assignee\"" ;;
+    esac
+    [ -n "$project" ] && add_clause "project = \"$project\""
+    # Guard against an unbounded query (e.g. assignee=any with no project).
+    [ -z "$where" ] && where="updated >= -30d"
+    jql="$where ORDER BY updated DESC"
+  fi
+
   max="${LITEDUCK_PARAM_MAX_RESULTS:-25}"
   case "$max" in (*[!0-9]*|'') max=25 ;; esac
   [ "$max" -gt "$MAX_PAGE" ] && max="$MAX_PAGE"

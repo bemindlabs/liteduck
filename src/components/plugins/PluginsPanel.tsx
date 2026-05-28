@@ -740,8 +740,16 @@ function prettifyArg(arg: string): string {
 
 /** Optional per-arg placeholder hints (sensible defaults shown to the user). */
 const ARG_PLACEHOLDERS: Record<string, string> = {
-  jql: "updated >= -30d ORDER BY updated DESC",
+  assignee: "me · unassigned · any · email@…",
+  project: "board/project key, e.g. ALE",
+  jql: "advanced — full JQL overrides the filters above",
   max_results: "25",
+};
+
+/** Per-arg initial values — seed the inline form so the filter is visible and
+ *  active by default (e.g. Assignee pre-filled with "me" → your issues). */
+const ARG_DEFAULTS: Record<string, string> = {
+  assignee: "me",
 };
 
 /**
@@ -763,7 +771,16 @@ function InlineParamForm({
   onSubmit: (params: Record<string, string>) => void;
 }) {
   const args = command.args;
-  const [values, setValues] = useState<Record<string, string>>({});
+  // Seed initial values from ARG_DEFAULTS so default filters (e.g. assignee="me")
+  // are visible and active. The form remounts per command (keyed on command.id),
+  // so this initializer re-runs whenever a different command is expanded.
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const seed: Record<string, string> = {};
+    for (const [arg, def] of Object.entries(ARG_DEFAULTS)) {
+      if (args.includes(arg)) seed[arg] = def;
+    }
+    return seed;
+  });
 
   return (
     <form

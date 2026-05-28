@@ -45,7 +45,7 @@ const jiraPlugin: InstalledPlugin = {
       id: "jira.list",
       title: "Jira: List Issues (JQL)",
       run: "sh jira.sh list",
-      args: ["jql", "max_results"],
+      args: ["assignee", "project", "jql", "max_results"],
       view: "table",
       default: true,
     },
@@ -101,16 +101,37 @@ describe("PluginsPanel command toolbar", () => {
     });
   });
 
-  it("drops empty args so the script's own defaults apply", async () => {
+  it("seeds the Assignee filter with 'me' by default and submits it", async () => {
     const user = userEvent.setup();
     render(<PluginsPanel initialPluginId="jira" />);
 
-    // Expand the list command and submit with nothing filled → empty params object.
+    // Expanding the list command shows the Assignee filter pre-filled with "me".
     await user.click(await screen.findByRole("button", { name: /List Issues/ }));
+    expect(await screen.findByLabelText("Assignee")).toHaveValue("me");
+
+    // Submitting with only the seeded default → just { assignee: "me" } (the
+    // empty project/jql/max_results are dropped so the script's defaults apply).
+    await user.click(screen.getByRole("button", { name: /^Run$/ }));
+    await waitFor(() => {
+      expect(pluginRunCommand).toHaveBeenCalledWith("jira", "jira.list", { assignee: "me" }, undefined);
+    });
+  });
+
+  it("passes a project (board) filter alongside the assignee default", async () => {
+    const user = userEvent.setup();
+    render(<PluginsPanel initialPluginId="jira" />);
+
+    await user.click(await screen.findByRole("button", { name: /List Issues/ }));
+    await user.type(await screen.findByLabelText("Project"), "ALE");
     await user.click(screen.getByRole("button", { name: /^Run$/ }));
 
     await waitFor(() => {
-      expect(pluginRunCommand).toHaveBeenCalledWith("jira", "jira.list", {}, undefined);
+      expect(pluginRunCommand).toHaveBeenCalledWith(
+        "jira",
+        "jira.list",
+        { assignee: "me", project: "ALE" },
+        undefined,
+      );
     });
   });
 });

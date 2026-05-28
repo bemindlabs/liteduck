@@ -16,7 +16,7 @@
       "id": "jira.list",
       "title": "Jira: List Issues (JQL)",
       "run": "sh \"$LITEDUCK_PLUGIN_DIR/jira.sh\" list",
-      "args": ["jql", "max_results"],
+      "args": ["assignee", "project", "jql", "max_results"],
       "view": "table",
       "default": true
     },
