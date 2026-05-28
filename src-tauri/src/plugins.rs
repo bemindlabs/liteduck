@@ -106,6 +106,31 @@ pub struct PluginManifest {
     /// clutter; absent → `false`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pinned: Option<bool>,
+    /// Optional **executable UI** entry (ADR-002 / `2026-05-28_plugin-ui-host-design.md`).
+    /// When present, the frontend renders the plugin through the isolated UI host
+    /// (a sandboxed, opaque-origin iframe) using the named bundle instead of the
+    /// built-in declarative views. Absent → declarative (backward compatible). The
+    /// Rust side only declares + serves the bundle; it never executes plugin code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui: Option<PluginUi>,
+}
+
+/// Executable-UI descriptor for a plugin (ADR-002). The bundle is a single,
+/// self-contained ES module shipped in the plugin directory; LiteDuck loads it
+/// into a sandboxed iframe with no access to the host or the Tauri bridge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginUi {
+    /// Bundle filename relative to the plugin directory (e.g. `ui.js`). Must be a
+    /// bare filename — path separators / `..` are rejected when the bundle is read.
+    pub entry: String,
+    /// Optional height hint for panel surfaces (`full` or a px value). Page
+    /// surfaces fill the editor area regardless.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<String>,
+    /// What to do if the bundle fails to load: `declarative` falls back to the
+    /// built-in views. Absent → `declarative`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<String>,
 }
 
 /// An installed plugin: its manifest plus the resolved on-disk directory.
@@ -585,6 +610,33 @@ pub fn uninstall_plugin_inner(id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Read a plugin's declared executable-UI bundle (ADR-002 / the plugin-UI-host
+/// design note). Resolves the installed plugin, requires a `ui.entry`, validates
+/// the entry is a bare filename (no path separators / `..`), and returns the
+/// bundle text. The host only *reads* the file — it never executes it; the
+/// frontend loads it into a sandboxed, opaque-origin iframe.
+pub fn read_ui_inner(plugin_id: &str) -> Result<String, String> {
+    if plugin_id.contains('/') || plugin_id.contains('\\') || plugin_id.contains("..") {
+        return Err(format!("invalid plugin id '{plugin_id}'"));
+    }
+    let plugin = list_plugins_inner()?
+        .into_iter()
+        .find(|p| p.manifest.id == plugin_id)
+        .ok_or_else(|| format!("plugin '{plugin_id}' is not installed"))?;
+    let ui = plugin
+        .manifest
+        .ui
+        .as_ref()
+        .ok_or_else(|| format!("plugin '{plugin_id}' declares no UI bundle"))?;
+    let entry = ui.entry.as_str();
+    if entry.is_empty() || entry.contains('/') || entry.contains('\\') || entry.contains("..") {
+        return Err(format!("invalid ui entry '{entry}' for plugin '{plugin_id}'"));
+    }
+    let path = PathBuf::from(&plugin.dir).join(entry);
+    fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read UI bundle {}: {e}", path.display()))
+}
+
 /// Run a plugin's contributed command. The command's `run` template is spawned
 /// via `sh -c`. Caller-supplied `params` are exported as `LITEDUCK_PARAM_<KEY>`
 /// env vars (uppercased) — never interpolated into the shell string, to keep
@@ -735,6 +787,13 @@ pub fn plugin_run_command(
     )
 }
 
+/// Read a plugin's declared executable-UI bundle (ADR-002) so the frontend can
+/// load it into a sandboxed iframe. Read-only; the host never executes the code.
+#[tauri::command]
+pub fn plugin_read_ui(plugin_id: String) -> Result<String, String> {
+    read_ui_inner(&plugin_id)
+}
+
 /// Fetch the published plugin registry (`registry.json`) and return its entries.
 /// `registry_url` overrides the official default
 /// (`bemindlabs/liteduck-plugins@main`). Read-only — no disk writes.
@@ -828,6 +887,38 @@ mod tests {
         assert!(!json2.contains("surface"), "absent surface omitted: {json2}");
         assert!(!json2.contains("icon"), "absent icon omitted: {json2}");
         assert!(!json2.contains("pinned"), "absent pinned omitted: {json2}");
+    }
+
+    #[test]
+    fn ui_entry_parses_through() {
+        // A manifest declaring a plugin-level `ui` entry parses + round-trips
+        // (ADR-002). Absent → None (back-compat: declarative rendering).
+        let m: PluginManifest = serde_json::from_str(
+            r#"{"id":"bwoc","name":"BWOC","version":"1","kind":"integration",
+                "ui":{"entry":"ui.js","fallback":"declarative"}}"#,
+        )
+        .unwrap();
+        let ui = m.ui.as_ref().expect("ui present");
+        assert_eq!(ui.entry, "ui.js");
+        assert_eq!(ui.fallback.as_deref(), Some("declarative"));
+
+        let m2: PluginManifest =
+            serde_json::from_str(r#"{"id":"y","name":"Y","version":"1","kind":"tool"}"#).unwrap();
+        assert!(m2.ui.is_none());
+
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"ui\""), "got: {json}");
+        let json2 = serde_json::to_string(&m2).unwrap();
+        assert!(!json2.contains("\"ui\""), "absent ui omitted: {json2}");
+    }
+
+    #[test]
+    fn read_ui_rejects_path_traversal_in_id() {
+        // The plugin-id guard fires before any filesystem access, so this needs
+        // no installed plugin / home override.
+        for bad in ["../etc", "a/b", "..\\x"] {
+            assert!(read_ui_inner(bad).unwrap_err().contains("invalid plugin id"));
+        }
     }
 
     #[test]

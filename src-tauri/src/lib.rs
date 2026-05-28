@@ -281,6 +281,7 @@ pub fn run() {
             plugins::plugin_install,
             plugins::plugin_uninstall,
             plugins::plugin_run_command,
+            plugins::plugin_read_ui,
             plugins::plugin_registry_fetch,
             plugins::plugin_install_from_registry,
         ])

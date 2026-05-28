@@ -72,6 +72,26 @@ export interface PluginManifest {
    * Plugins icon) that opens its page directly. Absent → `false`. Opt-in.
    */
   pinned?: boolean;
+  /**
+   * Optional **executable UI** entry (ADR-002). When present, the plugin renders
+   * through the isolated UI host (a sandboxed, opaque-origin iframe) using this
+   * bundle instead of the built-in declarative views. Absent → declarative.
+   */
+  ui?: PluginUi;
+}
+
+/**
+ * Executable-UI descriptor (ADR-002 / `notes/2026-05-28_plugin-ui-host-design.md`).
+ * The bundle is a single self-contained ES module shipped in the plugin folder;
+ * LiteDuck loads it into a sandboxed iframe with no host / Tauri access.
+ */
+export interface PluginUi {
+  /** Bundle filename relative to the plugin dir (e.g. `ui.js`). Bare name only. */
+  entry: string;
+  /** Height hint for panel surfaces (`"full"` or px). Page surfaces fill the area. */
+  height?: string;
+  /** `"declarative"` → fall back to built-in views if the bundle fails to load. */
+  fallback?: string;
 }
 
 /** An installed plugin: its manifest plus the resolved on-disk directory. */
@@ -146,6 +166,15 @@ export async function pluginRunCommand(
     params: params ?? null,
     workspace: workspace ?? null,
   });
+}
+
+/**
+ * Read a plugin's declared executable-UI bundle (ADR-002) so it can be loaded
+ * into a sandboxed iframe. Read-only — the host never executes the code itself.
+ * Rejects plugins with no `ui` entry and any path-traversal in the entry name.
+ */
+export async function pluginReadUi(pluginId: string): Promise<string> {
+  return invoke<string>("plugin_read_ui", { pluginId });
 }
 
 /**

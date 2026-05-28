@@ -98,6 +98,11 @@ Key invariant: **`run-command` reuses the existing `plugin_run_command` path** �
 CWD, same `LITEDUCK_PARAM_*` env, same declared-command check. The UI host adds **zero** new
 execution capability; it is a new *renderer*, not a new *privilege*.
 
+> **Implementation note (opaque origin).** Because the iframe has no `allow-same-origin`, its
+> messages arrive with `event.origin === "null"`. The host therefore authenticates inbound
+> messages by **`event.source === frame.contentWindow`** (the exact frame), never by origin
+> string. The host posts to the frame via that same `contentWindow` reference.
+
 ## Capability gating
 
 - The UI may only call commands the plugin declared (`commands[].id`). A forged `commandId` is
@@ -110,9 +115,36 @@ execution capability; it is a new *renderer*, not a new *privilege*.
 ## CSP
 
 - Host window: **unchanged** (`script-src 'self'`).
-- The iframe is sandboxed with an opaque origin; its content is host-authored bootstrap +
-  blob-delivered plugin code. We add a frame allowance for the sandboxed child only. The host's
-  `connect-src` is **not** opened to plugin code (the iframe has no network by default).
+- See the spike finding below — running plugin scripts under the host CSP is **not** possible
+  with `srcdoc`; the plugin UI must load from a **separate origin** (custom URI scheme) whose
+  CSP we set per-response. The host window's own `script-src 'self'` stays untouched.
+
+## ⚠ Spike finding (2026-05-28) — `srcdoc` cannot isolate AND execute
+
+Building the Phase-1 scaffold surfaced a blocker in the `srcdoc` approach above:
+
+- A **sandboxed `srcdoc` iframe inherits the embedder's CSP**. With the host CSP at
+  `script-src 'self'` (no `'unsafe-inline'`), the bootstrap's inline `<script>` — and any
+  injected plugin script — is **blocked**. CSPs compose as an intersection, so a child `<meta>`
+  CSP cannot loosen the inherited `'self'`.
+- The two escapes both fail the goal:
+  - Loosen the **host** CSP to `'unsafe-inline'`/`blob:` → weakens the *whole app*'s XSS
+    posture. Rejected — it betrays the security model ADR-002 is built on.
+  - Load the frame from app origin (`/plugin-host.html`) **without** sandbox → same origin as
+    the host → plugin code can reach the parent + Tauri `invoke`. Rejected — no isolation.
+
+**Conclusion (revises the Isolation model above):** to *both* isolate from the host *and* run
+plugin scripts, the plugin UI must be served from a **separate origin with its own CSP** —
+i.e. a **custom URI scheme** registered in Tauri (`register_uri_scheme_protocol("plugin", …)`),
+serving `plugin://…/<id>/ui.html` + the bundle with a per-response `Content-Security-Policy`,
+loaded in a **cross-origin iframe**. This mirrors VS Code's `vscode-webview://` design. The
+host↔plugin **postMessage bridge, command gating, and `event.source` auth are unchanged**; only
+the *delivery + isolation mechanism* changes from `srcdoc` to a custom scheme.
+
+**Status:** groundwork landed (manifest `ui` field, `plugin_read_ui`, frontend types). The
+custom-scheme renderer + the bwoc proving bundle + PluginsPanel wiring are **held pending the
+operator's decision** to build the protocol (a real subsystem, larger than the original spike
+framing).
 
 ## Phasing
 
@@ -145,12 +177,20 @@ execution capability; it is a new *renderer*, not a new *privilege*.
 | Supply-chain (malicious bundle) | Install consent; registry `verified` flag; future signing (Phase 3+) |
 | Charter drift (AI surface returns) | `chat`/`agent`/`llm` `kind` deny-list unchanged |
 
-## Open questions for the operator
+## Resolved decisions (operator-approved 2026-05-28)
 
-1. **Proving plugin** — convert jira or bwoc first to a JS UI in Phase 1? (jira has the richer
-   payload; bwoc is simpler.)
-2. **Bundle authoring** — do we ship a starter template + bundling recipe in
-   `liteduck-plugins`, or document esbuild and leave it to authors?
-3. **Surfaces** — JS UI for both the `panel` and `page` surfaces in Phase 1, or `page` only?
-4. **Signing** — is registry `verified` + install consent enough for v1, or do we want bundle
-   signing before any JS-UI plugin can be installed?
+1. **Proving plugin: `bwoc` first.** Simplest payload (no auth/network, small `{agents:[…]}`),
+   so the Phase-1 spike proves the *host mechanism* (sandbox + bridge + render) without rich-UI
+   noise. `jira` is the first rich showcase right after.
+2. **Bundle authoring: a small starter template in the registry.** Phase 1 ships only enough to
+   build the proving plugin (a hand-written `ui.js` needs no bundler); the full typed
+   `@liteduck/plugin-ui` SDK + bundling recipe is Phase 3.
+3. **Surfaces: `page` only in Phase 1.** Full editor-area slot = simplest layout/resize, fewest
+   variables. The `panel` surface (with the `resize` bridge message) is Phase 2.
+4. **Signing: `verified` + install consent for v1; defer bundle signing to Phase 3.** The
+   opaque-origin sandbox already bounds blast radius; signing (key management, trust roots) is
+   premature before the model is proven.
+
+**Framing decision:** declarative views remain the **primary** path; the JS host is the
+**escape hatch** for the minority of plugins that need bespoke UI — not a migration target for
+every plugin. This keeps the executable-code surface small.
