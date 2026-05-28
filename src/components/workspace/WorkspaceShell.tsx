@@ -99,26 +99,25 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
   const handleRailSelect = useCallback(
     (panel: WorkspacePanel) => {
-      // Clicking the active icon collapses; otherwise switch to it.
-      const collapsing = activePanel === panel;
-      setActivePanel(collapsing ? null : panel);
-
-      // Route-replace for full-page panels so deep linking & menus stay in sync.
-      if (!collapsing && (panel === "settings" || panel === "notifications")) {
+      // Settings / notifications are full-page Outlets — the side panel has no
+      // useful body for them. Clicking the rail icon just ensures we're on the
+      // route; it never expands/collapses a vestigial side panel. (URL→panel
+      // sync keeps the rail icon highlighted.)
+      if (panel === "settings" || panel === "notifications") {
         const target = panel === "settings" ? ROUTES.SETTINGS : ROUTES.NOTIFICATIONS;
         if (location.pathname !== target) {
           void navigate(target);
         }
+        return;
       }
-      // For files/git, leave the URL alone — they're shown in the side panel
-      // alongside whatever else (editor / terminal) is currently visible.
-      // If the user explicitly went to /settings or /notifications, switching
-      // back to files/git in the rail should pull them out of that view.
-      if (
-        !collapsing &&
-        (panel === "files" || panel === "git") &&
-        routeOverridesEditor(location.pathname)
-      ) {
+
+      // Files / git: clicking the active icon collapses; otherwise switch.
+      const collapsing = activePanel === panel;
+      setActivePanel(collapsing ? null : panel);
+
+      // If the user was on /settings or /notifications, switching to files/git
+      // in the rail pulls them out of that view.
+      if (!collapsing && routeOverridesEditor(location.pathname)) {
         void navigate(ROUTES.HOME);
       }
     },
@@ -169,6 +168,14 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
   const showOutlet = routeOverridesEditor(location.pathname);
 
+  // The side panel only has a useful body for "files" / "git". For
+  // "settings" / "notifications" the editor area shows the full page, so
+  // the side panel stays collapsed even though the rail icon still
+  // highlights via `activePanel`. This is what makes Cmd+, behave like
+  // clicking the rail Settings icon (no auto-expand of a vestigial pointer).
+  const sidePanelBody: "files" | "git" | null =
+    activePanel === "files" || activePanel === "git" ? activePanel : null;
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -176,9 +183,9 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <ActivityRail active={activePanel} onSelect={handleRailSelect} />
 
-        {activePanel && (
+        {sidePanelBody !== null && (
           <SidePanel
-            panel={activePanel}
+            panel={sidePanelBody}
             width={sidePanelWidth}
             onResize={setSidePanelWidth}
             selectedFilePath={activeTabId}

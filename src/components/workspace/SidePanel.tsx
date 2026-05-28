@@ -4,8 +4,10 @@
  * Renders the appropriate panel body for the active panel:
  *   - files → FilesTreePanel (tree only; editor area handles the preview)
  *   - git   → GitPage (its own self-contained UI)
- *   - settings / notifications → handled by the shell as full-page Outlets,
- *     so when those are active we show a compact pointer here instead.
+ *
+ * For settings / notifications the shell does not render the SidePanel at all
+ * (those routes own the full editor area via Outlet); the rail icon highlights
+ * via `activePanel` state, but no side column is shown.
  *
  * Width is user-adjustable via the drag handle on its right edge.
  */
@@ -83,9 +85,6 @@ export function SidePanel({
             </div>
           </Suspense>
         )}
-
-        {panel === "settings" && <PanelPointer label="Settings" />}
-        {panel === "notifications" && <PanelPointer label="Notifications" />}
       </div>
 
       {/* Drag handle */}
@@ -100,15 +99,5 @@ export function SidePanel({
         )}
       />
     </aside>
-  );
-}
-
-function PanelPointer({ label }: { label: string }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-      <p className="text-xs text-[var(--color-muted-foreground)]">
-        {label} is open in the editor area.
-      </p>
-    </div>
   );
 }
