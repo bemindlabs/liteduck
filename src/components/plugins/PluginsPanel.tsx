@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { createLogger } from "@/lib/logger";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
   type InstalledPlugin,
   type PluginCommand,
@@ -67,6 +68,10 @@ interface CommandRun {
 }
 
 export function PluginsPanel() {
+  // The active workspace. Plugin commands run with this as their CWD so
+  // workspace-scoped tools (e.g. `bwoc list`) resolve the open workspace rather
+  // than the plugin's install dir. Empty string ("") = no workspace open.
+  const { workspace } = useWorkspace();
   const [tab, setTab] = useState<PluginsTab>("installed");
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [loading, setLoading] = useState(false);
@@ -138,7 +143,11 @@ export function PluginsPanel() {
   );
 
   const handleInstall = useCallback(async () => {
-    const selected = await openDialog({ directory: true, multiple: false, title: "Install plugin folder" });
+    const selected = await openDialog({
+      directory: true,
+      multiple: false,
+      title: "Install plugin folder",
+    });
     if (typeof selected !== "string") return;
     setBusy("install");
     setError(null);
@@ -170,39 +179,55 @@ export function PluginsPanel() {
     [refresh],
   );
 
-  const handleRun = useCallback(async (plugin: InstalledPlugin, command: PluginCommand) => {
-    setBusy(`${plugin.id}:${command.id}`);
-    setError(null);
-    try {
-      const result = await pluginRunCommand(plugin.id, command.id);
-      if (result.exit_code !== 0) {
+  const handleRun = useCallback(
+    async (plugin: InstalledPlugin, command: PluginCommand) => {
+      setBusy(`${plugin.id}:${command.id}`);
+      setError(null);
+      try {
+        // Forward the active workspace (if any) so the command runs with it as
+        // CWD; undefined when none is open → command falls back to the plugin dir.
+        const result = await pluginRunCommand(
+          plugin.id,
+          command.id,
+          undefined,
+          workspace || undefined,
+        );
+        if (result.exit_code !== 0) {
+          setRun({
+            pluginId: plugin.id,
+            commandId: command.id,
+            rows: null,
+            raw: result.stdout,
+            error: result.stderr.trim() || `exited ${result.exit_code}`,
+          });
+          return;
+        }
+        let rows: Record<string, unknown>[] | null = null;
+        try {
+          const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
+          if (Array.isArray(parsed.issues)) {
+            rows = parsed.issues as Record<string, unknown>[];
+          } else if (parsed.issue && typeof parsed.issue === "object") {
+            rows = [parsed.issue as Record<string, unknown>];
+          }
+        } catch {
+          // Non-JSON output is fine — show it raw.
+        }
         setRun({
           pluginId: plugin.id,
           commandId: command.id,
-          rows: null,
+          rows,
           raw: result.stdout,
-          error: result.stderr.trim() || `exited ${result.exit_code}`,
+          error: null,
         });
-        return;
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setBusy(null);
       }
-      let rows: Record<string, unknown>[] | null = null;
-      try {
-        const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
-        if (Array.isArray(parsed.issues)) {
-          rows = parsed.issues as Record<string, unknown>[];
-        } else if (parsed.issue && typeof parsed.issue === "object") {
-          rows = [parsed.issue as Record<string, unknown>];
-        }
-      } catch {
-        // Non-JSON output is fine — show it raw.
-      }
-      setRun({ pluginId: plugin.id, commandId: command.id, rows, raw: result.stdout, error: null });
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(null);
-    }
-  }, []);
+    },
+    [workspace],
+  );
 
   const installedView = tab === "installed";
 
@@ -276,94 +301,96 @@ export function PluginsPanel() {
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {plugins.length === 0 && !loading ? (
-          <div className="mx-auto mt-12 max-w-md text-center text-sm text-[var(--color-muted-foreground)]">
-            <Boxes className="mx-auto mb-3 h-10 w-10 opacity-40" />
-            <p>No plugins installed.</p>
-            <p className="mt-1">
-              Plugins live under <code>~/.liteduck/plugins/</code>. Install a folder containing a{" "}
-              <code>plugin.json</code> manifest.
-            </p>
-          </div>
-        ) : (
-          <ul className="space-y-3">
-            {plugins.map((plugin) => (
-              <li
-                key={plugin.id}
-                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{plugin.name}</span>
-                      <span className="text-xs text-[var(--color-muted-foreground)]">
-                        v{plugin.version}
-                      </span>
-                      <span className="rounded bg-[var(--color-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-secondary-foreground)]">
-                        {plugin.kind}
-                      </span>
-                      <span
-                        title={
-                          plugin.network
-                            ? "Declares network access"
-                            : "No network access declared"
-                        }
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]",
-                          plugin.network
-                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                            : "bg-[var(--color-muted)] text-[var(--color-muted-foreground)]",
-                        )}
-                      >
-                        {plugin.network ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                        {plugin.network ? "network" : "no network"}
-                      </span>
+            <div className="mx-auto mt-12 max-w-md text-center text-sm text-[var(--color-muted-foreground)]">
+              <Boxes className="mx-auto mb-3 h-10 w-10 opacity-40" />
+              <p>No plugins installed.</p>
+              <p className="mt-1">
+                Plugins live under <code>~/.liteduck/plugins/</code>. Install a folder containing a{" "}
+                <code>plugin.json</code> manifest.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {plugins.map((plugin) => (
+                <li
+                  key={plugin.id}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{plugin.name}</span>
+                        <span className="text-xs text-[var(--color-muted-foreground)]">
+                          v{plugin.version}
+                        </span>
+                        <span className="rounded bg-[var(--color-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-secondary-foreground)]">
+                          {plugin.kind}
+                        </span>
+                        <span
+                          title={
+                            plugin.network
+                              ? "Declares network access"
+                              : "No network access declared"
+                          }
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]",
+                            plugin.network
+                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                              : "bg-[var(--color-muted)] text-[var(--color-muted-foreground)]",
+                          )}
+                        >
+                          {plugin.network ? (
+                            <Globe className="h-3 w-3" />
+                          ) : (
+                            <Lock className="h-3 w-3" />
+                          )}
+                          {plugin.network ? "network" : "no network"}
+                        </span>
+                      </div>
+                      {plugin.description && (
+                        <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                          {plugin.description}
+                        </p>
+                      )}
+                      {plugin.paths.length > 0 && (
+                        <p className="mt-1 truncate text-[10px] text-[var(--color-muted-foreground)]">
+                          Declared paths: {plugin.paths.join(", ")}
+                        </p>
+                      )}
                     </div>
-                    {plugin.description && (
-                      <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-                        {plugin.description}
-                      </p>
-                    )}
-                    {plugin.paths.length > 0 && (
-                      <p className="mt-1 truncate text-[10px] text-[var(--color-muted-foreground)]">
-                        Declared paths: {plugin.paths.join(", ")}
-                      </p>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Uninstall"
+                      aria-label={`Uninstall ${plugin.name}`}
+                      onClick={() => void handleUninstall(plugin.id)}
+                      disabled={busy === plugin.id}
+                    >
+                      <Trash2 className="h-4 w-4 text-[var(--color-destructive)]" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Uninstall"
-                    aria-label={`Uninstall ${plugin.name}`}
-                    onClick={() => void handleUninstall(plugin.id)}
-                    disabled={busy === plugin.id}
-                  >
-                    <Trash2 className="h-4 w-4 text-[var(--color-destructive)]" />
-                  </Button>
-                </div>
 
-                {plugin.commands.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-3">
-                    {plugin.commands.map((command) => (
-                      <Button
-                        key={command.id}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleRun(plugin, command)}
-                        disabled={busy === `${plugin.id}:${command.id}`}
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                        {command.title}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+                  {plugin.commands.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-3">
+                      {plugin.commands.map((command) => (
+                        <Button
+                          key={command.id}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleRun(plugin, command)}
+                          disabled={busy === `${plugin.id}:${command.id}`}
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                          {command.title}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
 
-                {run?.pluginId === plugin.id && (
-                  <CommandOutput run={run} />
-                )}
-              </li>
-            ))}
-          </ul>
+                  {run?.pluginId === plugin.id && <CommandOutput run={run} />}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
@@ -479,9 +506,7 @@ function AvailableView({
                       )}
                       <span
                         title={
-                          entry.network
-                            ? "Declares network access"
-                            : "No network access declared"
+                          entry.network ? "Declares network access" : "No network access declared"
                         }
                         className={cn(
                           "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]",

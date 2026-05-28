@@ -81,15 +81,32 @@ do_list() {
     exit 2
   fi
 
-  OUTPUT="$(bwoc list 2>/tmp/bwoc_list_err.$$ || true)"
+  # Prefer an explicit workspace when the host exports one (LiteDuck sets
+  # LITEDUCK_WORKSPACE to the open workspace; BWOC_WORKSPACE is honored too).
+  # Otherwise fall back to CWD-based resolution (the host now runs us with the
+  # active workspace as CWD, so this is the common path).
+  WS="${LITEDUCK_WORKSPACE:-${BWOC_WORKSPACE:-}}"
+  if [ -n "$WS" ]; then
+    OUTPUT="$(bwoc list --workspace "$WS" 2>/tmp/bwoc_list_err.$$ || true)"
+  else
+    OUTPUT="$(bwoc list 2>/tmp/bwoc_list_err.$$ || true)"
+  fi
   STATUS=$?
+  msg="$(cat /tmp/bwoc_list_err.$$ 2>/dev/null || true)"
+  rm -f /tmp/bwoc_list_err.$$
+
   if [ "$STATUS" -ne 0 ] && [ -z "$OUTPUT" ]; then
-    msg="$(cat /tmp/bwoc_list_err.$$ 2>/dev/null || true)"
-    rm -f /tmp/bwoc_list_err.$$
     err "'bwoc list' failed: $msg"
     exit 3
   fi
-  rm -f /tmp/bwoc_list_err.$$
+
+  # `bwoc list` can write "no workspace found" to stderr yet exit 0, which would
+  # otherwise be silently flattened to an empty {"agents":[]}. Detect that case
+  # and surface the real message instead of a misleading empty list.
+  if printf '%s' "$msg" | grep -qi 'no workspace'; then
+    err "$msg"
+    exit 4
+  fi
 
   printf '%s\n' "$OUTPUT" | awk '
     function jesc(s) {

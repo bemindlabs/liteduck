@@ -84,16 +84,26 @@ export async function pluginUninstall(id: string): Promise<void> {
   return invoke<undefined>("plugin_uninstall", { id });
 }
 
-/** Run a plugin's contributed command with optional params. */
+/**
+ * Run a plugin's contributed command with optional params.
+ *
+ * `workspace` is the directory LiteDuck currently has open. When provided it
+ * becomes the command's working directory (and is exported as
+ * `LITEDUCK_WORKSPACE`), so workspace-scoped tools like `bwoc` resolve the open
+ * workspace rather than the plugin's install dir. Pass `undefined` when no
+ * workspace is open — the command then falls back to running in the plugin dir.
+ */
 export async function pluginRunCommand(
   pluginId: string,
   commandId: string,
   params?: Record<string, string>,
+  workspace?: string,
 ): Promise<PluginRunResult> {
   return invoke<PluginRunResult>("plugin_run_command", {
     pluginId,
     commandId,
     params: params ?? null,
+    workspace: workspace ?? null,
   });
 }
 

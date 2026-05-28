@@ -558,13 +558,23 @@ pub fn uninstall_plugin_inner(id: &str) -> Result<(), String> {
 }
 
 /// Run a plugin's contributed command. The command's `run` template is spawned
-/// via `sh -c` with the plugin directory as CWD. Caller-supplied `params` are
-/// exported as `LITEDUCK_PARAM_<KEY>` env vars (uppercased) — never interpolated
-/// into the shell string, to keep user input off the command line.
+/// via `sh -c`. Caller-supplied `params` are exported as `LITEDUCK_PARAM_<KEY>`
+/// env vars (uppercased) — never interpolated into the shell string, to keep
+/// user input off the command line.
+///
+/// `workspace` is the directory LiteDuck currently has open. When it is a
+/// non-empty, existing directory the child process runs with that as its CWD
+/// (so CWD-based resolution works for workspace-scoped tools like `bwoc`, `git`,
+/// …) and `LITEDUCK_WORKSPACE` is exported so scripts can read it explicitly.
+/// When `workspace` is absent or invalid the CWD falls back to the plugin's own
+/// directory (legacy behavior). The plugin dir is always exported as
+/// `LITEDUCK_PLUGIN_DIR` so a plugin can locate its bundled files regardless of
+/// which CWD is in effect.
 pub fn run_command_inner(
     plugin_id: &str,
     command_id: &str,
     params: &HashMap<String, String>,
+    workspace: Option<&str>,
 ) -> Result<PluginRunResult, String> {
     let plugins = list_plugins_inner()?;
     let plugin = plugins
@@ -581,8 +591,25 @@ pub fn run_command_inner(
 
     let mut command = Command::new("sh");
     command.arg("-c").arg(&cmd.run);
-    command.current_dir(&plugin.dir);
+    // The plugin dir is always discoverable via this env var even when the CWD
+    // is the active workspace, so a plugin can still find its bundled files.
     command.env("LITEDUCK_PLUGIN_DIR", &plugin.dir);
+
+    // Prefer the active workspace as CWD when it is a real, existing directory;
+    // otherwise fall back to the plugin's own directory (legacy behavior).
+    let workspace_dir = workspace
+        .map(str::trim)
+        .filter(|w| !w.is_empty())
+        .filter(|w| Path::new(w).is_dir());
+    match workspace_dir {
+        Some(ws) => {
+            command.current_dir(ws);
+            command.env("LITEDUCK_WORKSPACE", ws);
+        }
+        None => {
+            command.current_dir(&plugin.dir);
+        }
+    }
 
     for (key, value) in params {
         let env_key = format!(
@@ -661,14 +688,23 @@ pub fn plugin_uninstall(id: String) -> Result<(), String> {
     uninstall_plugin_inner(&id)
 }
 
-/// Run a plugin's contributed command with optional params.
+/// Run a plugin's contributed command with optional params. `workspace` is the
+/// directory LiteDuck currently has open; when present it becomes the child's
+/// CWD (and is exported as `LITEDUCK_WORKSPACE`) so workspace-scoped tools like
+/// `bwoc` resolve the open workspace instead of the plugin's install dir.
 #[tauri::command]
 pub fn plugin_run_command(
     plugin_id: String,
     command_id: String,
     params: Option<HashMap<String, String>>,
+    workspace: Option<String>,
 ) -> Result<PluginRunResult, String> {
-    run_command_inner(&plugin_id, &command_id, &params.unwrap_or_default())
+    run_command_inner(
+        &plugin_id,
+        &command_id,
+        &params.unwrap_or_default(),
+        workspace.as_deref(),
+    )
 }
 
 /// Fetch the published plugin registry (`registry.json`) and return its entries.
@@ -783,11 +819,85 @@ mod tests {
 
         let mut params = HashMap::new();
         params.insert("name".to_string(), "duck".to_string());
-        let res = run_command_inner("echoer", "hi", &params).unwrap();
+        let res = run_command_inner("echoer", "hi", &params, None).unwrap();
         std::env::remove_var("LITEDUCK_HOME");
 
         assert_eq!(res.exit_code, 0);
         assert_eq!(res.stdout, "duck");
+    }
+
+    #[test]
+    fn run_command_uses_workspace_as_cwd_when_valid() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        std::env::set_var("LITEDUCK_HOME", tmp.path());
+        let root = plugins_dir();
+        fs::create_dir_all(&root).unwrap();
+        // The command echoes its CWD + the workspace env var so we can assert
+        // both the current_dir() and LITEDUCK_WORKSPACE wiring.
+        write_manifest(
+            &root,
+            "pwd",
+            r#"{"id":"pwd","name":"P","version":"1","kind":"tool",
+                "commands":[{"id":"where","title":"Where","run":"pwd; printf '%s' \"$LITEDUCK_WORKSPACE\""}]}"#,
+        );
+
+        // A real, existing workspace dir distinct from the plugin's install dir.
+        let ws = tempfile::tempdir().unwrap();
+        let ws_path = ws.path().canonicalize().unwrap();
+        let params = HashMap::new();
+        let res =
+            run_command_inner("pwd", "where", &params, Some(ws_path.to_str().unwrap())).unwrap();
+        std::env::remove_var("LITEDUCK_HOME");
+
+        assert_eq!(res.exit_code, 0);
+        // CWD line (first) resolves to the workspace, and LITEDUCK_WORKSPACE is set.
+        let cwd_line = res.stdout.lines().next().unwrap_or("");
+        assert_eq!(
+            std::fs::canonicalize(cwd_line).unwrap(),
+            ws_path,
+            "CWD should be the active workspace, got: {}",
+            res.stdout
+        );
+        assert!(
+            res.stdout.contains(ws_path.to_str().unwrap()),
+            "LITEDUCK_WORKSPACE should be exported, got: {}",
+            res.stdout
+        );
+    }
+
+    #[test]
+    fn run_command_falls_back_to_plugin_dir_when_workspace_missing() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        std::env::set_var("LITEDUCK_HOME", tmp.path());
+        let root = plugins_dir();
+        fs::create_dir_all(&root).unwrap();
+        write_manifest(
+            &root,
+            "pwd2",
+            r#"{"id":"pwd2","name":"P","version":"1","kind":"tool",
+                "commands":[{"id":"where","title":"Where","run":"pwd; printf '%s' \"$LITEDUCK_WORKSPACE\""}]}"#,
+        );
+        let plugin_dir = plugins_dir().join("pwd2").canonicalize().unwrap();
+        let params = HashMap::new();
+
+        // None workspace → CWD is the plugin dir, LITEDUCK_WORKSPACE unset.
+        let res = run_command_inner("pwd2", "where", &params, None).unwrap();
+        assert_eq!(res.exit_code, 0);
+        let cwd_line = res.stdout.lines().next().unwrap_or("");
+        assert_eq!(std::fs::canonicalize(cwd_line).unwrap(), plugin_dir);
+
+        // A non-existent / empty workspace path also falls back to the plugin dir.
+        let res2 =
+            run_command_inner("pwd2", "where", &params, Some("/no/such/dir/at/all")).unwrap();
+        let res3 = run_command_inner("pwd2", "where", &params, Some("   ")).unwrap();
+        std::env::remove_var("LITEDUCK_HOME");
+
+        let cwd2 = res2.stdout.lines().next().unwrap_or("");
+        let cwd3 = res3.stdout.lines().next().unwrap_or("");
+        assert_eq!(std::fs::canonicalize(cwd2).unwrap(), plugin_dir);
+        assert_eq!(std::fs::canonicalize(cwd3).unwrap(), plugin_dir);
     }
 
     #[test]
