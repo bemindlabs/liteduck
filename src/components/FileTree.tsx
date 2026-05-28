@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createLogger } from "@/lib/logger";
@@ -37,16 +37,57 @@ function ContextMenu({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Start at the cursor; clamp into the viewport once we can measure the menu.
+  const [pos, setPos] = useState({ left: state.x, top: state.y });
 
+  // Re-clamp whenever the requested position changes (new right-click).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const margin = 8;
+    const maxLeft = window.innerWidth - width - margin;
+    const maxTop = window.innerHeight - height - margin;
+    setPos({
+      left: Math.max(margin, Math.min(state.x, maxLeft)),
+      top: Math.max(margin, Math.min(state.y, maxTop)),
+    });
+  }, [state.x, state.y]);
+
+  // Dismiss on outside-click, Escape, scroll, and window blur — standard
+  // desktop context-menu behaviour.
   useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
+    function onPointerDown(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         onClose();
       }
     }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    // Capture-phase scroll so nested scroll containers also dismiss the menu.
+    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("blur", onClose);
+    window.addEventListener("resize", onClose);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("blur", onClose);
+      window.removeEventListener("resize", onClose);
+    };
   }, [onClose]);
+
+  // Move keyboard focus into the menu so arrow/Escape keys work and a
+  // subsequent click anywhere else dismisses it.
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
 
   async function handleCopyPath() {
     try {
@@ -112,8 +153,11 @@ function ContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-50 min-w-[160px] rounded-md border border-[var(--color-border)] py-1 shadow-lg"
-      style={{ left: state.x, top: state.y, backgroundColor: "var(--color-popover)" }}
+      role="menu"
+      tabIndex={-1}
+      aria-label={`Actions for ${state.entry.name}`}
+      className="fixed z-50 min-w-[160px] rounded-md border border-[var(--color-border)] py-1 shadow-lg outline-none"
+      style={{ left: pos.left, top: pos.top, backgroundColor: "var(--color-popover)" }}
     >
       {visibleItems.map((item, i) => (
         <div key={item.label}>
@@ -121,6 +165,7 @@ function ContextMenu({
             <div className="my-1 border-t border-[var(--color-border)]" />
           )}
           <button
+            role="menuitem"
             onClick={item.onClick}
             className={cn(
               "w-full px-3 py-1.5 text-left text-sm transition-colors",
@@ -200,6 +245,7 @@ interface TreeNodeProps {
   entry: FileEntry;
   depth: number;
   selectedPath: string | null;
+  contextPath: string | null;
   renamingPath: string | null;
   onFileSelect: (entry: FileEntry) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileEntry) => void;
@@ -213,6 +259,7 @@ function TreeNode({
   entry,
   depth,
   selectedPath,
+  contextPath,
   renamingPath,
   onFileSelect,
   onContextMenu,
@@ -253,6 +300,9 @@ function TreeNode({
   }
 
   const isSelected = selectedPath === entry.path;
+  // The row a context menu currently targets — highlighted like a selection so
+  // it's clear which item the actions apply to, without opening the file.
+  const isContextTarget = contextPath === entry.path;
   const icon = getFileIcon(entry);
   const indentPx = depth * 16;
 
@@ -267,6 +317,8 @@ function TreeNode({
           "text-[var(--color-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
           isSelected &&
             "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] font-medium",
+          isContextTarget &&
+            "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] ring-1 ring-inset ring-[var(--color-border)]",
         )}
         style={{ paddingLeft: `${indentPx + 8}px` }}
         title={entry.path}
@@ -334,6 +386,7 @@ function TreeNode({
               entry={child}
               depth={depth + 1}
               selectedPath={selectedPath}
+              contextPath={contextPath}
               renamingPath={renamingPath}
               onFileSelect={onFileSelect}
               onContextMenu={onContextMenu}
@@ -449,6 +502,7 @@ export function FileTree({
             entry={entry}
             depth={0}
             selectedPath={selectedPath}
+            contextPath={contextMenu?.entry.path ?? null}
             renamingPath={renamingPath}
             onFileSelect={onFileSelect}
             onContextMenu={handleContextMenu}
