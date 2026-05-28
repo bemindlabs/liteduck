@@ -11,6 +11,14 @@ import "@xterm/xterm/css/xterm.css";
 interface TerminalPaneProps {
   tabId: string;
   visible: boolean;
+  /**
+   * Monotonic counter bumped by the split layout whenever a pane's size may
+   * have changed (split / unsplit / Separator drag). A change forces a re-fit
+   * so xterm reflows to the new container size and the PTY learns the new
+   * cols/rows — the ResizeObserver alone can miss the transition during tree
+   * restructuring.
+   */
+  layoutSignal?: number;
   onInput: (data: string) => void;
   onResize: (cols: number, rows: number) => void;
   onRegister: (xterm: XTerm) => void;
@@ -20,6 +28,7 @@ interface TerminalPaneProps {
 export function TerminalPane({
   tabId,
   visible,
+  layoutSignal,
   onInput,
   onResize,
   onRegister,
@@ -166,6 +175,25 @@ export function TerminalPane({
       });
     }
   }, [visible]);
+
+  // Re-fit when the split layout changes (split / unsplit / Separator drag).
+  // Deferred across two animation frames so the new flex layout has settled
+  // before we measure. `fit()` resizes xterm, whose onResize handler then
+  // forwards the new cols/rows to the PTY. Skip when hidden — the visibility
+  // effect above handles the re-fit when the pane is shown again.
+  useEffect(() => {
+    if (layoutSignal === undefined || !visible || !fitAddonRef.current) return;
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        try {
+          fitAddonRef.current?.fit();
+        } catch {
+          /* container not measurable yet */
+        }
+      }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [layoutSignal, visible]);
 
   return (
     <div

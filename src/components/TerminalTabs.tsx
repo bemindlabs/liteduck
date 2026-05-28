@@ -166,6 +166,8 @@ interface TerminalPanesProps {
   onResize: (tabId: string, cols: number, rows: number) => void;
   onRegisterXterm: (tabId: string, xterm: XTerm) => void;
   onUnregisterXterm: (tabId: string) => void;
+  /** Bumped when the split layout changes, triggering an xterm re-fit. */
+  layoutSignal?: number;
 }
 
 export function TerminalPanes({
@@ -175,6 +177,7 @@ export function TerminalPanes({
   onResize,
   onRegisterXterm,
   onUnregisterXterm,
+  layoutSignal,
 }: TerminalPanesProps) {
   return (
     <div
@@ -187,6 +190,7 @@ export function TerminalPanes({
           key={tab.id}
           tabId={tab.id}
           visible={tab.id === activeTabId}
+          layoutSignal={layoutSignal}
           onInput={(data) => onInput(tab.id, data)}
           onResize={(cols, rows) => onResize(tab.id, cols, rows)}
           onRegister={(xterm) => onRegisterXterm(tab.id, xterm)}
@@ -217,6 +221,7 @@ export default function TerminalTabs({
   onRegisterXterm,
   onUnregisterXterm,
   actions,
+  layoutSignal,
 }: TerminalTabsProps) {
   const [activeTabId, setActiveTabId] = useState(activeTabIdProp);
 
@@ -246,6 +251,7 @@ export default function TerminalTabs({
         onResize={onResize}
         onRegisterXterm={onRegisterXterm}
         onUnregisterXterm={onUnregisterXterm}
+        layoutSignal={layoutSignal}
       />
     </div>
   );
