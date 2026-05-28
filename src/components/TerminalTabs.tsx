@@ -168,6 +168,12 @@ interface TerminalPanesProps {
   onUnregisterXterm: (tabId: string) => void;
   /** Bumped when the split layout changes, triggering an xterm re-fit. */
   layoutSignal?: number;
+  /** Context-menu "New Terminal" — open a fresh shell tab in this pane. */
+  onNewTerminal?: () => void;
+  /** Context-menu "Split" — split this pane. */
+  onSplit?: () => void;
+  /** Whether another split is currently possible (≤ 4 panes). */
+  canSplit?: boolean;
 }
 
 export function TerminalPanes({
@@ -178,6 +184,9 @@ export function TerminalPanes({
   onRegisterXterm,
   onUnregisterXterm,
   layoutSignal,
+  onNewTerminal,
+  onSplit,
+  canSplit,
 }: TerminalPanesProps) {
   return (
     <div
@@ -195,6 +204,9 @@ export function TerminalPanes({
           onResize={(cols, rows) => onResize(tab.id, cols, rows)}
           onRegister={(xterm) => onRegisterXterm(tab.id, xterm)}
           onUnregister={() => onUnregisterXterm(tab.id)}
+          onNewTerminal={onNewTerminal}
+          onSplit={onSplit}
+          canSplit={canSplit}
         />
       ))}
     </div>
@@ -222,6 +234,9 @@ export default function TerminalTabs({
   onUnregisterXterm,
   actions,
   layoutSignal,
+  onNewTerminal,
+  onSplit,
+  canSplit,
 }: TerminalTabsProps) {
   const [activeTabId, setActiveTabId] = useState(activeTabIdProp);
 
@@ -252,6 +267,9 @@ export default function TerminalTabs({
         onRegisterXterm={onRegisterXterm}
         onUnregisterXterm={onUnregisterXterm}
         layoutSignal={layoutSignal}
+        onNewTerminal={onNewTerminal}
+        onSplit={onSplit}
+        canSplit={canSplit}
       />
     </div>
   );

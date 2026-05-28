@@ -1,10 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { cn } from "@/lib/utils";
 import { TERMINAL_OPTIONS } from "@/lib/terminal-theme";
+import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
+import { LITEDUCK_PATH_MIME, quotePathsForShell } from "@/utils/shellQuote";
 
 import "@xterm/xterm/css/xterm.css";
 
@@ -23,6 +25,18 @@ interface TerminalPaneProps {
   onResize: (cols: number, rows: number) => void;
   onRegister: (xterm: XTerm) => void;
   onUnregister: () => void;
+  /** Open a fresh shell tab (context-menu "New Terminal"). */
+  onNewTerminal?: () => void;
+  /** Split this pane horizontally (context-menu "Split"). */
+  onSplit?: () => void;
+  /** Whether another split is currently possible (≤ 4 panes). */
+  canSplit?: boolean;
+}
+
+interface PaneMenuState {
+  x: number;
+  y: number;
+  hasSelection: boolean;
 }
 
 export function TerminalPane({
@@ -33,10 +47,21 @@ export function TerminalPane({
   onResize,
   onRegister,
   onUnregister,
+  onNewTerminal,
+  onSplit,
+  canSplit = false,
 }: TerminalPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const [menu, setMenu] = useState<PaneMenuState | null>(null);
+  const [dropActive, setDropActive] = useState(false);
+
+  // Stable ref for onInput so the drop handler always uses the latest callback.
+  const onInputRefForDrop = useRef(onInput);
+  useEffect(() => {
+    onInputRefForDrop.current = onInput;
+  }, [onInput]);
 
   // Use refs for callbacks so the effect closure never becomes stale.
   const onInputRef = useRef(onInput);
@@ -195,12 +220,115 @@ export function TerminalPane({
     return () => cancelAnimationFrame(id);
   }, [layoutSignal, visible]);
 
+  // ── Context-menu actions ────────────────────────────────────────────────────
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const term = xtermRef.current;
+    setMenu({ x: e.clientX, y: e.clientY, hasSelection: term?.hasSelection() ?? false });
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    const term = xtermRef.current;
+    if (!term?.hasSelection()) return;
+    try {
+      await navigator.clipboard.writeText(term.getSelection());
+    } catch {
+      /* clipboard unavailable — silent */
+    }
+  }, []);
+
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) onInput(text);
+    } catch {
+      /* clipboard unavailable — silent */
+    }
+  }, [onInput]);
+
+  const handleSelectAll = useCallback(() => {
+    xtermRef.current?.selectAll();
+  }, []);
+
+  const handleClear = useCallback(() => {
+    xtermRef.current?.clear();
+  }, []);
+
+  // ── Drop handling (file-tree path → terminal) ─────────────────────────────────
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    // Only react to internal path drags; let native OS-file drops fall through
+    // to Tauri's own handler.
+    if (
+      !e.dataTransfer.types.includes(LITEDUCK_PATH_MIME) &&
+      !e.dataTransfer.types.includes("text/plain")
+    ) {
+      return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDropActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Ignore leaves into descendant elements.
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDropActive(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    setDropActive(false);
+    const raw = e.dataTransfer.getData(LITEDUCK_PATH_MIME) || e.dataTransfer.getData("text/plain");
+    if (!raw) return;
+    e.preventDefault();
+    // A drag may carry multiple newline-separated paths; quote + space-join.
+    const paths = raw.split(/\r?\n/).filter((p) => p.trim().length > 0);
+    const insert = quotePathsForShell(paths);
+    if (insert) onInputRefForDrop.current(insert);
+  }, []);
+
+  const menuItems: ContextMenuItem[] = menu
+    ? [
+        { label: "Copy", onSelect: handleCopy, show: menu.hasSelection },
+        { label: "Paste", onSelect: handlePaste },
+        { label: "Select All", onSelect: handleSelectAll },
+        { label: "Clear", onSelect: handleClear },
+        {
+          label: "New Terminal",
+          onSelect: () => onNewTerminal?.(),
+          show: !!onNewTerminal,
+          separatorBefore: true,
+        },
+        { label: "Split", onSelect: () => onSplit?.(), show: !!onSplit, disabled: !canSplit },
+      ]
+    : [];
+
   return (
-    <div
-      ref={containerRef}
-      className={cn("absolute inset-0", !visible && "pointer-events-none invisible")}
-      style={{ backgroundColor: "var(--color-background)" }}
-      aria-label={`Terminal pane ${tabId}`}
-    />
+    <>
+      <div
+        ref={containerRef}
+        onContextMenu={handleContextMenu}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          "absolute inset-0",
+          !visible && "pointer-events-none invisible",
+          dropActive && "ring-2 ring-inset ring-[var(--color-primary)]",
+        )}
+        style={{ backgroundColor: "var(--color-background)" }}
+        aria-label={`Terminal pane ${tabId}`}
+      />
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={menuItems}
+          onClose={() => setMenu(null)}
+          ariaLabel="Terminal actions"
+        />
+      )}
+    </>
   );
 }

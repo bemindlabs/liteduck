@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createLogger } from "@/lib/logger";
+import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
+import { LITEDUCK_PATH_MIME } from "@/utils/shellQuote";
 
 const logger = createLogger("FileTree");
 import {
@@ -24,7 +26,13 @@ interface ContextMenuState {
   entry: FileEntry;
 }
 
-function ContextMenu({
+/**
+ * File-tree context menu — keeps the original actions (Open Terminal Here /
+ * Rename / Copy Path / Delete) but now renders via the shared ContextMenu
+ * primitive. Delete still uses a two-step in-menu confirmation, which the
+ * primitive supports through `keepOpen`.
+ */
+function FileTreeContextMenu({
   state,
   onClose,
   onDelete,
@@ -35,59 +43,7 @@ function ContextMenu({
   onDelete?: (entry: FileEntry) => void;
   onStartRename?: (entry: FileEntry) => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  // Start at the cursor; clamp into the viewport once we can measure the menu.
-  const [pos, setPos] = useState({ left: state.x, top: state.y });
-
-  // Re-clamp whenever the requested position changes (new right-click).
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const { width, height } = el.getBoundingClientRect();
-    const margin = 8;
-    const maxLeft = window.innerWidth - width - margin;
-    const maxTop = window.innerHeight - height - margin;
-    setPos({
-      left: Math.max(margin, Math.min(state.x, maxLeft)),
-      top: Math.max(margin, Math.min(state.y, maxTop)),
-    });
-  }, [state.x, state.y]);
-
-  // Dismiss on outside-click, Escape, scroll, and window blur — standard
-  // desktop context-menu behaviour.
-  useEffect(() => {
-    function onPointerDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    // Capture-phase scroll so nested scroll containers also dismiss the menu.
-    window.addEventListener("scroll", onClose, true);
-    window.addEventListener("blur", onClose);
-    window.addEventListener("resize", onClose);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", onClose, true);
-      window.removeEventListener("blur", onClose);
-      window.removeEventListener("resize", onClose);
-    };
-  }, [onClose]);
-
-  // Move keyboard focus into the menu so arrow/Escape keys work and a
-  // subsequent click anywhere else dismisses it.
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
 
   async function handleCopyPath() {
     try {
@@ -95,7 +51,6 @@ function ContextMenu({
     } catch {
       // Clipboard API may be unavailable in some contexts — silent fail.
     }
-    onClose();
   }
 
   function handleOpenTerminal() {
@@ -103,7 +58,6 @@ function ContextMenu({
       ? state.entry.path
       : state.entry.path.substring(0, state.entry.path.lastIndexOf("/"));
     window.dispatchEvent(new CustomEvent("open-terminal-at", { detail: { path: dirPath } }));
-    onClose();
   }
 
   async function handleDelete() {
@@ -120,65 +74,33 @@ function ContextMenu({
     onClose();
   }
 
-  const menuItems: {
-    label: string;
-    onClick: () => void | Promise<void>;
-    show: boolean;
-    destructive?: boolean;
-  }[] = [
-    {
-      label: "Open Terminal Here",
-      onClick: handleOpenTerminal,
-      show: true,
-    },
+  const items: ContextMenuItem[] = [
+    { label: "Open Terminal Here", onSelect: handleOpenTerminal },
     {
       label: "Rename",
-      onClick: () => {
-        onStartRename?.(state.entry);
-        onClose();
-      },
+      onSelect: () => onStartRename?.(state.entry),
       show: !!onStartRename,
     },
-    { label: "Copy Path", onClick: handleCopyPath, show: true },
+    { label: "Copy Path", onSelect: handleCopyPath },
     {
       label: confirmDelete ? `Confirm Delete "${state.entry.name}"?` : "Delete",
-      onClick: handleDelete,
+      onSelect: handleDelete,
       show: !!onDelete,
       destructive: true,
+      separatorBefore: true,
+      // First click arms the confirmation; only the second click closes.
+      keepOpen: !confirmDelete,
     },
   ];
 
-  const visibleItems = menuItems.filter((item) => item.show);
-
   return (
-    <div
-      ref={ref}
-      role="menu"
-      tabIndex={-1}
-      aria-label={`Actions for ${state.entry.name}`}
-      className="fixed z-50 min-w-[160px] rounded-md border border-[var(--color-border)] py-1 shadow-lg outline-none"
-      style={{ left: pos.left, top: pos.top, backgroundColor: "var(--color-popover)" }}
-    >
-      {visibleItems.map((item, i) => (
-        <div key={item.label}>
-          {item.destructive && i > 0 && (
-            <div className="my-1 border-t border-[var(--color-border)]" />
-          )}
-          <button
-            role="menuitem"
-            onClick={item.onClick}
-            className={cn(
-              "w-full px-3 py-1.5 text-left text-sm transition-colors",
-              item.destructive
-                ? "text-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/10"
-                : "text-[var(--color-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
-            )}
-          >
-            {item.label}
-          </button>
-        </div>
-      ))}
-    </div>
+    <ContextMenu
+      x={state.x}
+      y={state.y}
+      items={items}
+      onClose={onClose}
+      ariaLabel={`Actions for ${state.entry.name}`}
+    />
   );
 }
 
@@ -312,6 +234,15 @@ function TreeNode({
       <button
         onClick={handleClick}
         onContextMenu={(e) => onContextMenu(e, entry)}
+        draggable
+        onDragStart={(e) => {
+          // Internal drag payload for "drop onto terminal → insert path".
+          // Set a custom mime plus a text/plain fallback. Use "copy" so the
+          // path is conceptually copied, not moved.
+          e.dataTransfer.setData(LITEDUCK_PATH_MIME, entry.path);
+          e.dataTransfer.setData("text/plain", entry.path);
+          e.dataTransfer.effectAllowed = "copy";
+        }}
         className={cn(
           "group flex w-full items-center gap-1.5 rounded-sm px-2 py-0.5 text-left text-sm transition-colors",
           "text-[var(--color-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
@@ -520,7 +451,7 @@ export function FileTree({
       </div>
 
       {contextMenu && (
-        <ContextMenu
+        <FileTreeContextMenu
           state={contextMenu}
           onClose={() => setContextMenu(null)}
           onDelete={onDelete}

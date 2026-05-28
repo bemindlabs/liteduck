@@ -182,6 +182,9 @@ function LeafPaneView({ pane, callbacks, isOnly, layoutSignal }: LeafPaneViewPro
           onUnregisterXterm={unregisterXterm}
           actions={paneActions}
           layoutSignal={layoutSignal}
+          onNewTerminal={() => void terminal.createTab(`Terminal ${tabs.length + 1}`, "", [])}
+          onSplit={() => callbacks.onSplit(pane.id, "horizontal")}
+          canSplit={canSplit}
         />
       ) : (
         <div className="flex h-full items-center justify-center bg-[var(--color-background)] px-4">
@@ -225,12 +228,7 @@ function PaneTreeView({
 }: PaneTreeViewProps) {
   if (node.kind === "leaf") {
     return (
-      <LeafPaneView
-        pane={node}
-        callbacks={callbacks}
-        isOnly={isOnly}
-        layoutSignal={layoutSignal}
-      />
+      <LeafPaneView pane={node} callbacks={callbacks} isOnly={isOnly} layoutSignal={layoutSignal} />
     );
   }
 
@@ -244,7 +242,11 @@ function PaneTreeView({
   const handleLayoutChanged = (_layout: Layout) => onLayoutChanged();
 
   return (
-    <Group orientation={orientation} className="h-full w-full" onLayoutChanged={handleLayoutChanged}>
+    <Group
+      orientation={orientation}
+      className="h-full w-full"
+      onLayoutChanged={handleLayoutChanged}
+    >
       <Panel defaultSize={50} minSize={20} className="overflow-hidden">
         <PaneTreeView
           node={childA}

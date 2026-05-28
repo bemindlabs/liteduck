@@ -9,10 +9,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { shouldShowWizard, shouldShowWizardForWorkspace } from "@/lib/wizard";
-import {
-  WorkspaceShell,
-  type WorkspaceShellHandle,
-} from "@/components/workspace/WorkspaceShell";
+import { WorkspaceShell, type WorkspaceShellHandle } from "@/components/workspace/WorkspaceShell";
 
 // Lazy-loaded pages — split into separate chunks for faster initial load.
 // (FilesPage/GitPage are owned by WorkspaceShell on native; SidePanel imports
@@ -37,6 +34,7 @@ import {
   loadShortcutOverrides,
 } from "@/hooks/useKeyboardShortcuts";
 import { useMenuEvents } from "@/hooks/useMenuEvents";
+import { useSuppressNativeContextMenu } from "@/hooks/useSuppressNativeContextMenu";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
@@ -61,6 +59,9 @@ import { useWindowSize, BREAKPOINTS } from "@/hooks/useWindowSize";
 function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Kill the native WebView right-click menu app-wide (editable fields exempt).
+  useSuppressNativeContextMenu();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -221,23 +222,20 @@ function Layout() {
 
   useMenuEvents({
     navigate,
-    onToggleSidebar: useCallback(
-      () => {
-        if (isMobileLayout) {
-          toggleMobileSidebar();
-          return;
-        }
-        // On native, the outer Sidebar is replaced by the WorkspaceShell's
-        // ActivityRail + SidePanel. Route "toggle sidebar" menu commands to the
-        // shell's collapse toggle so the View menu / Cmd+B do the same thing.
-        if (nativeCapable) {
-          shellHandleRef.current?.toggleSidePanel();
-          return;
-        }
-        setSidebarCollapsed((v) => !v);
-      },
-      [isMobileLayout, toggleMobileSidebar, nativeCapable],
-    ),
+    onToggleSidebar: useCallback(() => {
+      if (isMobileLayout) {
+        toggleMobileSidebar();
+        return;
+      }
+      // On native, the outer Sidebar is replaced by the WorkspaceShell's
+      // ActivityRail + SidePanel. Route "toggle sidebar" menu commands to the
+      // shell's collapse toggle so the View menu / Cmd+B do the same thing.
+      if (nativeCapable) {
+        shellHandleRef.current?.toggleSidePanel();
+        return;
+      }
+      setSidebarCollapsed((v) => !v);
+    }, [isMobileLayout, toggleMobileSidebar, nativeCapable]),
     onOpenCommandPalette: handleOpenCommandPalette,
     onToggleDark: toggleDark,
     onToggleFocusMode: handleToggleFocusMode,
@@ -335,10 +333,7 @@ function Layout() {
         </div>
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          <main
-            id="main-content"
-            className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
-          >
+          <main id="main-content" className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {/* Focus mode toggle button — top-right corner */}
             <button
               onClick={handleToggleFocusMode}
@@ -544,7 +539,10 @@ export default function App() {
                 <Route
                   path="*"
                   element={
-                    <Navigate to={hasNativeCapabilities() ? ROUTES.HOME : ROUTES.SETTINGS} replace />
+                    <Navigate
+                      to={hasNativeCapabilities() ? ROUTES.HOME : ROUTES.SETTINGS}
+                      replace
+                    />
                   }
                 />
               </Route>
