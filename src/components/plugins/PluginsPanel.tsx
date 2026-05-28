@@ -94,9 +94,15 @@ export interface PluginsPanelProps {
    * activity rail. Absent → the normal master-detail Plugins panel.
    */
   initialPluginId?: string;
+  /**
+   * Called after the installed set changes (install / uninstall) so the host can
+   * refresh live — e.g. the activity rail adds/removes a pinned plugin's icon the
+   * moment it is installed/uninstalled, no reload needed.
+   */
+  onPluginsChanged?: () => void;
 }
 
-export function PluginsPanel({ initialPluginId }: PluginsPanelProps = {}) {
+export function PluginsPanel({ initialPluginId, onPluginsChanged }: PluginsPanelProps = {}) {
   // Full-page mode: opened to a single plugin from the activity rail. Hides the
   // master list / tabs and shows just that plugin's detail page (no Back).
   const pageMode = initialPluginId !== undefined;
@@ -167,13 +173,14 @@ export function PluginsPanel({ initialPluginId }: PluginsPanelProps = {}) {
         const installed = await pluginInstallFromRegistry(entry.id);
         logger.info(`Installed plugin '${installed.id}' from registry`);
         await refresh();
+        onPluginsChanged?.();
       } catch (e) {
         setRegistryError(String(e));
       } finally {
         setBusy(null);
       }
     },
-    [refresh],
+    [refresh, onPluginsChanged],
   );
 
   const handleInstall = useCallback(async () => {
@@ -189,12 +196,13 @@ export function PluginsPanel({ initialPluginId }: PluginsPanelProps = {}) {
       const installed = await pluginInstall(picked);
       logger.info(`Installed plugin '${installed.id}'`);
       await refresh();
+      onPluginsChanged?.();
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(null);
     }
-  }, [refresh]);
+  }, [refresh, onPluginsChanged]);
 
   const handleUninstall = useCallback(
     async (id: string) => {
@@ -205,13 +213,14 @@ export function PluginsPanel({ initialPluginId }: PluginsPanelProps = {}) {
         setRun((r) => (r?.pluginId === id ? null : r));
         setSelectedId((s) => (s === id ? null : s));
         await refresh();
+        onPluginsChanged?.();
       } catch (e) {
         setError(String(e));
       } finally {
         setBusy(null);
       }
     },
-    [refresh],
+    [refresh, onPluginsChanged],
   );
 
   const handleRun = useCallback(

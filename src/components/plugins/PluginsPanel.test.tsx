@@ -134,4 +134,15 @@ describe("PluginsPanel command toolbar", () => {
       );
     });
   });
+
+  it("notifies the host when the installed set changes (uninstall)", async () => {
+    const user = userEvent.setup();
+    const onPluginsChanged = vi.fn();
+    render(<PluginsPanel initialPluginId="jira" onPluginsChanged={onPluginsChanged} />);
+
+    // Page mode exposes an Uninstall control in the detail header.
+    await user.click(await screen.findByRole("button", { name: /Uninstall/ }));
+
+    await waitFor(() => expect(onPluginsChanged).toHaveBeenCalled());
+  });
 });

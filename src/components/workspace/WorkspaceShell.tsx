@@ -105,17 +105,28 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
   // Installed plugins drive the per-plugin activity-rail icons. Fetched lazily
   // (mirrors PluginsPanel) — only those with `pinned: true` get a rail icon.
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    void pluginList()
-      .then((list) => {
-        if (!cancelled) setInstalledPlugins(list);
-      })
-      .catch((e: unknown) => logger.error("Failed to list plugins for activity rail", e));
-    return () => {
-      cancelled = true;
-    };
+
+  // Re-fetch the installed set. Called on mount and whenever PluginsPanel reports
+  // an install / uninstall, so a pinned plugin's rail icon appears the instant it
+  // is installed and disappears the instant it is removed (no reload). If the
+  // open plugin page was the one uninstalled, fall back to the editor (Files).
+  const refreshPlugins = useCallback(async () => {
+    try {
+      const list = await pluginList();
+      setInstalledPlugins(list);
+      setActivePluginId((cur) => (cur !== null && !list.some((p) => p.id === cur) ? null : cur));
+    } catch (e: unknown) {
+      logger.error("Failed to list plugins for activity rail", e);
+    }
   }, []);
+
+  // Initial fetch on mount; the setState lives in refreshPlugins (a legitimate
+  // data-fetch effect, like the URL↔panel sync below).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    void refreshPlugins();
+  }, [refreshPlugins]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const pinnedPlugins = useMemo(
     () => installedPlugins.filter((p) => p.pinned),
@@ -315,7 +326,10 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
                   {/* Full-page plugin surface: opens straight to the pinned
                       plugin, auto-running its `default` command. Reuses the
                       PluginsPanel detail renderer via initialPluginId. */}
-                  <PluginsPanel initialPluginId={activePluginId} />
+                  <PluginsPanel
+                    initialPluginId={activePluginId}
+                    onPluginsChanged={() => void refreshPlugins()}
+                  />
                 </div>
               </Suspense>
             ) : showOutlet ? (
@@ -333,7 +347,7 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
             ) : showPlugins ? (
               <Suspense fallback={<PageLoading />}>
                 <div className="h-full overflow-hidden">
-                  <PluginsPanel />
+                  <PluginsPanel onPluginsChanged={() => void refreshPlugins()} />
                 </div>
               </Suspense>
             ) : (
