@@ -16,8 +16,7 @@ class Liteduck < Formula
   homepage "https://buildonclaw.cloud/products/liteduck"
   url "https://github.com/bemindlabs/liteduck/archive/refs/tags/v2026.5.2.tar.gz"
   version "2026.5.2"
-  # Replace with: shasum -a 256 v2026.5.2.tar.gz
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "4dbcd6c813e3042b588ed0c7f47eb737dcc5237ae81d23d6971b9cf856cada5d"
   license "MIT"
 
   depends_on "node" => :build
