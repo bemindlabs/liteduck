@@ -28,12 +28,32 @@ interface BridgeMessage {
   payload?: unknown;
 }
 
-export function PluginHostFrame({ plugin }: { plugin: InstalledPlugin }) {
+/** Max wait for the plugin frame's `ready` handshake before falling back. The
+ *  bootstrap posts `ready` as soon as the shell loads, so this only elapses when
+ *  the `plugin://` scheme / CSP is misbehaving (e.g. a webview quirk). */
+const READY_TIMEOUT_MS = 3000;
+
+export function PluginHostFrame({
+  plugin,
+  onFallback,
+}: {
+  plugin: InstalledPlugin;
+  /** Called if the frame never hands-shakes — the caller should render the
+   *  declarative fallback so the plugin is never a blank page. */
+  onFallback?: () => void;
+}) {
   const { workspace } = useWorkspace();
   const frameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     const declared = new Set(plugin.commands.map((c) => c.id));
+    let ready = false;
+    const readyTimer = window.setTimeout(() => {
+      if (!ready) {
+        logger.warn(`plugin '${plugin.id}' UI did not hand-shake — falling back to declarative`);
+        onFallback?.();
+      }
+    }, READY_TIMEOUT_MS);
 
     function onMessage(e: MessageEvent) {
       // Authenticate by the exact frame window — the plugin origin is cross/opaque,
@@ -44,6 +64,8 @@ export function PluginHostFrame({ plugin }: { plugin: InstalledPlugin }) {
       if (m?.v !== 1 || typeof m.type !== "string") return;
 
       if (m.type === "ready") {
+        ready = true;
+        window.clearTimeout(readyTimer);
         win.postMessage(
           {
             v: 1,
@@ -102,8 +124,11 @@ export function PluginHostFrame({ plugin }: { plugin: InstalledPlugin }) {
     }
 
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [plugin, workspace]);
+    return () => {
+      window.clearTimeout(readyTimer);
+      window.removeEventListener("message", onMessage);
+    };
+  }, [plugin, workspace, onFallback]);
 
   return (
     <iframe

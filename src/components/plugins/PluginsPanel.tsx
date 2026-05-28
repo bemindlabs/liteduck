@@ -557,6 +557,11 @@ function PluginDetail({
   onUninstall: (id: string) => void;
 }) {
   const activeRun = run?.pluginId === plugin.id ? run : null;
+  // If a plugin's executable UI (ADR-002) fails to hand-shake, fall back to the
+  // declarative views. Tracked by id so switching plugins re-evaluates cleanly.
+  const [failedHostId, setFailedHostId] = useState<string | null>(null);
+  const useHostUi = !!plugin.ui && failedHostId !== plugin.id;
+  const handleHostFallback = useCallback(() => setFailedHostId(plugin.id), [plugin.id]);
   // The arg-command whose inline param form is expanded (only one at a time).
   const [openForm, setOpenForm] = useState<string | null>(null);
   const openCommand = plugin.commands.find((c) => c.id === openForm) ?? null;
@@ -615,12 +620,12 @@ function PluginDetail({
         )}
       </header>
 
-      {plugin.ui ? (
+      {useHostUi ? (
         /* Executable UI (ADR-002): the plugin renders itself inside an isolated
-           `plugin://` iframe. The command toolbar / declarative output below is
-           the fallback path for plugins without a `ui` bundle. */
+           `plugin://` iframe. If it never hands-shakes, onFallback flips this to
+           the declarative path below — the plugin is never a blank page. */
         <div className="min-h-0 flex-1 overflow-hidden">
-          <PluginHostFrame plugin={plugin} />
+          <PluginHostFrame plugin={plugin} onFallback={handleHostFallback} />
         </div>
       ) : (
         <>

@@ -25,6 +25,7 @@ vi.mock("@/lib/plugins", () => ({
   pluginInstallFromRegistry: vi.fn(),
   pluginUninstall: vi.fn(),
   pluginRegistryFetch: vi.fn(),
+  pluginUiUrl: (id: string) => `plugin://localhost/${id}/`,
 }));
 
 import { PluginsPanel } from "./PluginsPanel";
@@ -133,6 +134,19 @@ describe("PluginsPanel command toolbar", () => {
         undefined,
       );
     });
+  });
+
+  it("renders the executable-UI host frame when the plugin declares `ui`", async () => {
+    const jiraUiPlugin: InstalledPlugin = {
+      ...jiraPlugin,
+      ui: { entry: "ui.js", fallback: "declarative" },
+    };
+    pluginList.mockResolvedValue([jiraUiPlugin]);
+    render(<PluginsPanel initialPluginId="jira" />);
+
+    // The plugin's own UI iframe is shown instead of the declarative toolbar.
+    expect(await screen.findByTitle("Jira Cloud UI")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /View Issue/ })).not.toBeInTheDocument();
   });
 
   it("notifies the host when the installed set changes (uninstall)", async () => {

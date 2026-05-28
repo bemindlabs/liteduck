@@ -8,6 +8,7 @@
   "surface": "page",
   "icon": "square-kanban",
   "pinned": true,
+  "ui": { "entry": "ui.js", "fallback": "declarative" },
   "paths": [
     "~/.liteduck/plugins/jira/auth.toml"
   ],
