@@ -100,7 +100,7 @@ export function TabBar({
 }: TabBarProps) {
   return (
     <div
-      className="flex h-9 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-sidebar)] px-2"
+      className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-sidebar)] px-1.5"
       style={{ scrollbarWidth: "none" }}
       role="tablist"
       aria-label="Terminal tabs"
@@ -117,10 +117,10 @@ export function TabBar({
             if (e.key === "Enter" || e.key === " ") onSelectTab(tab.id);
           }}
           className={cn(
-            "group flex h-7 max-w-[min(180px,calc(100vw-8rem))] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+            "group flex h-6 max-w-[160px] shrink-0 cursor-pointer select-none items-center gap-1.5 rounded px-2 text-[11px] font-medium transition-colors",
             tab.id === activeTabId
               ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)]"
-              : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-foreground)]",
+              : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)]/60 hover:text-[var(--color-foreground)]",
           )}
         >
           <span

@@ -185,18 +185,20 @@ function LeafPaneView({ pane, callbacks, isOnly }: LeafPaneViewProps) {
           actions={paneActions}
         />
       ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-3 text-[var(--color-muted-foreground)]">
-          <p className="text-sm">No terminal in this pane.</p>
-          <button
-            onClick={() => void terminal.createTab("Terminal 1", "", [])}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-              "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] hover:opacity-90",
-            )}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Terminal
-          </button>
+        <div className="flex h-full items-center justify-center bg-[var(--color-background)] px-4">
+          <div className="flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
+            <span>Empty pane.</span>
+            <button
+              onClick={() => void terminal.createTab("Terminal 1", "", [])}
+              className={cn(
+                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium transition-colors",
+                "text-[var(--color-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
+              )}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Terminal
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -223,13 +225,13 @@ function PaneTreeView({ node, callbacks, isOnly }: PaneTreeViewProps) {
 
   return (
     <Group orientation={orientation} className="h-full w-full">
-      <Panel defaultSize={50} minSize={15} className="overflow-hidden">
+      <Panel defaultSize={50} minSize={20} className="overflow-hidden">
         <PaneTreeView node={childA} callbacks={callbacks} isOnly={false} />
       </Panel>
 
       <ResizeHandle direction={node.direction} />
 
-      <Panel defaultSize={50} minSize={15} className="overflow-hidden">
+      <Panel defaultSize={50} minSize={20} className="overflow-hidden">
         <PaneTreeView node={childB} callbacks={callbacks} isOnly={false} />
       </Panel>
     </Group>

@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, TerminalSquare } from "lucide-react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { Plus } from "lucide-react";
 import { useTerminal } from "@/hooks/useTerminal";
 import type { UseTerminalReturn } from "@/hooks/useTerminal";
 import SplitTerminal, {
@@ -18,49 +25,20 @@ function makeLeafId() {
   return `pane-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** Shared toolbar button classes. */
-const toolbarBtnCls = cn(
-  "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors",
-  "text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
-);
+// ── Imperative handle ──────────────────────────────────────────────────────────
 
-// ── NewTerminalButton ─────────────────────────────────────────────────────────
-
-interface NewTerminalButtonProps {
-  onNewTerminal: () => void;
-}
-
-function NewTerminalButton({ onNewTerminal }: NewTerminalButtonProps) {
-  return (
-    <button
-      onClick={onNewTerminal}
-      className={cn(toolbarBtnCls, "gap-1 px-2")}
-      aria-label="New terminal"
-      title="New terminal"
-    >
-      <Plus className="h-3.5 w-3.5" />
-      <span className="hidden sm:inline">New</span>
-    </button>
-  );
-}
-
-// ── SplitToolbar ──────────────────────────────────────────────────────────────
-
-interface SplitToolbarProps {
-  /** New-terminal button for the primary pane */
-  newTerminalButton: React.ReactNode;
-}
-
-function SplitToolbar({ newTerminalButton }: SplitToolbarProps) {
-  return (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-[var(--color-border)] bg-[var(--color-sidebar)] px-2">
-      <span className="mr-auto text-xs font-medium text-[var(--color-muted-foreground)]">
-        Terminal
-      </span>
-
-      {newTerminalButton}
-    </div>
-  );
+/**
+ * Surface a tiny imperative API so the dock header (TerminalDock) can drive the
+ * primary pane without owning its state. The dock renders the chrome; the page
+ * owns the pane pool + split tree.
+ */
+export interface TerminalPageHandle {
+  /** Open a fresh shell tab in the primary pane. */
+  newTerminal: () => void;
+  /** Split the primary pane (raw-PTY split) in the given direction. */
+  splitPrimary: (direction: SplitDirection) => void;
+  /** Whether another split is possible (≤ 4 panes). */
+  canSplit: () => boolean;
 }
 
 // ── TerminalPage ──────────────────────────────────────────────────────────────
@@ -89,7 +67,7 @@ function usePanePool(): [
   return [t0, t1, t2, t3];
 }
 
-export default function TerminalPage() {
+const TerminalPage = forwardRef<TerminalPageHandle>(function TerminalPage(_props, ref) {
   const pool = usePanePool();
   const { workspace } = useWorkspace();
 
@@ -147,6 +125,12 @@ export default function TerminalPage() {
     const firstLeafId = collectLeafIds(root)[0];
     return firstLeafId ? getTerminalForPane(firstLeafId) : null;
   }, [root, getTerminalForPane]);
+
+  /** Resolve the id of the primary (first) pane leaf. */
+  const getPrimaryLeafId = useCallback((): string | null => {
+    if (!root) return null;
+    return collectLeafIds(root)[0] ?? null;
+  }, [root]);
 
   // ── Global keyboard shortcut event listeners ───────────────────────────────
 
@@ -253,10 +237,34 @@ export default function TerminalPage() {
     }
   }
 
-  // ── Callbacks object (stable reference via object identity not needed —
-  //    SplitTerminal doesn't memo on it) ──────────────────────────────────────
+  // ── Imperative handle for the dock header ───────────────────────────────────
 
   const leafCount = root ? countLeaves(root) : 1;
+
+  // Split the primary pane: if it has no shell yet, open one first so the new
+  // pane has a sibling to split from.
+  const handleSplitPrimary = useCallback(
+    (direction: SplitDirection) => {
+      const primaryId = getPrimaryLeafId();
+      if (!primaryId) return;
+      if (pool[0].tabs.length === 0) handleNewTerminal();
+      handleSplit(primaryId, direction);
+    },
+    [getPrimaryLeafId, handleNewTerminal, handleSplit, pool],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      newTerminal: handleNewTerminal,
+      splitPrimary: handleSplitPrimary,
+      canSplit: () => leafCount < 4 && pool[0].tabs.length > 0,
+    }),
+    [handleNewTerminal, handleSplitPrimary, leafCount, pool],
+  );
+
+  // ── Callbacks object (stable reference via object identity not needed —
+  //    SplitTerminal doesn't memo on it) ──────────────────────────────────────
 
   const splitCallbacks: SplitCallbacks = {
     getTerminal: getTerminalForPane,
@@ -269,56 +277,36 @@ export default function TerminalPage() {
 
   if (!root) {
     // Loading state — primary pane not yet initialized.
-    return (
-      <div className="flex h-full flex-col overflow-hidden rounded-lg border border-[var(--color-border)]" />
-    );
+    return <div className="flex h-full flex-col overflow-hidden bg-[var(--color-background)]" />;
   }
 
   // Determine if primary pane has any terminals (for empty state).
   const primaryHasTerminals = pool[0].tabs.length > 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--color-border)]">
-      {/* Global toolbar: only shown when there are terminals */}
-      {primaryHasTerminals && (
-        <SplitToolbar
-          newTerminalButton={<NewTerminalButton onNewTerminal={handleNewTerminal} />}
-        />
-      )}
-
-      {/* Main split area */}
-      <div
-        className={cn(
-          "flex-1 min-h-0",
-          primaryHasTerminals ? "overflow-hidden" : "overflow-y-auto",
-        )}
-      >
-        {primaryHasTerminals ? (
-          <SplitTerminal root={root} callbacks={splitCallbacks} />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-            <TerminalSquare className="h-12 w-12 text-[var(--color-muted-foreground)]" />
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-[var(--color-foreground)]">
-                No terminal open
-              </h3>
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                Open a shell to start working in your workspace.
-              </p>
-            </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-background)]">
+      {primaryHasTerminals ? (
+        <SplitTerminal root={root} callbacks={splitCallbacks} />
+      ) : (
+        // Compact empty state — reads well even at a ~200px dock height.
+        <div className="flex h-full items-center justify-center px-4">
+          <div className="flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
+            <span>No terminal open.</span>
             <button
               onClick={handleNewTerminal}
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] hover:opacity-90",
+                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium transition-colors",
+                "text-[var(--color-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
               )}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
               New Terminal
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
-}
+});
+
+export default TerminalPage;
