@@ -1,0 +1,30 @@
+# auth.toml — Jira Cloud authentication CONTRACT. Declares the SHAPE only.
+#
+# =============================================================================
+#  NEVER COMMIT REAL CREDENTIALS TO THIS FILE.
+#
+#  The three values below are EMPTY placeholders that document the contract.
+#  This bundled copy ships with LiteDuck as a sample. The REAL one lives at:
+#
+#      ~/.liteduck/plugins/jira/auth.toml   (chmod 600, gitignored)
+#
+#  Resolution order at runtime (first hit wins), per jira.sh:
+#
+#    1. Environment variables (preferred — nothing touches disk):
+#         JIRA_EMAIL     account email (HTTP Basic username half)
+#         JIRA_TOKEN     API token     (HTTP Basic password half — SECRET)
+#         JIRA_BASE_URL  site URL, e.g. https://<site>.atlassian.net
+#
+#    2. This file, ONLY when it is owner-only (chmod 600). jira.sh refuses to
+#       read it otherwise. Fill the values in the user-home copy, never here.
+#
+#  The token is the secret. It is never written to the bundled copy, never
+#  logged, and never placed in any JSON output.
+# =============================================================================
+
+[jira.auth]
+# Placeholders ONLY — leave empty here; set the matching JIRA_* env var, or
+# fill the chmod-600 copy at ~/.liteduck/plugins/jira/auth.toml.
+email    = ""   # ← never commit a value; set JIRA_EMAIL
+token    = ""   # ← never commit a value; set JIRA_TOKEN  (THE SECRET)
+base_url = ""   # ← never commit a value; set JIRA_BASE_URL

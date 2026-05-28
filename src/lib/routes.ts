@@ -16,6 +16,7 @@ export const ROUTES = {
   FILES: "/files",
   TERMINAL: "/terminal",
   GIT: "/git",
+  PLUGINS: "/plugins",
   // Utility
   NOTIFICATIONS: "/notifications",
   SETTINGS: "/settings",
@@ -28,19 +29,25 @@ export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];
  * These are hidden on iOS/Android (including iPad) where the Rust backend
  * does not expose those commands.
  */
-export const NATIVE_ONLY_ROUTES = new Set<string>([ROUTES.TERMINAL, ROUTES.FILES, ROUTES.GIT]);
+export const NATIVE_ONLY_ROUTES = new Set<string>([
+  ROUTES.TERMINAL,
+  ROUTES.FILES,
+  ROUTES.GIT,
+  ROUTES.PLUGINS,
+]);
 
 /**
  * Workspace side-panel identifiers. The activity rail toggles between these,
  * and each is also reachable via its route (which scrolls the panel into view
  * inside the shell). `null` means the side panel is collapsed.
  */
-export type WorkspacePanel = "files" | "git" | "settings" | "notifications";
+export type WorkspacePanel = "files" | "git" | "plugins" | "settings" | "notifications";
 
 /** Map a router path to the corresponding side-panel identifier (if any). */
 export function panelFromPath(pathname: string): WorkspacePanel | null {
   if (pathname === ROUTES.FILES) return "files";
   if (pathname === ROUTES.GIT) return "git";
+  if (pathname === ROUTES.PLUGINS) return "plugins";
   if (pathname === ROUTES.SETTINGS) return "settings";
   if (pathname === ROUTES.NOTIFICATIONS) return "notifications";
   return null;

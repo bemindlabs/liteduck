@@ -19,6 +19,8 @@ pub mod home;
 pub mod keychain;
 pub mod keyring_store;
 #[cfg(not(target_os = "ios"))]
+pub mod plugins;
+#[cfg(not(target_os = "ios"))]
 pub mod pty;
 pub mod settings;
 #[cfg(not(target_os = "ios"))]
@@ -270,6 +272,11 @@ pub fn run() {
             // BWOC integration (optional)
             bwoc::bwoc_detect,
             bwoc::bwoc_list,
+            // Plugin system (Hybrid manifest + shell — desktop only)
+            plugins::plugin_list,
+            plugins::plugin_install,
+            plugins::plugin_uninstall,
+            plugins::plugin_run_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

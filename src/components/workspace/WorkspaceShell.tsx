@@ -36,6 +36,13 @@ import { PageLoading } from "@/components/ui/skeleton";
 // settings / notifications Outlets replace the editor area.
 const GitPage = lazy(() => import("@/pages/GitPage"));
 
+// PluginsPanel renders full-width in the editor area when the "plugins" panel
+// is active, mirroring the GitPage full-area pattern. It is the workspace view
+// for LiteDuck's plugin system.
+const PluginsPanel = lazy(() =>
+  import("@/components/plugins/PluginsPanel").then((m) => ({ default: m.PluginsPanel })),
+);
+
 // Re-export for parent forwarding refs of imperative actions (toggles).
 export interface WorkspaceShellHandle {
   toggleSidePanel: () => void;
@@ -182,6 +189,10 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
   // `activePanel`; the editor area shows GitPage when this is true.
   const showGit = activePanel === "git";
 
+  // Plugins render full-width in the editor area too (same pattern as Git):
+  // the manifest list + command output need room beyond the ~240px side panel.
+  const showPlugins = activePanel === "plugins";
+
   // The side panel only has a useful body for "files". For
   // "git" / "settings" / "notifications" the editor area shows the full page,
   // so the side panel stays collapsed even though the rail icon still
@@ -218,6 +229,12 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
               <Suspense fallback={<PageLoading />}>
                 <div className="h-full overflow-y-auto">
                   <GitPage />
+                </div>
+              </Suspense>
+            ) : showPlugins ? (
+              <Suspense fallback={<PageLoading />}>
+                <div className="h-full overflow-hidden">
+                  <PluginsPanel />
                 </div>
               </Suspense>
             ) : (

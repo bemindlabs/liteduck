@@ -8,7 +8,7 @@
  * behaviour). The shell decides what "active" means when nothing is selected.
  */
 
-import { Bell, FolderTree, GitBranch, Settings } from "lucide-react";
+import { Bell, Boxes, FolderTree, GitBranch, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LiteDuckLogo } from "@/components/LiteDuckLogo";
 import type { WorkspacePanel } from "@/lib/routes";
@@ -22,6 +22,7 @@ interface RailItem {
 const TOP_ITEMS: RailItem[] = [
   { id: "files", label: "Explorer (Files)", icon: FolderTree },
   { id: "git", label: "Source Control", icon: GitBranch },
+  { id: "plugins", label: "Plugins", icon: Boxes },
 ];
 
 const BOTTOM_ITEMS: RailItem[] = [

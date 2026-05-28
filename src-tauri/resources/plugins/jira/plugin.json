@@ -1,0 +1,25 @@
+{
+  "id": "jira",
+  "name": "Jira Cloud",
+  "version": "0.1.0",
+  "description": "Read-only Jira Cloud integration. Lists and views issues via JQL against Atlassian REST v3. The first proving plugin of LiteDuck's plugin system.",
+  "kind": "integration",
+  "network": true,
+  "paths": [
+    "~/.liteduck/plugins/jira/auth.toml"
+  ],
+  "commands": [
+    {
+      "id": "jira.list",
+      "title": "Jira: List Issues (JQL)",
+      "run": "sh jira.sh list",
+      "args": ["jql", "max_results"]
+    },
+    {
+      "id": "jira.view",
+      "title": "Jira: View Issue",
+      "run": "sh jira.sh view",
+      "args": ["issue"]
+    }
+  ]
+}

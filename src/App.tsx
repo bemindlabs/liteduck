@@ -531,6 +531,7 @@ export default function App() {
                     <Route path="terminal" element={null} />
                     <Route path="files" element={null} />
                     <Route path="git" element={null} />
+                    <Route path="plugins" element={null} />
                   </>
                 )}
 
