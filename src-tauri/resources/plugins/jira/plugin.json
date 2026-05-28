@@ -17,13 +17,15 @@
       "title": "Jira: List Issues (JQL)",
       "run": "sh \"$LITEDUCK_PLUGIN_DIR/jira.sh\" list",
       "args": ["jql", "max_results"],
-      "view": "table"
+      "view": "table",
+      "default": true
     },
     {
       "id": "jira.view",
       "title": "Jira: View Issue",
       "run": "sh \"$LITEDUCK_PLUGIN_DIR/jira.sh\" view",
-      "args": ["issue"]
+      "args": ["issue"],
+      "view": "keyvalue"
     }
   ]
 }

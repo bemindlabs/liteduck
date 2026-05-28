@@ -20,7 +20,9 @@ import {
   ArrowLeft,
   BadgeCheck,
   Boxes,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Download,
   Globe,
   Lock,
@@ -517,9 +519,12 @@ function InstalledList({
 }
 
 /**
- * The detail page for one installed plugin: header (name / version / kind /
- * network badge / description), its commands as Run buttons, and a rendered
- * output region driven by the run command's declared `view`.
+ * The detail page for one installed plugin, **output-first**: a compact header,
+ * a single command **toolbar** (no-arg commands run on click; commands with args
+ * toggle a small inline param form), and the rendered **output region as the
+ * hero** filling the remaining height. The output is driven by the run command's
+ * declared `view`. The plugin's `default` command auto-runs on open (wired by the
+ * parent) so the page lands on real data instead of an empty prompt.
  */
 function PluginDetail({
   plugin,
@@ -542,12 +547,20 @@ function PluginDetail({
   onUninstall: (id: string) => void;
 }) {
   const activeRun = run?.pluginId === plugin.id ? run : null;
+  // The arg-command whose inline param form is expanded (only one at a time).
+  const [openForm, setOpenForm] = useState<string | null>(null);
+  const openCommand = plugin.commands.find((c) => c.id === openForm) ?? null;
+  // The landing command — re-run by the Refresh control.
+  const defaultCommand = plugin.commands.find((c) => c.default) ?? null;
+  const refreshBusy = defaultCommand
+    ? busy === `${plugin.id}:${defaultCommand.id}`
+    : false;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Back affordance (master-detail) + uninstall. The Back button is hidden
           in full-page mode where the activity rail handles navigation. */}
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
         {onBack ? (
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-4 w-4" />
@@ -570,78 +583,149 @@ function PluginDetail({
         </Button>
       </div>
 
-      <div className="space-y-5 p-5">
-        {/* Plugin header */}
-        <header>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold">{plugin.name}</h2>
-            <span className="text-xs text-[var(--color-muted-foreground)]">v{plugin.version}</span>
-            <span className="rounded bg-[var(--color-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-secondary-foreground)]">
-              {plugin.kind}
-            </span>
-            <NetworkBadge network={plugin.network} />
-          </div>
-          {plugin.description && (
-            <p className="mt-2 max-w-2xl text-sm text-[var(--color-muted-foreground)]">
-              {plugin.description}
-            </p>
-          )}
-          {plugin.paths.length > 0 && (
-            <p className="mt-1 truncate text-[10px] text-[var(--color-muted-foreground)]">
-              Declared paths: {plugin.paths.join(", ")}
-            </p>
-          )}
-        </header>
-
-        {/* Commands */}
-        {plugin.commands.length > 0 ? (
-          <section>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
-              Commands
-            </h3>
-            <div className="flex flex-col gap-3">
-              {plugin.commands.map((command) => (
-                <CommandRunner
-                  key={command.id}
-                  plugin={plugin}
-                  command={command}
-                  active={activeRun?.commandId === command.id}
-                  busy={busy === `${plugin.id}:${command.id}`}
-                  onRun={onRun}
-                />
-              ))}
-            </div>
-          </section>
-        ) : (
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            This plugin contributes no commands.
+      {/* Compact header */}
+      <header className="shrink-0 px-5 pt-4 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold">{plugin.name}</h2>
+          <span className="text-xs text-[var(--color-muted-foreground)]">v{plugin.version}</span>
+          <span className="rounded bg-[var(--color-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-secondary-foreground)]">
+            {plugin.kind}
+          </span>
+          <NetworkBadge network={plugin.network} />
+        </div>
+        {plugin.description && (
+          <p className="mt-1.5 max-w-2xl text-xs text-[var(--color-muted-foreground)]">
+            {plugin.description}
           </p>
         )}
+        {plugin.paths.length > 0 && (
+          <p className="mt-1 truncate text-[10px] text-[var(--color-muted-foreground)]">
+            Declared paths: {plugin.paths.join(", ")}
+          </p>
+        )}
+      </header>
 
-        {/* Output region */}
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
-            Output
-          </h3>
-          {activeRun ? (
-            activeRun.error ? (
-              <div className="space-y-2">
-                <pre className="overflow-auto rounded border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 p-3 text-xs text-[var(--color-destructive)]">
-                  {activeRun.error}
-                </pre>
-                {activeRun.raw.trim() && <OutputView view={activeRun.view} raw={activeRun.raw} />}
-              </div>
-            ) : (
-              <OutputView view={activeRun.view} raw={activeRun.raw} />
-            )
-          ) : (
-            <div className="rounded border border-dashed border-[var(--color-border)] p-6 text-center text-xs text-[var(--color-muted-foreground)]">
-              Run a command above to see its output here.
-            </div>
+      {/* Command toolbar */}
+      {plugin.commands.length > 0 && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-y border-[var(--color-border)] bg-[var(--color-muted)]/30 px-5 py-2.5">
+          {plugin.commands.map((command) => (
+            <CommandButton
+              key={command.id}
+              command={command}
+              active={activeRun?.commandId === command.id}
+              busy={busy === `${plugin.id}:${command.id}`}
+              expanded={openForm === command.id}
+              onClick={() => {
+                if (command.args.length > 0) {
+                  setOpenForm((id) => (id === command.id ? null : command.id));
+                } else {
+                  setOpenForm(null);
+                  onRun(plugin, command);
+                }
+              }}
+            />
+          ))}
+          {defaultCommand && (
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Re-run the default command"
+              onClick={() => {
+                setOpenForm(null);
+                onRun(plugin, defaultCommand);
+              }}
+              disabled={refreshBusy}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", refreshBusy && "animate-spin")} />
+              Refresh
+            </Button>
           )}
-        </section>
+        </div>
+      )}
+
+      {/* Inline param form for the expanded arg-command (above the output). */}
+      {openCommand && (
+        <InlineParamForm
+          key={openCommand.id}
+          plugin={plugin}
+          command={openCommand}
+          busy={busy === `${plugin.id}:${openCommand.id}`}
+          onSubmit={(params) => onRun(plugin, openCommand, params)}
+        />
+      )}
+
+      {/* Output — the hero. Fills the remaining height and scrolls on its own. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {activeRun ? (
+          activeRun.error ? (
+            <div className="space-y-2">
+              <pre className="overflow-auto rounded border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 p-3 text-xs text-[var(--color-destructive)]">
+                {activeRun.error}
+              </pre>
+              {activeRun.raw.trim() && <OutputView view={activeRun.view} raw={activeRun.raw} />}
+            </div>
+          ) : (
+            <OutputView view={activeRun.view} raw={activeRun.raw} />
+          )
+        ) : (
+          <div className="rounded border border-dashed border-[var(--color-border)] p-6 text-center text-xs text-[var(--color-muted-foreground)]">
+            {plugin.commands.length > 0
+              ? "Run a command above to see its output here."
+              : "This plugin contributes no commands."}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+/** Strip a leading "Prefix: " from a command title for compact toolbar labels
+ *  ("Jira: View Issue" → "View Issue"). Titles without a short prefix are kept. */
+function shortCommandLabel(title: string): string {
+  return title.replace(/^[\w .-]{1,24}:\s+/, "");
+}
+
+/**
+ * One command in the toolbar. No-arg commands run on click (Play icon); commands
+ * with args toggle their inline param form (chevron reflects open/closed). The
+ * label drops the redundant "Plugin:" prefix; the full title stays as the tooltip.
+ */
+function CommandButton({
+  command,
+  active,
+  busy,
+  expanded,
+  onClick,
+}: {
+  command: PluginCommand;
+  active: boolean;
+  busy: boolean;
+  expanded: boolean;
+  onClick: () => void;
+}) {
+  const hasArgs = command.args.length > 0;
+  return (
+    <Button
+      variant={active ? "default" : "outline"}
+      size="sm"
+      onClick={onClick}
+      disabled={busy}
+      title={command.title}
+      aria-expanded={hasArgs ? expanded : undefined}
+    >
+      {busy ? (
+        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Play className="h-3.5 w-3.5" />
+      )}
+      {shortCommandLabel(command.title)}
+      {hasArgs &&
+        (expanded ? (
+          <ChevronUp className="h-3.5 w-3.5 opacity-60" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+        ))}
+    </Button>
   );
 }
 
@@ -661,70 +745,40 @@ const ARG_PLACEHOLDERS: Record<string, string> = {
 };
 
 /**
- * One command's Run control. When the command declares `args`, render a small
- * inline form (one labeled text input per arg) above the Run button; on Run the
- * filled values are collected into `{ argName: value }` and passed as `params`
- * (the runner exports each as `LITEDUCK_PARAM_<KEY>`). Commands with no args
- * keep the plain Run button.
+ * The inline param form for a command that declares `args` — shown above the
+ * output when its toolbar button is expanded. One labeled text input per arg laid
+ * out in a row; on submit the filled values are collected into `{ argName: value }`
+ * and passed as `params` (the runner exports each as `LITEDUCK_PARAM_<KEY>`).
+ * Empty values are dropped so the script's own defaults / "required" errors apply.
  */
-function CommandRunner({
+function InlineParamForm({
   plugin,
   command,
-  active,
   busy,
-  onRun,
+  onSubmit,
 }: {
   plugin: InstalledPlugin;
   command: PluginCommand;
-  active: boolean;
   busy: boolean;
-  onRun: (
-    plugin: InstalledPlugin,
-    command: PluginCommand,
-    params?: Record<string, string>,
-  ) => void;
+  onSubmit: (params: Record<string, string>) => void;
 }) {
   const args = command.args;
   const [values, setValues] = useState<Record<string, string>>({});
 
-  const runButton = (
-    <Button
-      type="submit"
-      variant={active ? "default" : "outline"}
-      size="sm"
-      onClick={args.length > 0 ? undefined : () => onRun(plugin, command)}
-      disabled={busy}
-    >
-      {busy ? (
-        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Play className="h-3.5 w-3.5" />
-      )}
-      {command.title}
-    </Button>
-  );
-
-  if (args.length === 0) {
-    return <div className="flex flex-wrap gap-2">{runButton}</div>;
-  }
-
   return (
     <form
-      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3"
+      className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-card)] px-5 py-3"
       onSubmit={(e) => {
         e.preventDefault();
-        // Pass only non-empty values; empty params are dropped so the script's
-        // own defaults / "required" errors apply.
         const params: Record<string, string> = {};
         for (const arg of args) {
           const v = (values[arg] ?? "").trim();
           if (v) params[arg] = v;
         }
-        onRun(plugin, command, params);
+        onSubmit(params);
       }}
     >
-      <div className="mb-2 text-xs font-medium">{command.title}</div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-end gap-3">
         {args.map((arg) => {
           const inputId = `${plugin.id}-${command.id}-${arg}`;
           return (
@@ -736,13 +790,20 @@ function CommandRunner({
                 value={values[arg] ?? ""}
                 placeholder={ARG_PLACEHOLDERS[arg] ?? prettifyArg(arg)}
                 onChange={(e) => setValues((prev) => ({ ...prev, [arg]: e.target.value }))}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-sm outline-none focus:border-[var(--color-primary)]"
+                className="w-56 rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-sm outline-none focus:border-[var(--color-primary)]"
               />
             </label>
           );
         })}
+        <Button type="submit" size="sm" disabled={busy}>
+          {busy ? (
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Play className="h-3.5 w-3.5" />
+          )}
+          Run
+        </Button>
       </div>
-      <div className="mt-2.5 flex flex-wrap gap-2">{runButton}</div>
     </form>
   );
 }

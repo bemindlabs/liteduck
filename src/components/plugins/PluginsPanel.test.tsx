@@ -53,7 +53,7 @@ const jiraPlugin: InstalledPlugin = {
   ],
 };
 
-describe("PluginsPanel param form", () => {
+describe("PluginsPanel command toolbar", () => {
   beforeEach(() => {
     pluginRunCommand.mockReset();
     pluginRunCommand.mockResolvedValue({ stdout: "{}", stderr: "", exit_code: 0 });
@@ -61,23 +61,35 @@ describe("PluginsPanel param form", () => {
     pluginList.mockResolvedValue([jiraPlugin]);
   });
 
-  it("renders one labeled input per command arg", async () => {
+  it("auto-runs the default command on open (lands on data, not an empty prompt)", async () => {
     render(<PluginsPanel initialPluginId="jira" />);
-    // The view command's `issue` input, and the list command's `jql`/`max_results`.
+    await waitFor(() => {
+      expect(pluginRunCommand).toHaveBeenCalledWith("jira", "jira.list", undefined, undefined);
+    });
+  });
+
+  it("shows short command labels and keeps arg inputs hidden until expanded", async () => {
+    render(<PluginsPanel initialPluginId="jira" />);
+    // Toolbar uses the compact label (no "Jira:" prefix).
+    expect(await screen.findByRole("button", { name: /View Issue/ })).toBeInTheDocument();
+    // The `issue` input is not rendered until its command is expanded.
+    expect(screen.queryByLabelText("Issue")).not.toBeInTheDocument();
+  });
+
+  it("expands a command's inline form on click", async () => {
+    const user = userEvent.setup();
+    render(<PluginsPanel initialPluginId="jira" />);
+    await user.click(await screen.findByRole("button", { name: /View Issue/ }));
     expect(await screen.findByLabelText("Issue")).toBeInTheDocument();
-    expect(screen.getByLabelText("Jql")).toBeInTheDocument();
-    expect(screen.getByLabelText("Max Results")).toBeInTheDocument();
   });
 
   it("passes filled arg values as params to the run call", async () => {
     const user = userEvent.setup();
     render(<PluginsPanel initialPluginId="jira" />);
 
-    const issueInput = await screen.findByLabelText("Issue");
-    await user.type(issueInput, "PROJ-123");
-
-    // Submit the `view` command's form via its Run button.
-    await user.click(screen.getByRole("button", { name: /Jira: View Issue/ }));
+    await user.click(await screen.findByRole("button", { name: /View Issue/ }));
+    await user.type(await screen.findByLabelText("Issue"), "PROJ-123");
+    await user.click(screen.getByRole("button", { name: /^Run$/ }));
 
     await waitFor(() => {
       expect(pluginRunCommand).toHaveBeenCalledWith(
@@ -93,9 +105,9 @@ describe("PluginsPanel param form", () => {
     const user = userEvent.setup();
     render(<PluginsPanel initialPluginId="jira" />);
 
-    await screen.findByLabelText("Issue");
-    // Submit the list command with nothing filled → empty params object.
-    await user.click(screen.getByRole("button", { name: /Jira: List Issues/ }));
+    // Expand the list command and submit with nothing filled → empty params object.
+    await user.click(await screen.findByRole("button", { name: /List Issues/ }));
+    await user.click(screen.getByRole("button", { name: /^Run$/ }));
 
     await waitFor(() => {
       expect(pluginRunCommand).toHaveBeenCalledWith("jira", "jira.list", {}, undefined);

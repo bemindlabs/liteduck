@@ -14,7 +14,8 @@
       "id": "bwoc.detect",
       "title": "BWOC: Detect CLI",
       "run": "sh \"$LITEDUCK_PLUGIN_DIR/bwoc.sh\" detect",
-      "args": []
+      "args": [],
+      "view": "keyvalue"
     },
     {
       "id": "bwoc.list",

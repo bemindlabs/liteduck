@@ -157,15 +157,15 @@ do_view() {
   http_get "${BASE_URL}${API_BASE}/issue/${issue}?fields=summary,status,assignee,description"
   classify
 
+  # Emit the keyvalue contract ({ pairs: [[key, value], …] }) so LiteDuck renders
+  # the issue as a labeled key/value card rather than a wall of raw JSON.
   printf '%s' "$HTTP_BODY" | jq '{
-    ok: true,
-    verb: "view",
-    issue: {
-      key: .key,
-      summary: (.fields.summary // null),
-      status: (.fields.status.name // null),
-      assignee: (.fields.assignee.displayName // .fields.assignee.emailAddress // null)
-    }
+    pairs: [
+      ["Key",      .key],
+      ["Summary",  (.fields.summary // "—")],
+      ["Status",   (.fields.status.name // "—")],
+      ["Assignee", (.fields.assignee.displayName // .fields.assignee.emailAddress // "—")]
+    ]
   }'
 }
 
