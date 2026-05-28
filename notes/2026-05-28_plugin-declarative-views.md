@@ -1,0 +1,99 @@
+# Plugin declarative views — design spec (2026-05-28)
+
+## Problem
+
+Plugins today contribute **commands only**. A command runs a shell template and its
+stdout is shown as raw text/JSON in `PluginsPanel`. Users want richer "pages" — e.g. the
+BWOC agent roster as a table, or a Jira issue list — not a wall of JSON.
+
+A full JS/HTML webview page (VS Code-extension style) is **deliberately rejected**: per
+`notes/2026-05-28_plugin-system-design.md`, VISION.md, and ADR-001, a plugin JS host
+reintroduces exactly the AI/agent/chat surface area LiteDuck removed. We keep the
+**hybrid (declarative-manifest + shell-command) model**: a plugin emits **data**; LiteDuck
+renders it with **trusted built-in components**. No plugin-supplied JS/HTML ever executes.
+
+## Design
+
+### Manifest extension
+
+Each command gains an optional `view` field (default `text` = today's behavior):
+
+```json
+{
+  "id": "bwoc.list",
+  "title": "BWOC: List Agents",
+  "run": "sh \"$LITEDUCK_PLUGIN_DIR/bwoc.sh\" list",
+  "view": "table",
+  "default": true
+}
+```
+
+- **`view`** — enum: `text` | `table` | `list` | `keyvalue` | `markdown`. Absent → `text`.
+- **`default`** (optional bool) — one command per plugin may set `default: true`; LiteDuck
+  runs + renders it as the plugin's **landing page** when the plugin is opened from the
+  activity rail (instead of a bare command list).
+
+### Output contracts (what the command writes to stdout per `view`)
+
+| `view` | stdout shape |
+|---|---|
+| `text` | raw text (current behavior) |
+| `table` | `{ "columns": ["Name","Status"], "rows": [["agent-prime","active"], …] }` |
+| `list` | `{ "items": [{ "title": "...", "subtitle"?: "...", "badge"?: "..." }, …] }` (plain strings also accepted) |
+| `keyvalue` | `{ "pairs": [["Version","0.1.0"], …] }` (a flat object is also accepted) |
+| `markdown` | a raw Markdown string |
+
+Malformed output for the declared `view` **falls back to `text`** with an inline error
+banner — never a crash, never a blank page.
+
+### Rendering
+
+- LiteDuck ships built-in React renderers (`TableView` / `ListView` / `KeyValueView` /
+  `MarkdownView` / `TextView`) selected by the command's `view`.
+- Rendered **full-width in the editor area** — the workspace shell already renders the
+  Plugins surface there (same slot as Git/Settings). The rendered output **is** the
+  plugin "page".
+- Markdown goes through the existing sanitized `Markdown` component (no raw HTML/script).
+  Table/list/keyvalue values render as React text nodes (auto-escaped).
+
+### Security & charter
+
+- **No JS execution from plugins** — only declarative data flows in. Charter-safe; the
+  scope-ceiling deny-list (`chat`/`agent`/`llm`) and the user-trust subprocess sandbox are
+  unchanged. `view` only affects *how host-trusted code renders host-received data*.
+- Markdown sanitized; all data escaped on render.
+
+### Backward compatibility
+
+`view` absent ⇒ `text` ⇒ identical to today. Existing plugins (and the bundled Jira/BWOC)
+keep working untouched until their manifests opt in.
+
+## Phasing
+
+1. **Phase 1** — manifest `view` field + JSON-schema update; `text` / `table` / `markdown`
+   renderers; malformed-output fallback. Showcase: flip bundled `bwoc.list` and `jira.list`
+   to `view: "table"`.
+2. **Phase 2** — `list` + `keyvalue` renderers; the `default` landing-page command.
+3. **Phase 3 (optional)** — a Refresh affordance (re-run the command), param-driven views
+   (run with `LITEDUCK_PARAM_*` from a small form), and persisting a plugin page as an
+   editor tab.
+
+## Open questions for the operator
+
+1. **Pagination** — large tables (hundreds of rows): client-side virtualization, or leave
+   it to the plugin to page?
+2. **Page persistence** — should an opened plugin page become a closeable editor tab (like
+   a file), or stay a transient editor-area view?
+3. **Refresh** — manual button only, or opt-in auto-refresh interval declared in the
+   manifest?
+4. **Schema location** — extend the registry's `schema/plugin.schema.json`
+   (`bemindlabs/liteduck-plugins`) in lockstep with the in-app loader?
+
+## Files this will touch (impl, not done here)
+
+- `src-tauri/src/plugins.rs` — accept + pass through the `view` / `default` manifest fields.
+- `src/lib/plugins.ts` — types for `view` / `default`.
+- `src/components/plugins/` — the renderers + the landing-page wiring in `PluginsPanel`.
+- `src-tauri/resources/plugins/{bwoc,jira}/plugin.json` + the registry copies — opt into
+  `table`.
+- `projects/liteduck-plugins/schema/plugin.schema.json` — add `view` enum + `default`.
