@@ -69,7 +69,7 @@ function WelcomeStep({ onNext }: WizardStepProps) {
           {
             icon: Terminal,
             title: "Integrated terminal",
-            desc: "Run shells and tmux sessions",
+            desc: "Run shells in split panes",
           },
           {
             icon: GitBranch,
