@@ -213,16 +213,18 @@ export function PluginsPanel({ initialPluginId }: PluginsPanelProps = {}) {
   );
 
   const handleRun = useCallback(
-    async (plugin: InstalledPlugin, command: PluginCommand) => {
+    async (plugin: InstalledPlugin, command: PluginCommand, params?: Record<string, string>) => {
       setBusy(`${plugin.id}:${command.id}`);
       setError(null);
       try {
         // Forward the active workspace (if any) so the command runs with it as
         // CWD; undefined when none is open → command falls back to the plugin dir.
+        // `params` (collected from the per-command arg form) are exported as
+        // LITEDUCK_PARAM_<KEY> env vars by the runner; undefined → none.
         const result = await pluginRunCommand(
           plugin.id,
           command.id,
-          undefined,
+          params,
           workspace || undefined,
         );
         setRun({
@@ -532,7 +534,11 @@ function PluginDetail({
   busy: string | null;
   /** Absent in full-page mode — the activity rail is how you leave the page. */
   onBack?: () => void;
-  onRun: (plugin: InstalledPlugin, command: PluginCommand) => void;
+  onRun: (
+    plugin: InstalledPlugin,
+    command: PluginCommand,
+    params?: Record<string, string>,
+  ) => void;
   onUninstall: (id: string) => void;
 }) {
   const activeRun = run?.pluginId === plugin.id ? run : null;
@@ -593,22 +599,16 @@ function PluginDetail({
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
               Commands
             </h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-3">
               {plugin.commands.map((command) => (
-                <Button
+                <CommandRunner
                   key={command.id}
-                  variant={activeRun?.commandId === command.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onRun(plugin, command)}
-                  disabled={busy === `${plugin.id}:${command.id}`}
-                >
-                  {busy === `${plugin.id}:${command.id}` ? (
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Play className="h-3.5 w-3.5" />
-                  )}
-                  {command.title}
-                </Button>
+                  plugin={plugin}
+                  command={command}
+                  active={activeRun?.commandId === command.id}
+                  busy={busy === `${plugin.id}:${command.id}`}
+                  onRun={onRun}
+                />
               ))}
             </div>
           </section>
@@ -642,6 +642,108 @@ function PluginDetail({
         </section>
       </div>
     </div>
+  );
+}
+
+/** Prettify a manifest arg name for use as a label/placeholder ("max_results" → "Max Results"). */
+function prettifyArg(arg: string): string {
+  return arg
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** Optional per-arg placeholder hints (sensible defaults shown to the user). */
+const ARG_PLACEHOLDERS: Record<string, string> = {
+  jql: "order by updated DESC",
+  max_results: "25",
+};
+
+/**
+ * One command's Run control. When the command declares `args`, render a small
+ * inline form (one labeled text input per arg) above the Run button; on Run the
+ * filled values are collected into `{ argName: value }` and passed as `params`
+ * (the runner exports each as `LITEDUCK_PARAM_<KEY>`). Commands with no args
+ * keep the plain Run button.
+ */
+function CommandRunner({
+  plugin,
+  command,
+  active,
+  busy,
+  onRun,
+}: {
+  plugin: InstalledPlugin;
+  command: PluginCommand;
+  active: boolean;
+  busy: boolean;
+  onRun: (
+    plugin: InstalledPlugin,
+    command: PluginCommand,
+    params?: Record<string, string>,
+  ) => void;
+}) {
+  const args = command.args;
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const runButton = (
+    <Button
+      type="submit"
+      variant={active ? "default" : "outline"}
+      size="sm"
+      onClick={args.length > 0 ? undefined : () => onRun(plugin, command)}
+      disabled={busy}
+    >
+      {busy ? (
+        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Play className="h-3.5 w-3.5" />
+      )}
+      {command.title}
+    </Button>
+  );
+
+  if (args.length === 0) {
+    return <div className="flex flex-wrap gap-2">{runButton}</div>;
+  }
+
+  return (
+    <form
+      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        // Pass only non-empty values; empty params are dropped so the script's
+        // own defaults / "required" errors apply.
+        const params: Record<string, string> = {};
+        for (const arg of args) {
+          const v = (values[arg] ?? "").trim();
+          if (v) params[arg] = v;
+        }
+        onRun(plugin, command, params);
+      }}
+    >
+      <div className="mb-2 text-xs font-medium">{command.title}</div>
+      <div className="flex flex-col gap-2">
+        {args.map((arg) => {
+          const inputId = `${plugin.id}-${command.id}-${arg}`;
+          return (
+            <label key={arg} htmlFor={inputId} className="flex flex-col gap-1 text-xs">
+              <span className="text-[var(--color-muted-foreground)]">{prettifyArg(arg)}</span>
+              <input
+                id={inputId}
+                type="text"
+                value={values[arg] ?? ""}
+                placeholder={ARG_PLACEHOLDERS[arg] ?? prettifyArg(arg)}
+                onChange={(e) => setValues((prev) => ({ ...prev, [arg]: e.target.value }))}
+                className="rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-sm outline-none focus:border-[var(--color-primary)]"
+              />
+            </label>
+          );
+        })}
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-2">{runButton}</div>
+    </form>
   );
 }
 

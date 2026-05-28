@@ -10,8 +10,8 @@
 # non-zero (LiteDuck surfaces both).
 #
 # ── Verbs (READ-ONLY in v1) ──────────────────────────────────────────────────
-#   list  — GET /rest/api/3/search  (JQL, bounded paging)   → {issues:[...]}
-#   view  — GET /rest/api/3/issue/<KEY>                      → {issue:{...}}
+#   list  — GET /rest/api/3/search/jql (enhanced JQL search)  → {issues:[...]}
+#   view  — GET /rest/api/3/issue/<KEY>                       → {issue:{...}}
 # Write / transition is deliberately NOT implemented in v1 (avoids the
 # write-confirmation-gate complexity); it is a documented follow-up.
 #
@@ -118,17 +118,23 @@ do_list() {
   case "$max" in (*[!0-9]*|'') max=25 ;; esac
   [ "$max" -gt "$MAX_PAGE" ] && max="$MAX_PAGE"
 
-  http_get "${BASE_URL}${API_BASE}/search" \
+  # Enhanced JQL search: the legacy /rest/api/3/search endpoint was removed by
+  # Atlassian (returns 410 Gone). /search/jql is token-paginated (nextPageToken),
+  # NOT offset-paginated — `startAt` is invalid here and is dropped. The endpoint
+  # returns only id+key unless `fields` is requested, so it is always passed.
+  # For a bounded v1 list we fetch a single page (no nextPageToken follow-up).
+  http_get "${BASE_URL}${API_BASE}/search/jql" \
     -G --data-urlencode "jql=${jql}" \
-       --data-urlencode "startAt=0" \
        --data-urlencode "maxResults=${max}" \
        --data-urlencode "fields=summary,status,assignee"
   classify
 
+  # The /search/jql response has no `total`/`startAt` (just issues + nextPageToken
+  # + isLast); report total as the count of issues in this page.
   printf '%s' "$HTTP_BODY" | jq '{
     ok: true,
     verb: "list",
-    total: (.total // 0),
+    total: (.issues | length),
     issues: [ .issues[]? | {
       key: .key,
       summary: (.fields.summary // null),
