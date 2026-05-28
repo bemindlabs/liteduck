@@ -5,6 +5,9 @@
   "description": "Read-only Jira Cloud integration. Lists and views issues via JQL against Atlassian REST v3. The first proving plugin of LiteDuck's plugin system.",
   "kind": "integration",
   "network": true,
+  "surface": "page",
+  "icon": "square-kanban",
+  "pinned": true,
   "paths": [
     "~/.liteduck/plugins/jira/auth.toml"
   ],

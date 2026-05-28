@@ -5,6 +5,9 @@
   "description": "Optional, read-only integration with the external BWOC agent-orchestration CLI. Detects the binary and lists the registered agent roster. LiteDuck never spawns or modifies agents.",
   "kind": "integration",
   "network": false,
+  "surface": "page",
+  "icon": "users",
+  "pinned": true,
   "paths": [],
   "commands": [
     {
