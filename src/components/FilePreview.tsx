@@ -7,7 +7,6 @@ import {
   Pencil,
   Save,
   Undo2,
-  PenLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,6 @@ import {
 } from "@/lib/files";
 import { Markdown } from "@/components/Markdown";
 import { ReadingView } from "@/components/ReadingView";
-import { WritingView } from "@/components/WritingView";
 import { highlightLine } from "./file-preview/syntax-highlight";
 import { MdToolbar } from "./file-preview/MdToolbar";
 
@@ -38,7 +36,7 @@ export type WriteFileFn = (path: string, content: string) => Promise<void>;
 
 // ── Markdown view modes ─────────────────────────────────────────────────────
 
-type MdViewMode = "preview" | "edit" | "split" | "write";
+type MdViewMode = "preview" | "edit" | "split";
 
 // ── FilePreview / Editor ─────────────────────────────────────────────────────
 
@@ -48,7 +46,7 @@ interface FilePreviewProps {
   readFile?: ReadFileFn;
   /** When provided, replaces the default local `filesWriteText` call. */
   writeFile?: WriteFileFn;
-  /** When true, markdown defaults to WritingView; non-markdown gets ReadingView. */
+  /** When true, markdown defaults to Edit mode; non-markdown gets ReadingView. */
   docsMode?: boolean;
 }
 
@@ -60,7 +58,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
-  const [mdViewMode, setMdViewMode] = useState<MdViewMode>(docsMode ? "write" : "preview");
+  const [mdViewMode, setMdViewMode] = useState<MdViewMode>(docsMode ? "edit" : "preview");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
@@ -76,14 +74,13 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
   // read-only to avoid clobbering the full file with a partial save.
   const canEditCode = !isTruncated;
   const isEditing = isMd ? mdViewMode === "edit" || mdViewMode === "split" : canEditCode;
-  const isWriteMode = isMd && mdViewMode === "write";
-  const hasChanges = (isEditing || isWriteMode) && editContent !== originalContent;
+  const hasChanges = isEditing && editContent !== originalContent;
 
   useEffect(() => {
     if (!entry || entry.is_dir) {
       setContent(null);
       setError(null);
-      setMdViewMode(docsMode ? "write" : "preview");
+      setMdViewMode(docsMode ? "edit" : "preview");
       return;
     }
 
@@ -95,7 +92,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
       setError(null);
       setContent(null);
       setIsTruncated(false);
-      setMdViewMode(docsMode ? "write" : "preview");
+      setMdViewMode(docsMode ? "edit" : "preview");
       setSaved(false);
 
       try {
@@ -252,21 +249,6 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
     return <ReadingView content={content} filename={entry.name} isMarkdown={false} />;
   }
 
-  // ── Write mode — distraction-free writing view ─────────────────────────
-
-  if (isWriteMode && content !== null) {
-    return (
-      <WritingView
-        content={editContent}
-        filename={entry.name}
-        onChange={setEditContent}
-        onSave={handleSave}
-        hasChanges={hasChanges}
-        docsMode={docsMode}
-      />
-    );
-  }
-
   // ── Content / Editor ───────────────────────────────────────────────────
 
   const lines = (content ?? "").split("\n");
@@ -341,18 +323,6 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
                 <Eye className="h-3 w-3" />
                 Preview
               </button>
-              <button
-                onClick={() => setMdViewMode("write")}
-                className={cn(
-                  "flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition-all",
-                  mdViewMode === "write"
-                    ? "bg-[var(--color-background)] text-[var(--color-foreground)] shadow-sm"
-                    : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]",
-                )}
-              >
-                <PenLine className="h-3 w-3" />
-                Write
-              </button>
             </div>
           )}
 
@@ -398,7 +368,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
       </div>
 
       {/* Markdown formatting toolbar */}
-      {isMd && mdViewMode !== "preview" && mdViewMode !== "write" && (
+      {isMd && mdViewMode !== "preview" && (
         <MdToolbar
           textareaRef={editorRef}
           editContent={editContent}
