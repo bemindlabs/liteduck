@@ -132,7 +132,7 @@ function StatusBanner({ status, errorMessage }: { status: SaveStatus; errorMessa
     error: {
       text: errorMessage || "An error occurred while saving.",
       classes:
-        "border-[var(--color-border)] bg-[var(--color-destructive)] text-[var(--color-destructive)]",
+        "border-[var(--color-border)] bg-[var(--color-destructive)] text-[var(--color-destructive-foreground)]",
       icon: null,
     },
   };
@@ -410,11 +410,7 @@ export default function SettingsPage() {
         {/* Save footer */}
         <footer className="sticky bottom-0 z-30 w-full border-t border-[var(--color-border)] bg-[var(--color-card)]/95 backdrop-blur-sm">
           <div className="flex items-center gap-3 px-4 py-2.5">
-            <div className="flex-1 min-w-0">
-              {saveStatus !== "idle" && (
-                <StatusBanner status={saveStatus} errorMessage={errorMessage} />
-              )}
-            </div>
+            <div className="flex-1 min-w-0" />
             <div className="flex items-center gap-2 shrink-0">
               <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-[var(--color-border)] bg-[var(--color-muted)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--color-muted-foreground)]">
                 {/* eslint-disable-next-line @typescript-eslint/no-deprecated */}

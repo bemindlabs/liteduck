@@ -151,7 +151,7 @@ export function IdentitySection() {
               className={cn(
                 "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors",
                 confirmReset
-                  ? "border-[var(--color-border)] bg-[var(--color-destructive)] text-[var(--color-destructive)] hover:bg-[var(--color-destructive)]"
+                  ? "border-[var(--color-border)] bg-[var(--color-destructive)] text-[var(--color-destructive-foreground)] hover:bg-[var(--color-destructive)]"
                   : "border-[var(--color-input)] bg-[var(--color-background)] text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
               )}
             >
