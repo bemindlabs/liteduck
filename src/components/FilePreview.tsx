@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   CheckCircle2,
   ClipboardCopy,
@@ -64,6 +64,10 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  // Highlight overlay (the colored <pre> behind the transparent code textarea)
+  // and its line-number gutter — both must scroll in lock-step with the textarea.
+  const highlightRef = useRef<HTMLPreElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
 
   const ext = entry?.extension?.toLowerCase() ?? "";
   const isMd = ext === "md" || ext === "markdown" || ext === "mdx";
@@ -173,6 +177,36 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
     },
     [handleSave, editContent],
   );
+
+  // Keep the highlight overlay + line-number gutter aligned with the textarea
+  // as the user scrolls (the textarea is the only scrollable layer).
+  const handleEditorScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
+    const { scrollTop, scrollLeft } = e.currentTarget;
+    if (highlightRef.current) {
+      highlightRef.current.scrollTop = scrollTop;
+      highlightRef.current.scrollLeft = scrollLeft;
+    }
+    if (gutterRef.current) {
+      gutterRef.current.scrollTop = scrollTop;
+    }
+  }, []);
+
+  // Pre-highlight each line of the editable buffer once per content/ext change.
+  // Mirrors the read-only view's coloring; cheap enough to skip virtualization.
+  // An empty line gets a zero-width space so it keeps full line-height and stays
+  // aligned with the textarea's caret. A trailing "" element guards the final
+  // newline (a <pre> collapses a trailing blank line; a textarea keeps it).
+  const editLineCount = useMemo(
+    () => (isMd ? 0 : editContent.split("\n").length),
+    [editContent, isMd],
+  );
+  const highlightedEditLines = useMemo(() => {
+    if (!isEditing || isMd) return null;
+    return editContent.split("\n").map((line, i) => {
+      const nodes = highlightLine(line, ext);
+      return <div key={i}>{line.length === 0 ? "​" : nodes}</div>;
+    });
+  }, [editContent, ext, isEditing, isMd]);
 
   // ── Empty / dir states ─────────────────────────────────────────────────
 
@@ -447,26 +481,46 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
           </div>
         )
       ) : isEditing ? (
-        /* Non-markdown editor — directly editable (VS Code-style) with line-number gutter */
+        /* Non-markdown editor — directly editable (VS Code-style) with live syntax
+           highlighting via a transparent textarea layered over a colored <pre>. */
         <div className="flex-1 overflow-hidden relative">
+          {/* Highlight layer (behind) — colored, non-interactive, scroll-synced. */}
+          <pre
+            ref={highlightRef}
+            aria-hidden="true"
+            className={cn(
+              "absolute inset-0 w-full h-full m-0 overflow-hidden pointer-events-none",
+              "font-mono text-xs leading-relaxed whitespace-pre-wrap break-words",
+              "bg-[var(--color-background)] text-[var(--color-foreground)] p-4 pl-14",
+            )}
+            style={{ tabSize: 2 }}
+          >
+            {highlightedEditLines}
+          </pre>
+          {/* Input layer (top) — transparent text, visible caret + selection. */}
           <textarea
             ref={editorRef}
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             onKeyDown={handleEditorKeyDown}
+            onScroll={handleEditorScroll}
             spellCheck={false}
             className={cn(
               "absolute inset-0 w-full h-full resize-none font-mono text-xs leading-relaxed",
-              "bg-[var(--color-background)] text-[var(--color-foreground)] p-4 pl-14",
+              "whitespace-pre-wrap break-words bg-transparent text-transparent p-4 pl-14",
+              "caret-[var(--color-foreground)]",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-ring)] border-none",
               "selection:bg-[var(--color-accent)]",
             )}
+            style={{ tabSize: 2 }}
           />
+          {/* Line-number gutter — scroll-synced with the textarea. */}
           <div
+            ref={gutterRef}
             className="absolute left-0 top-0 bottom-0 w-12 pointer-events-none overflow-hidden bg-[var(--color-card)] border-r border-[var(--color-border)]"
             style={{ paddingTop: "1rem" }}
           >
-            {editContent.split("\n").map((_, i) => (
+            {Array.from({ length: editLineCount }, (_, i) => (
               <div
                 key={i}
                 className="text-right pr-2 text-[var(--color-muted-foreground)] font-mono text-xs leading-relaxed select-none"
