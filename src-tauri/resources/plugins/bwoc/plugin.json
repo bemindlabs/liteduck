@@ -17,7 +17,9 @@
       "id": "bwoc.list",
       "title": "BWOC: List Agents",
       "run": "sh \"$LITEDUCK_PLUGIN_DIR/bwoc.sh\" list",
-      "args": []
+      "args": [],
+      "view": "table",
+      "default": true
     }
   ]
 }

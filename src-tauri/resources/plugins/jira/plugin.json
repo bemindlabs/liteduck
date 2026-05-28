@@ -12,13 +12,14 @@
     {
       "id": "jira.list",
       "title": "Jira: List Issues (JQL)",
-      "run": "sh jira.sh list",
-      "args": ["jql", "max_results"]
+      "run": "sh \"$LITEDUCK_PLUGIN_DIR/jira.sh\" list",
+      "args": ["jql", "max_results"],
+      "view": "table"
     },
     {
       "id": "jira.view",
       "title": "Jira: View Issue",
-      "run": "sh jira.sh view",
+      "run": "sh \"$LITEDUCK_PLUGIN_DIR/jira.sh\" view",
       "args": ["issue"]
     }
   ]

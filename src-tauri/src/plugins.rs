@@ -57,6 +57,17 @@ pub struct PluginCommand {
     /// Declared parameter keys this command accepts (documentation + UI hints).
     #[serde(default)]
     pub args: Vec<String>,
+    /// Declarative-view hint for how the command's stdout should be rendered:
+    /// `text` (default) | `table` | `list` | `keyvalue` | `markdown`. Absent or
+    /// unknown values are treated as `text` by the frontend renderer. The host
+    /// never interprets this — it only passes it through (no plugin JS/HTML
+    /// executes; `view` only selects a *built-in* renderer over plugin data).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub view: Option<String>,
+    /// When `true`, this command is auto-run as the plugin's landing view when
+    /// its page is opened. At most one command per plugin should set this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<bool>,
 }
 
 /// A parsed `plugin.json` manifest.
@@ -737,6 +748,38 @@ mod tests {
         let pdir = dir.join(id);
         fs::create_dir_all(&pdir).unwrap();
         fs::write(pdir.join("plugin.json"), json).unwrap();
+    }
+
+    #[test]
+    fn command_view_and_default_parse_through() {
+        // A manifest declaring `view` + `default` on a command parses, and the
+        // fields survive a round-trip back to JSON (frontend passthrough).
+        let m: PluginManifest = serde_json::from_str(
+            r#"{"id":"x","name":"X","version":"1","kind":"integration",
+                "commands":[{"id":"x.list","title":"List","run":"echo hi",
+                             "view":"table","default":true}]}"#,
+        )
+        .unwrap();
+        let cmd = &m.commands[0];
+        assert_eq!(cmd.view.as_deref(), Some("table"));
+        assert_eq!(cmd.default, Some(true));
+
+        // Absent → None for both (back-compat: behaves like text, no auto-run).
+        let m2: PluginManifest = serde_json::from_str(
+            r#"{"id":"y","name":"Y","version":"1","kind":"tool",
+                "commands":[{"id":"y.run","title":"Run","run":"echo hi"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(m2.commands[0].view, None);
+        assert_eq!(m2.commands[0].default, None);
+
+        // Round-trip: serialized JSON includes the set fields, omits the absent.
+        let json = serde_json::to_string(cmd).unwrap();
+        assert!(json.contains("\"view\":\"table\""), "got: {json}");
+        assert!(json.contains("\"default\":true"), "got: {json}");
+        let json2 = serde_json::to_string(&m2.commands[0]).unwrap();
+        assert!(!json2.contains("view"), "absent view should be omitted: {json2}");
+        assert!(!json2.contains("default"), "absent default should be omitted: {json2}");
     }
 
     #[test]

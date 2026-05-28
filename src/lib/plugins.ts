@@ -6,6 +6,13 @@ import { invoke } from "@tauri-apps/api/core";
 // a declarative `plugin.json` manifest + a shell command the host spawns. No
 // plugin code runs in the LiteDuck process.
 
+/**
+ * Declarative-view hint for how a command's stdout is rendered. Selects a
+ * **built-in, trusted** renderer over plugin-emitted *data* — no plugin JS/HTML
+ * ever executes. Unknown/absent → treated as `text` (the legacy behavior).
+ */
+export type PluginView = "text" | "table" | "list" | "keyvalue" | "markdown";
+
 export interface PluginCommand {
   id: string;
   title: string;
@@ -13,6 +20,17 @@ export interface PluginCommand {
   run: string;
   /** Declared parameter keys this command accepts. */
   args: string[];
+  /**
+   * How to render this command's stdout. Absent or unknown → `"text"`. See
+   * the output contracts per view in
+   * `notes/2026-05-28_plugin-declarative-views.md`.
+   */
+  view?: PluginView;
+  /**
+   * When `true`, LiteDuck auto-runs this command as the plugin's landing view
+   * when the plugin page opens. At most one command per plugin should set it.
+   */
+  default?: boolean;
 }
 
 /**
