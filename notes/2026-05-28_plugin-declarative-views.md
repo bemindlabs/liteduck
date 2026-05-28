@@ -33,6 +33,16 @@ Each command gains an optional `view` field (default `text` = today's behavior):
   runs + renders it as the plugin's **landing page** when the plugin is opened from the
   activity rail (instead of a bare command list).
 
+#### Plugin-level fields — activity-rail pinning
+
+- **`icon`** (optional string) — a name from LiteDuck's **built-in icon set** (lucide). A
+  plugin only *names* a host-provided icon; it never ships an SVG/asset, so there is no
+  content surface (charter-safe). Unknown/absent → the generic plugin (Boxes) icon.
+- **`pinned`** (optional bool, default `false`) — when true, the plugin gets **its own icon
+  in the activity rail** (below the shared Plugins icon). Clicking it opens the plugin's
+  page directly (auto-running its `default` command if one is set). **Opt-in** to avoid rail
+  clutter — un-pinned plugins stay reachable through the Plugins panel.
+
 ### Output contracts (what the command writes to stdout per `view`)
 
 | `view` | stdout shape |
@@ -77,6 +87,9 @@ keep working untouched until their manifests opt in.
 3. **Phase 3 (optional)** — a Refresh affordance (re-run the command), param-driven views
    (run with `LITEDUCK_PARAM_*` from a small form), and persisting a plugin page as an
    editor tab.
+4. **Phase 4 — activity-rail pinning** — manifest `icon` (lucide name) + `pinned`; pinned
+   plugins render an icon in the activity rail (below the Plugins icon) that opens the
+   plugin's page directly. Opt-in; the rail stays uncluttered by default.
 
 ## Open questions for the operator
 
