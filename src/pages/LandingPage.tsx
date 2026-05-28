@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "@/lib/routes";
-import { getAppVersion } from "@/lib/updater";
+import { getAppVersion } from "@/lib/version";
 import { FolderOpen, Plus, Clock, ChevronRight, Settings, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasNativeCapabilities } from "@/lib/platform";

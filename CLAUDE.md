@@ -67,7 +67,7 @@ All commands return `Result<T, String>`.
 
 | Domain    | Modules                                                                 | Purpose                                              |
 | --------- | ----------------------------------------------------------------------- | ---------------------------------------------------- |
-| Core      | `db.rs`, `settings.rs`, `keychain.rs`, `keyring_store.rs`, `workspace.rs`, `home.rs`, `app_menu.rs`, `updater.rs` | SQLite, keychain secrets, workspace init, app home, native menu, auto-updater |
+| Core      | `db.rs`, `settings.rs`, `keychain.rs`, `keyring_store.rs`, `workspace.rs`, `home.rs`, `app_menu.rs` | SQLite, keychain secrets, workspace init, app home, native menu |
 | Terminal  | `terminal.rs`, `pty.rs`                                                  | PTY/tmux session management (managed state: `PtyManager`) |
 | Files     | `files.rs`                                                               | File listing, read/write, rename/delete, open in VS Code |
 | Git       | `git.rs`                                                                 | Status, log, diffs, branches, worktrees (git2)       |

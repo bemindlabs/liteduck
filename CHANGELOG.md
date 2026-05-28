@@ -16,6 +16,28 @@ Versions follow [Calendar Versioning](https://calver.org/) (YYYY.M.D).
 
 ## [Unreleased]
 
+### Distribution: Homebrew-formula-from-source only
+
+LiteDuck is now distributed **only** as a build-from-source Homebrew formula. The
+CI release pipeline, DMG releases, and in-app auto-updater have all been removed.
+
+- **Added** — `HomebrewFormula/liteduck.rb` rewritten from a cask (prebuilt DMG)
+  into a formula that compiles the Tauri app from the tagged GitHub source archive.
+  Install with `brew install bemindlabs/liteduck/liteduck`; update with
+  `brew upgrade liteduck`. The build is unsigned/un-notarized (Gatekeeper may need
+  right-click → Open on first launch) — the deliberate trade-off of source dist.
+- **Removed** — in-app **auto-updater** (`updater.rs`, `src/lib/updater.ts`, the
+  `UpdateChecker`/`UpdateDialog` UI, the "Check for Updates" menu item and its
+  24-hour background check). The About section now just shows the version and
+  points to `brew upgrade`. Version display is preserved via a standalone
+  `get_app_version` command.
+- **Removed** — the **release CI** (`.github/workflows/release.yml` build → sign →
+  notarize → publish → update-homebrew, and `auto-release.yml` auto-tagging). No
+  more `RELEASE_PAT` / `PUBLIC_RELEASE_TOKEN` / Apple signing secrets. Releasing is
+  now: bump version, tag, push, bump the formula's version + sha256 (see
+  `docs/RELEASING.md`). The quality CI (`ci.yml`) and E2E regression
+  (`regression.yml`) workflows are unchanged.
+
 ### Refocused to an editor-only product (LoopDuck → LiteDuck)
 
 LiteDuck is now a lightweight, editor-only desktop app. See
@@ -251,7 +273,7 @@ toggle, and the GitHub clone dialog. See **[Unreleased]**._
 - **File logger** for diagnostics
 - **Playwright e2e** test setup
 - Homebrew cask auto-update step in the release workflow
-- Mirror release assets to the public `bemindlabs/liteduck-releases` repo
+- Publish signed/notarized release assets directly on `bemindlabs/liteduck`
 
 ### Changed
 - **Versioning switched from SemVer to CalVer** (YYYY.M.D)

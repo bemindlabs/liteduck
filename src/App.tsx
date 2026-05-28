@@ -45,8 +45,7 @@ import { BiometricProvider } from "@/contexts/BiometricContext";
 import { BiometricLockScreen } from "@/components/BiometricLockScreen";
 import { Sidebar } from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { UpdateChecker } from "@/components/UpdateChecker";
-import { getAppVersion } from "@/lib/updater";
+import { getAppVersion } from "@/lib/version";
 import { useWindowSize, BREAKPOINTS } from "@/hooks/useWindowSize";
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -216,15 +215,6 @@ function Layout() {
     onToggleTerminalMaximize: handleToggleTerminalMaximize,
   });
 
-  const handleCheckUpdate = useCallback(() => {
-    void navigate(ROUTES.SETTINGS);
-    requestAnimationFrame(() => {
-      document
-        .getElementById("section-about")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, [navigate]);
-
   useMenuEvents({
     navigate,
     onToggleSidebar: useCallback(() => {
@@ -247,7 +237,6 @@ function Layout() {
     onNewTerminalTab: handleNewTerminalTab,
     onCloseTerminalTab: handleCloseTerminalTab,
     onOpenShortcutsHelp: handleOpenShortcutsHelp,
-    onCheckUpdate: handleCheckUpdate,
   });
 
   // Exit focus mode on Escape
@@ -419,8 +408,6 @@ function Layout() {
         onClose={() => setShortcutsOpen(false)}
         bindings={bindings}
       />
-
-      <UpdateChecker />
 
       {/* Screen reader notification announcer (WCAG 4.1.3) */}
       <NotificationAnnouncer />

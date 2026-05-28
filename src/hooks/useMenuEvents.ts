@@ -11,7 +11,6 @@ interface MenuEventHandlers {
   onNewTerminalTab: () => void;
   onCloseTerminalTab: () => void;
   onOpenShortcutsHelp: () => void;
-  onCheckUpdate?: () => void;
 }
 
 /**
@@ -27,7 +26,6 @@ export function useMenuEvents({
   onNewTerminalTab,
   onCloseTerminalTab,
   onOpenShortcutsHelp,
-  onCheckUpdate,
 }: MenuEventHandlers) {
   // Navigation events — menu items that navigate to a route
   useEffect(() => {
@@ -61,9 +59,6 @@ export function useMenuEvents({
             const el = document.getElementById("section-about");
             el?.scrollIntoView({ behavior: "smooth", block: "start" });
           });
-          break;
-        case "check_update":
-          onCheckUpdate?.();
           break;
 
         // File menu
@@ -130,6 +125,5 @@ export function useMenuEvents({
     onNewTerminalTab,
     onCloseTerminalTab,
     onOpenShortcutsHelp,
-    onCheckUpdate,
   ]);
 }

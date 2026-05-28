@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { Download } from "lucide-react";
-import { CheckForUpdateButton } from "@/components/UpdateChecker";
-import { getAppVersion } from "@/lib/updater";
+import { Info } from "lucide-react";
+import { getAppVersion } from "@/lib/version";
 
 export function AboutSection() {
   const [version, setVersion] = useState("");
@@ -17,12 +16,10 @@ export function AboutSection() {
     >
       <div className="border-b border-[var(--color-border)] pb-3">
         <div className="flex items-center gap-2">
-          <Download className="h-4 w-4 text-[var(--color-muted-foreground)]" />
+          <Info className="h-4 w-4 text-[var(--color-muted-foreground)]" />
           <h3 className="text-base font-medium text-[var(--color-foreground)]">About</h3>
         </div>
-        <p className="mt-0.5 text-sm text-[var(--color-muted-foreground)]">
-          Application version and updates.
-        </p>
+        <p className="mt-0.5 text-sm text-[var(--color-muted-foreground)]">Application version.</p>
       </div>
 
       <div className="space-y-4">
@@ -35,15 +32,13 @@ export function AboutSection() {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-[var(--color-foreground)]">
-            Software Updates
-          </label>
-          <p className="text-xs text-[var(--color-muted-foreground)]">
-            Checks the latest release on GitHub. Updates are checked automatically every 24 hours.
-          </p>
-          <CheckForUpdateButton />
-        </div>
+        <p className="text-xs text-[var(--color-muted-foreground)]">
+          LiteDuck is distributed via Homebrew and built from source. Update with{" "}
+          <code className="rounded bg-[var(--color-muted)] px-1 py-0.5 font-mono">
+            brew upgrade liteduck
+          </code>
+          .
+        </p>
       </div>
     </section>
   );

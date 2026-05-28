@@ -22,17 +22,26 @@
 ### Homebrew (macOS)
 
 ```bash
-brew install --cask bemindlabs/liteduck/liteduck
+brew install bemindlabs/liteduck/liteduck
 ```
 
-### Direct Download (macOS)
+This installs from the tap **`bemindlabs/homebrew-liteduck`** and **builds LiteDuck
+from source** — Homebrew compiles the Tauri app locally with Node + Rust. There is
+no prebuilt binary to download.
 
-- [macOS (Apple Silicon)](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck_2026.4.22_aarch64.dmg)
-- [macOS (Intel)](https://github.com/bemindlabs/liteduck-releases/releases/latest/download/LiteDuck_2026.4.22_x64.dmg)
+Update with Homebrew (there is **no in-app auto-updater**):
 
-> **Planned: Windows & Linux.** LiteDuck is macOS-only for now. Direct downloads for
-> Windows (`.exe`) and Linux (`.deb` / `.AppImage` / `.rpm`) will return once those
-> platforms ship.
+```bash
+brew upgrade liteduck
+```
+
+> **Unsigned build.** Because LiteDuck is built from source, the resulting app is
+> not code-signed or notarized. The first time you open it, macOS Gatekeeper may
+> block it — right-click **LiteDuck.app** and choose **Open**, or run
+> `xattr -dr com.apple.quarantine "$(brew --prefix)/opt/liteduck/LiteDuck.app"`.
+
+> **Planned: Windows & Linux.** LiteDuck is macOS-only for now. Support for other
+> platforms will follow once those targets ship.
 
 ## Features
 
@@ -136,7 +145,6 @@ src-tauri/                    # Backend (Rust, Tauri v2)
     home.rs                   #   ~/.liteduck home: config, profile, memory notes
     agent_memory.rs           #   Markdown note store backing home memory
     app_menu.rs               #   Native application menu
-    updater.rs                #   Auto-updater
     terminal.rs / pty.rs      #   Terminal and PTY/tmux handling
     files.rs                  #   File listing, read/write, rename/delete
     git.rs                    #   Git operations + worktrees (libgit2)

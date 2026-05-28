@@ -8,8 +8,6 @@ use tauri::{AppHandle, Emitter, Wry};
 pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri::Error> {
     // ── LiteDuck (app) menu ──────────────────────────────────────────────────
     let about = MenuItemBuilder::with_id("about", "About LiteDuck").build(app)?;
-    let check_update =
-        MenuItemBuilder::with_id("check_update", "Check for Updates...").build(app)?;
     let settings = MenuItemBuilder::with_id("nav_settings", "Settings...")
         .accelerator("CmdOrCtrl+,")
         .build(app)?;
@@ -19,7 +17,6 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
 
     let app_menu = SubmenuBuilder::new(app, "LiteDuck")
         .item(&about)
-        .item(&check_update)
         .separator()
         .item(&settings)
         .separator()
@@ -161,9 +158,6 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, event_id: &str) {
         "about" => {
             let _ = app.emit("menu-action", "about");
         }
-        "check_update" => {
-            let _ = app.emit("menu-action", "check_update");
-        }
         "quit" => {
             app.exit(0);
         }
@@ -229,13 +223,13 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, event_id: &str) {
         }
         "release_notes" => {
             let _ = tauri_plugin_opener::open_url(
-                "https://github.com/bemindlabs/liteduck-releases/releases",
+                "https://github.com/bemindlabs/liteduck/releases",
                 None::<&str>,
             );
         }
         "report_issue" => {
             let _ = tauri_plugin_opener::open_url(
-                "https://github.com/bemindlabs/liteduck-releases/issues",
+                "https://github.com/bemindlabs/liteduck/issues",
                 None::<&str>,
             );
         }

@@ -1,42 +1,52 @@
-# Homebrew Cask — LiteDuck
+# Homebrew Formula — LiteDuck
 
 How LiteDuck is distributed through Homebrew, how to create/publish the tap the
-first time, and how to bump the cask on every release.
+first time, and how to bump the formula on every release.
+
+LiteDuck ships as a **build-from-source formula** (not a cask): `brew install`
+compiles the Tauri app locally with Node + Rust. There is no prebuilt binary, no
+DMG, and no in-app updater — `brew upgrade liteduck` rebuilds the new version from
+source.
 
 End users install with:
 
 ```bash
-brew install --cask bemindlabs/liteduck/liteduck
+brew install bemindlabs/liteduck/liteduck
 ```
 
 That shorthand resolves to the tap repository **`bemindlabs/homebrew-liteduck`**
-(Homebrew strips the `homebrew-` prefix) and the cask file `Casks/liteduck.rb`
-inside it. The DMG artifacts it downloads live in the public releases repo
-**`bemindlabs/liteduck-releases`**.
+(Homebrew strips the `homebrew-` prefix) and the formula `Formula/liteduck.rb`
+inside it. The source archive it downloads is the GitHub-generated tarball for the
+release tag in **`bemindlabs/liteduck`**.
 
 ## Moving parts
 
 | Thing | Where | Role |
 |---|---|---|
-| Cask source of truth | this repo → [`HomebrewFormula/liteduck.rb`](../HomebrewFormula/liteduck.rb) | Reviewed copy, kept in version control next to the app |
-| Published cask | `bemindlabs/homebrew-liteduck` → `Casks/liteduck.rb` | What `brew` actually reads |
-| Release artifacts | `bemindlabs/liteduck-releases` → release `v<version>` | The `.dmg` files the cask downloads |
-| Release automation | this repo → [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Builds, publishes, mirrors, and bumps the cask on tag push |
+| Formula source of truth | this repo → [`HomebrewFormula/liteduck.rb`](../HomebrewFormula/liteduck.rb) | Reviewed copy, kept in version control next to the app |
+| Published formula | `bemindlabs/homebrew-liteduck` → `Formula/liteduck.rb` | What `brew` actually reads |
+| Source archive | `bemindlabs/liteduck` → tag `v<version>` | The `.tar.gz` the formula downloads and compiles |
 
-The cask carries **two** download URLs — one per macOS architecture — using the
-DMG names produced by the Tauri build:
+The formula downloads one URL — the GitHub auto-generated source archive for the
+tag:
 
-- Apple Silicon: `LiteDuck_<version>_aarch64.dmg`
-- Intel: `LiteDuck_<version>_x64.dmg`
+```
+https://github.com/bemindlabs/liteduck/archive/refs/tags/v2026.5.2.tar.gz
+```
 
-Both point at the versioned release tag, e.g.
-`https://github.com/bemindlabs/liteduck-releases/releases/download/v2026.5.2/LiteDuck_2026.5.2_aarch64.dmg`.
+`brew` then runs `npm ci` + `npm run tauri build -- --bundles app` and installs the
+resulting `LiteDuck.app` into the formula prefix, symlinking the inner binary onto
+`PATH` as `liteduck`.
+
+## Unsigned build — the trade-off
+
+Because the app is compiled locally and **not** code-signed or notarized, macOS
+Gatekeeper may block it on first launch. The formula's `caveats` block tells the
+user how to allow it (right-click → Open, or `xattr -dr com.apple.quarantine`).
+This is the deliberate cost of source distribution; signing would require a build
+pipeline and Apple credentials, which this project intentionally does not run.
 
 ## One-time: create and publish the tap
-
-> Do this once. The `update-homebrew` job in `release.yml` assumes the tap
-> repo already exists and that `Casks/liteduck.rb` is present so it can be
-> overwritten on each release.
 
 1. **Create the GitHub repo** `bemindlabs/homebrew-liteduck` (public). The
    `homebrew-` prefix is required — `brew tap bemindlabs/liteduck` looks for it.
@@ -46,111 +56,72 @@ Both point at the versioned release tag, e.g.
    ```bash
    git clone https://github.com/bemindlabs/homebrew-liteduck.git
    cd homebrew-liteduck
-   mkdir -p Casks
-   # Seed the published cask from this repo's source-of-truth copy:
-   cp /path/to/liteduck/HomebrewFormula/liteduck.rb Casks/liteduck.rb
+   mkdir -p Formula
+   # Seed the published formula from this repo's source-of-truth copy:
+   cp /path/to/liteduck/HomebrewFormula/liteduck.rb Formula/liteduck.rb
    ```
 
-3. **Fill in real checksums** (the source copy ships zero-placeholders on
-   purpose — see "Checksums" below), then validate:
+3. **Fill in the real sha256** (the source copy ships a zero-placeholder on
+   purpose — see "Checksum" below), then validate:
 
    ```bash
-   brew audit --cask --new Casks/liteduck.rb
-   brew style Casks/liteduck.rb
+   brew audit --new Formula/liteduck.rb
+   brew style Formula/liteduck.rb
    ```
 
 4. **Commit and push:**
 
    ```bash
-   git add Casks/liteduck.rb
-   git commit -m "Add LiteDuck cask"
+   git add Formula/liteduck.rb
+   git commit -m "Add LiteDuck formula"
    git push origin main
    ```
 
-5. **Smoke-test the end-user path** on a machine without the app installed:
+5. **Smoke-test the end-user path** (this compiles from source, so it is slow):
 
    ```bash
-   brew install --cask bemindlabs/liteduck/liteduck
-   brew uninstall --cask liteduck
+   brew install bemindlabs/liteduck/liteduck
+   brew test liteduck
+   brew uninstall liteduck
    ```
 
-## Provision the CI token (one-time)
+## Bumping the formula on each release
 
-The `release.yml` jobs that touch other repos use a personal access token
-exposed as the secret **`PUBLIC_RELEASE_TOKEN`** (the default `GITHUB_TOKEN`
-cannot push to `liteduck-releases` or `homebrew-liteduck`). Create a fine-grained
-PAT with **Contents: read/write** on both `bemindlabs/liteduck-releases` and
-`bemindlabs/homebrew-liteduck`, then add it as a repo secret on the app repo.
-
-## Bumping the cask on each release
-
-### Automated (default)
-
-Pushing a `v<version>` tag runs `release.yml`, whose final jobs:
-
-1. `public-release` — mirrors the DMG/EXE/DEB/RPM/AppImage assets to
-   `bemindlabs/liteduck-releases` under tag `v<version>`.
-2. `update-homebrew` — downloads the DMG, computes its SHA-256, rewrites
-   `Casks/liteduck.rb` in the tap, and pushes the bump commit.
-
-So a normal release needs no manual Homebrew step:
-
-```bash
-./scripts/bump-version.sh 2026.5.3   # updates package.json, Cargo.toml, tauri.conf.json
-git commit -am "Release 2026.5.3"
-git tag v2026.5.3
-git push origin main --tags
-```
-
-> **Keep the two copies in sync.** After the workflow bumps the tap, mirror the
-> same change back into this repo's `HomebrewFormula/liteduck.rb` (version +
-> both SHA-256 values) so the reviewed source of truth never drifts from what
-> `brew` serves.
->
-> **Known gaps in the current `update-homebrew` job** (flag for release owner):
-> - It writes only the **aarch64** URL/sha256 — Intel users get no cask. The
->   source copy here already has both arches; the workflow heredoc should be
->   updated to compute and emit both.
-> - Its `desc` reads "AI Coding workflow desktop app", which contradicts
->   LiteDuck's editor-only positioning. The accurate desc is in
->   `HomebrewFormula/liteduck.rb`.
-
-### Manual bump (hotfix / workflow unavailable)
+There is no automation — bump by hand on every tag:
 
 ```bash
 VERSION=2026.5.3
 
-# 1. Download both DMGs from the public releases repo
-gh release download "v$VERSION" --repo bemindlabs/liteduck-releases \
-  --pattern "LiteDuck_${VERSION}_aarch64.dmg" \
-  --pattern "LiteDuck_${VERSION}_x64.dmg"
+# 1. Fetch the source tarball GitHub auto-generates for the tag and hash it.
+curl -fsSL -o "v${VERSION}.tar.gz" \
+  "https://github.com/bemindlabs/liteduck/archive/refs/tags/v${VERSION}.tar.gz"
+shasum -a 256 "v${VERSION}.tar.gz"   # → new sha256
 
-# 2. Compute checksums
-shasum -a 256 "LiteDuck_${VERSION}_aarch64.dmg"   # → on_arm sha256
-shasum -a 256 "LiteDuck_${VERSION}_x64.dmg"        # → on_intel sha256
-
-# 3. Edit Casks/liteduck.rb in the tap: bump `version` and paste both sha256s
-# 4. Validate, commit, push
-brew audit --cask Casks/liteduck.rb
-brew style Casks/liteduck.rb
-git commit -am "Update LiteDuck to $VERSION" && git push
+# 2. In Formula/liteduck.rb (tap) AND HomebrewFormula/liteduck.rb (this repo):
+#    bump `url`, `version`, and paste the new sha256.
+# 3. Validate, commit, push.
+brew audit Formula/liteduck.rb
+brew style Formula/liteduck.rb
+git commit -am "liteduck ${VERSION}" && git push
 ```
 
-## Checksums
+> **Keep the two copies in sync.** The reviewed source of truth here
+> (`HomebrewFormula/liteduck.rb`) must never drift from what the tap serves
+> (`bemindlabs/homebrew-liteduck` → `Formula/liteduck.rb`).
 
-The source cask in this repo ships placeholder SHA-256 values
-(`000…000`) on purpose: the real digests only exist once the DMGs are built and
-published, and a wrong-but-plausible hash is worse than an obviously-empty one.
-The placeholders **will fail `brew install`** until replaced — never publish a
-cask with them.
+## Checksum
 
-Each architecture needs its own digest; `sha256 :no_check` is deliberately
-avoided so Homebrew verifies every download.
+The source formula in this repo ships a placeholder sha256 (`000…000`) on purpose:
+the real digest only exists once the tag is pushed and GitHub generates the source
+archive, and a wrong-but-plausible hash is worse than an obviously-empty one. The
+placeholder **will fail `brew install`** until replaced — never publish a formula
+with it.
 
-## Verifying a cask locally
+## Verifying a formula locally
 
 ```bash
-brew audit --cask <path-or-name>     # metadata + URL reachability
-brew style <path-or-name>            # Ruby style (rubocop)
-brew install --cask <path-or-name>   # full install dry-run on a clean machine
+brew audit <path-or-name>       # metadata + URL reachability
+brew style <path-or-name>       # Ruby style (rubocop)
+brew install --build-from-source <path-or-name>   # full source build
+brew test <name>                # runs the `test do` block
 ```

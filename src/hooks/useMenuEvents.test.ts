@@ -155,13 +155,6 @@ describe("useMenuEvents — menu-action", () => {
     expect(handlers.navigate).toHaveBeenCalledWith("/settings");
   });
 
-  it("check_update does not throw when onCheckUpdate is absent", () => {
-    // Default handlers object has no onCheckUpdate — must be a silent no-op.
-    expect(() => {
-      act(() => fireAction("check_update"));
-    }).not.toThrow();
-  });
-
   it("unknown action does not throw", () => {
     expect(() => {
       act(() => fireAction("unknown_action_xyz"));

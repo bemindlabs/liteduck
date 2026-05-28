@@ -23,8 +23,6 @@ pub mod pty;
 pub mod settings;
 #[cfg(not(target_os = "ios"))]
 pub mod terminal;
-#[cfg(not(target_os = "ios"))]
-pub mod updater;
 pub mod workspace;
 
 // ── Shared test utilities ─────────────────────────────────────────────────────
@@ -46,12 +44,24 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+// ── App version ────────────────────────────────────────────────────────────────
+
+/// Return the current app version (from Cargo.toml at compile time).
+///
+/// Used by the About/version UI. No network access — version updates ship via
+/// `brew upgrade liteduck` rebuilding from source, not an in-app updater.
+#[tauri::command]
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 // ── Application entry point ───────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // rustls 0.23 needs an explicit default crypto provider so the first TLS
-    // handshake (reqwest, used by the updater) doesn't panic on a worker thread.
+    // handshake (reqwest, used by the plugin registry fetch) doesn't panic on a
+    // worker thread.
     //
     // install_default() in rustls 0.23 only returns Err when a provider is already
     // installed (e.g. dev hot-reload re-running `run()`). We treat that as a benign
@@ -234,11 +244,8 @@ pub fn run() {
             biometric::biometric_status,
             biometric::biometric_authenticate,
             biometric::biometric_set_gate,
-            // Update checker — desktop only
-            updater::check_for_update,
-            updater::download_update,
-            updater::install_update,
-            updater::get_app_version,
+            // App version (for About/version UI)
+            get_app_version,
             // Workspace initialization
             workspace::path_exists,
             workspace::workspace_init,
@@ -302,6 +309,8 @@ pub fn run() {
             biometric::biometric_status,
             biometric::biometric_authenticate,
             biometric::biometric_set_gate,
+            // App version (for About/version UI)
+            get_app_version,
             // Workspace initialization
             workspace::path_exists,
             workspace::workspace_init,
