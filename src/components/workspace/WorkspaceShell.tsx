@@ -30,6 +30,7 @@ import { type EditorTab } from "./EditorTabs";
 import { ROUTES, panelFromPath, type WorkspacePanel } from "@/lib/routes";
 import type { FileEntry } from "@/lib/files";
 import { PageLoading } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 // GitPage is heavy (multi-repo scan, large tabs) — keep lazy. It renders in the
 // editor area (full width) when the "git" panel is active, mirroring how the
@@ -47,6 +48,7 @@ const PluginsPanel = lazy(() =>
 export interface WorkspaceShellHandle {
   toggleSidePanel: () => void;
   toggleTerminalDock: () => void;
+  toggleTerminalMaximized: () => void;
 }
 
 interface WorkspaceShellProps {
@@ -75,6 +77,12 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
   });
   const [sidePanelWidth, setSidePanelWidth] = useState(240);
   const [terminalOpen, setTerminalOpen] = useState(true);
+  /**
+   * When true, the terminal dock fills the full editor+terminal column,
+   * hiding the editor-area slot (VS Code's "maximize panel"). The terminal is
+   * never unmounted — only the editor slot is hidden — so PTY survives.
+   */
+  const [terminalMaximized, setTerminalMaximized] = useState(false);
 
   // ── Editor tab state ───────────────────────────────────────────────────────
 
@@ -103,12 +111,27 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
   }, []);
 
   const toggleTerminalDock = useCallback(() => {
-    setTerminalOpen((v) => !v);
+    setTerminalOpen((open) => {
+      const next = !open;
+      // Collapsing wins: un-maximize when the dock is collapsed so reopening
+      // restores the normal split rather than springing back to full-screen.
+      if (!next) setTerminalMaximized(false);
+      return next;
+    });
+  }, []);
+
+  const toggleTerminalMaximized = useCallback(() => {
+    setTerminalMaximized((max) => {
+      const next = !max;
+      // Maximizing a collapsed dock implicitly opens it first.
+      if (next) setTerminalOpen(true);
+      return next;
+    });
   }, []);
 
   useEffect(() => {
-    registerHandle?.({ toggleSidePanel, toggleTerminalDock });
-  }, [registerHandle, toggleSidePanel, toggleTerminalDock]);
+    registerHandle?.({ toggleSidePanel, toggleTerminalDock, toggleTerminalMaximized });
+  }, [registerHandle, toggleSidePanel, toggleTerminalDock, toggleTerminalMaximized]);
 
   // ── Activity rail handler ──────────────────────────────────────────────────
 
@@ -218,7 +241,9 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
         {/* Editor + Terminal column */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-hidden">
+          {/* Editor-area slot — hidden (not unmounted) when the terminal is
+              maximized so the dock can fill the full column height. */}
+          <div className={cn("flex-1 min-h-0 overflow-hidden", terminalMaximized && "hidden")}>
             {showOutlet ? (
               <div className="h-full overflow-y-auto">
                 <Suspense fallback={<PageLoading />}>
@@ -247,7 +272,12 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
             )}
           </div>
 
-          <TerminalDock open={terminalOpen} onToggle={toggleTerminalDock} />
+          <TerminalDock
+            open={terminalOpen}
+            onToggle={toggleTerminalDock}
+            maximized={terminalMaximized}
+            onToggleMaximized={toggleTerminalMaximized}
+          />
         </div>
       </div>
 

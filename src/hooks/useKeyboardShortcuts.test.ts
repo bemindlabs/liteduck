@@ -352,6 +352,41 @@ describe("useKeyboardShortcuts — action shortcuts", () => {
 
     unmount();
   });
+
+  it("calls onToggleTerminalDock on Cmd+` (no shift)", () => {
+    const onToggleTerminalDock = vi.fn();
+    const onToggleTerminalMaximize = vi.fn();
+    const config = makeConfig({ onToggleTerminalDock, onToggleTerminalMaximize });
+    renderHook(() => useKeyboardShortcuts(config));
+
+    fireKey("`", { metaKey: true });
+
+    expect(onToggleTerminalDock).toHaveBeenCalledTimes(1);
+    expect(onToggleTerminalMaximize).not.toHaveBeenCalled();
+  });
+
+  it("calls onToggleTerminalMaximize on Cmd+Shift+` (and not the dock toggle)", () => {
+    const onToggleTerminalDock = vi.fn();
+    const onToggleTerminalMaximize = vi.fn();
+    const config = makeConfig({ onToggleTerminalDock, onToggleTerminalMaximize });
+    renderHook(() => useKeyboardShortcuts(config));
+
+    fireKey("`", { metaKey: true, shiftKey: true });
+
+    expect(onToggleTerminalMaximize).toHaveBeenCalledTimes(1);
+    expect(onToggleTerminalDock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT throw when onToggleTerminalMaximize is absent and Cmd+Shift+` fires", () => {
+    const config = makeConfig(); // no onToggleTerminalMaximize
+    const { unmount } = renderHook(() => useKeyboardShortcuts(config));
+
+    expect(() => {
+      fireKey("`", { metaKey: true, shiftKey: true });
+    }).not.toThrow();
+
+    unmount();
+  });
 });
 
 describe("useKeyboardShortcuts — typing target suppression", () => {

@@ -11,7 +11,14 @@
  */
 
 import { useCallback, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Plus, SplitSquareHorizontal } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  Minimize2,
+  Plus,
+  SplitSquareHorizontal,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import TerminalPage, { type TerminalPageHandle } from "@/pages/TerminalPage";
 
@@ -19,6 +26,13 @@ interface TerminalDockProps {
   /** When false, the dock is collapsed and only the header bar is shown. */
   open: boolean;
   onToggle: () => void;
+  /**
+   * When true, the dock fills the full editor+terminal column (the editor-area
+   * slot is hidden by the parent) and the drag-resize height is ignored.
+   */
+  maximized?: boolean;
+  /** Toggle maximize/restore. Maximizing while collapsed opens the dock first. */
+  onToggleMaximized?: () => void;
 }
 
 const HEADER_HEIGHT = 32;
@@ -33,12 +47,22 @@ const headerBtnCls = cn(
   "disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--color-muted-foreground)]",
 );
 
-export function TerminalDock({ open, onToggle }: TerminalDockProps) {
+export function TerminalDock({
+  open,
+  onToggle,
+  maximized = false,
+  onToggleMaximized,
+}: TerminalDockProps) {
   const pageRef = useRef<TerminalPageHandle>(null);
 
   // User-resizable body height (px). Defaults to a comfortable dock height.
   const [bodyHeight, setBodyHeight] = useState(260);
   const draggingRef = useRef(false);
+
+  // When maximized the dock fills the column via flex-1 (TerminalPane's
+  // ResizeObserver re-fits xterm to the new container height). The drag-resize
+  // handle is suppressed since the height is no longer user-controlled.
+  const expanded = open && maximized;
 
   const handleNew = useCallback(() => pageRef.current?.newTerminal(), []);
   const handleSplit = useCallback(() => pageRef.current?.splitPrimary("horizontal"), []);
@@ -76,13 +100,15 @@ export function TerminalDock({ open, onToggle }: TerminalDockProps) {
   return (
     <div
       className={cn(
-        "relative flex shrink-0 flex-col overflow-hidden border-t border-[var(--color-border)]",
+        "relative flex flex-col overflow-hidden border-t border-[var(--color-border)]",
         "bg-[var(--color-background)]",
+        expanded ? "min-h-0 flex-1" : "shrink-0",
       )}
-      style={{ height: open ? bodyHeight + HEADER_HEIGHT : HEADER_HEIGHT }}
+      style={expanded ? undefined : { height: open ? bodyHeight + HEADER_HEIGHT : HEADER_HEIGHT }}
     >
-      {/* Resize handle — sits on the top edge; only active when open. */}
-      {open && (
+      {/* Resize handle — sits on the top edge; only active when open and not
+          maximized (a maximized dock's height is fixed to the full column). */}
+      {open && !maximized && (
         <div
           role="separator"
           aria-orientation="horizontal"
@@ -137,6 +163,22 @@ export function TerminalDock({ open, onToggle }: TerminalDockProps) {
             >
               <SplitSquareHorizontal className="h-3.5 w-3.5" />
             </button>
+            {onToggleMaximized && (
+              <button
+                type="button"
+                onClick={onToggleMaximized}
+                className={headerBtnCls}
+                aria-label={maximized ? "Restore panel" : "Maximize panel"}
+                aria-pressed={maximized}
+                title={maximized ? "Restore panel" : "Maximize panel"}
+              >
+                {maximized ? (
+                  <Minimize2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
             <span className="mx-1 h-4 w-px bg-[var(--color-border)]" aria-hidden />
           </>
         )}

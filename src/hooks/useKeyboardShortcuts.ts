@@ -14,7 +14,8 @@ export type ShortcutAction =
   | "terminal-close-tab"
   | "toggle-focus-mode"
   | "toggle-side-panel"
-  | "toggle-terminal-dock";
+  | "toggle-terminal-dock"
+  | "toggle-terminal-maximize";
 
 /**
  * Describes a single keyboard shortcut binding.
@@ -165,6 +166,15 @@ export const DEFAULT_BINDINGS: ShortcutBinding[] = [
     mod: true,
     globalOverride: true,
   },
+  {
+    action: "toggle-terminal-maximize",
+    label: "Maximize Terminal",
+    description: "Expand the terminal dock to fill the editor column, or restore it",
+    key: "`",
+    mod: true,
+    shift: true,
+    globalOverride: true,
+  },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -228,6 +238,8 @@ export interface KeyboardShortcutsConfig {
   onToggleSidePanel?: () => void;
   /** Called when "toggle-terminal-dock" (Cmd+`) fires. */
   onToggleTerminalDock?: () => void;
+  /** Called when "toggle-terminal-maximize" (Cmd+Shift+`) fires. */
+  onToggleTerminalMaximize?: () => void;
   /** React Router (or similar) navigate function. */
   navigate: (path: string) => void | Promise<void>;
   /**
@@ -264,6 +276,7 @@ export function useKeyboardShortcuts({
   onToggleFocusMode,
   onToggleSidePanel,
   onToggleTerminalDock,
+  onToggleTerminalMaximize,
   navigate,
   bindings = DEFAULT_BINDINGS,
 }: KeyboardShortcutsConfig) {
@@ -296,6 +309,9 @@ export function useKeyboardShortcuts({
         case "toggle-terminal-dock":
           onToggleTerminalDock?.();
           break;
+        case "toggle-terminal-maximize":
+          onToggleTerminalMaximize?.();
+          break;
         default:
           break;
       }
@@ -309,6 +325,7 @@ export function useKeyboardShortcuts({
       onToggleFocusMode,
       onToggleSidePanel,
       onToggleTerminalDock,
+      onToggleTerminalMaximize,
     ],
   );
 

@@ -199,6 +199,10 @@ function Layout() {
     shellHandleRef.current?.toggleTerminalDock();
   }, []);
 
+  const handleToggleTerminalMaximize = useCallback(() => {
+    shellHandleRef.current?.toggleTerminalMaximized();
+  }, []);
+
   useKeyboardShortcuts({
     bindings,
     navigate,
@@ -209,6 +213,7 @@ function Layout() {
     onToggleFocusMode: handleToggleFocusMode,
     onToggleSidePanel: handleToggleSidePanel,
     onToggleTerminalDock: handleToggleTerminalDock,
+    onToggleTerminalMaximize: handleToggleTerminalMaximize,
   });
 
   const handleCheckUpdate = useCallback(() => {
