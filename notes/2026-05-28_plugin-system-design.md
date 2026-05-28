@@ -17,10 +17,16 @@ real user value**: a **Hybrid — declarative manifest + shell command (option
 A LiteDuck plugin is a folder under `~/.liteduck/plugins/<id>/` containing
 `plugin.json` (declares commands, menus, keybindings, file-association preview
 hooks, status-bar items, settings panel entries) plus optional shell commands
-or static assets. There is **no embedded JS/Wasm runtime**, **no plugin-side
-React**, and **no in-process plugin code**. Plugins extend the UI by
-*declaration* and extend behavior by *spawning a child process* that LiteDuck
-brokers through the existing PTY/IPC paths.
+or static assets. There is **no embedded JS/Wasm runtime** and **no in-process
+plugin code**. Plugins extend the UI by *declaration* and extend behavior by
+*spawning a child process* that LiteDuck brokers through the existing PTY/IPC
+paths.
+
+> **Updated by [ADR-002](../docs/adr-002-plugin-ui-extension-host.md) (2026-05-28).**
+> The original "no plugin-side React" rule is lifted: a plugin MAY ship an executable UI,
+> but it runs **out-of-process and isolated** on the `plugin://` custom scheme (a separate
+> cross-origin webview context with its own CSP) — so "no *in-process* plugin code" still
+> holds, and the host's privileges + Tauri bridge stay unreachable from plugin code.
 
 The single strongest reason: it preserves LiteDuck's three load-bearing
 properties — small bundle, calm UX, local-first/private — while still

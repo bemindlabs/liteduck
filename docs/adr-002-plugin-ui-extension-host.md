@@ -1,6 +1,7 @@
 # ADR-002: Plugin UI Extension Host (VS Code-style plugin UIs)
 
-> **Status:** Proposed — pending operator review of this spec + the companion design note
+> **Status:** Accepted (2026-05-28) — Phase 1 shipped: the `plugin://` UI host + the bwoc
+> proving bundle. Hardening (sandbox attr, install-time consent) + the jira showcase are Phase 2.
 > **Date:** 2026-05-28
 > **Scope:** Plugin system architecture + product charter
 > **Supersedes (in part):** the **"no JS extension host"** stance recorded in
@@ -100,13 +101,15 @@ gating, phasing — is specified in `notes/2026-05-28_plugin-ui-host-design.md`.
   surface, not a widening of command privileges.
 - The four core capabilities (editor, terminal, Git, Settings) are untouched.
 
-## Ratification checklist (apply when Status → Accepted)
+## Ratification checklist
 
-- [ ] Update VISION.md — replace the "no JS host" guarantee with the isolated-host model.
-- [ ] Update ROADMAP.md — move "Plugin UI host" from out-of-scope to a planned line.
-- [ ] Update CLAUDE.md (liteduck) — the Plugin System section ("NO JS extension host").
-- [ ] Mark the no-JS-host rationale in the two plugin notes as superseded by this ADR.
-- [ ] Land Phase 1 (sandboxed-iframe loader + bridge) behind the design note's plan.
+- [x] Land Phase 1 — the `plugin://` custom-scheme host + bridge + bwoc proving bundle.
+- [x] Update VISION.md — clarify that the isolated plugin UI host is sanctioned extensibility.
+- [x] Update ROADMAP.md — record the plugin UI host under shipped/in-progress.
+- [x] Update CLAUDE.md (liteduck) — the Plugin System section + lean (registry) distribution.
+- [x] Mark the no-JS-host rationale in the two plugin notes as superseded by this ADR.
+- [ ] Phase 2 — `sandbox` attr (with explicit-scheme CSP), install-time "ships executable UI"
+      consent + capability grants, and the jira showcase bundle.
 
 ---
 

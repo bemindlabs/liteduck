@@ -80,6 +80,11 @@ To keep the charter clear, LiteDuck deliberately has **no**:
 
 These existed in LoopDuck and were intentionally removed. See [ADR-001](docs/adr-001-single-direction.md).
 
+Extensibility instead lives in the **plugin system** — including a plugin's own UI, served from
+an isolated `plugin://` origin with no access to the host or its privileges
+([ADR-002](docs/adr-002-plugin-ui-extension-host.md)). This adds *rendering* surface, not the
+list above: the `chat` / `agent` / `llm` deny-list and the no-AI charter are unchanged.
+
 ## Future Horizons
 
 Within the editor-only charter:

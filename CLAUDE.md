@@ -106,17 +106,26 @@ frontend `src/lib/plugins.ts` + `src/components/plugins/PluginsPanel.tsx`).
   manifest (declarative) whose contributed commands run as **shell subprocesses** (`sh -c`) with
   the user's privileges. The host loads no plugin code into its own address space; parameters pass
   as `LITEDUCK_PARAM_<KEY>` env vars (never string-interpolated, to avoid shell injection).
+- **Rendering:** by default a command's stdout renders via **built-in declarative views**
+  (`view: text|table|list|keyvalue|markdown`). A plugin MAY instead declare an **executable UI**
+  (`ui: { entry }`, ADR-002) served from the **`plugin://` custom scheme** — a separate origin,
+  cross-origin to the host (no host DOM / Tauri access), under its own per-response CSP, embedded
+  in an iframe and driven by a `postMessage` bridge (`PluginHostFrame`). The host still runs no
+  plugin code in its address space, and `run-command` is gated to the plugin's declared commands.
 - **Scope-ceiling deny-list:** manifests are validated against an allow-list of `kind`
   (`integration`, `formatter`, `linter`, `previewer`, `tool`) and a redundant deny-list
   (`chat`, `agent`, `llm`). Any AI/LLM-shaped plugin is **refused at load time, before any file
   touches disk** — the no-AI charter is enforced by the schema, not by review discipline.
 - **Install sources:** from a **local folder** (`plugin_install`) or from the **GitHub registry**
   `bemindlabs/liteduck-plugins` (`plugin_install_from_registry`, `plugin_registry_fetch`). Loading
-  is lazy — nothing is scanned on startup. Bundled reference plugins live under
-  `src-tauri/resources/plugins/` (`jira`, `bwoc`), both read-only `integration` kind.
+  is lazy — nothing is scanned on startup. The app ships **lean** (`tauri.conf.json` bundles no
+  plugins); the reference plugins (`jira`, `bwoc`) live under `src-tauri/resources/plugins/` only
+  as the **registry source** and are installed on demand from the registry.
 - **Sandbox (v1):** subprocesses inherit the user's full privileges (user-trust). Manifests declare
   `network` + host `paths`, surfaced in the install confirmation UI; a real OS sandbox is a
-  documented future phase.
+  documented future phase. A plugin's **executable UI** runs isolated by origin (the `plugin://`
+  scheme is cross-origin to the host and under a locked-down per-response CSP — `connect-src
+  'none'`); an iframe `sandbox` attribute is Phase 2 hardening.
 
 ### Storage
 

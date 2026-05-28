@@ -6,11 +6,17 @@ Plugins today contribute **commands only**. A command runs a shell template and 
 stdout is shown as raw text/JSON in `PluginsPanel`. Users want richer "pages" — e.g. the
 BWOC agent roster as a table, or a Jira issue list — not a wall of JSON.
 
-A full JS/HTML webview page (VS Code-extension style) is **deliberately rejected**: per
-`notes/2026-05-28_plugin-system-design.md`, VISION.md, and ADR-001, a plugin JS host
-reintroduces exactly the AI/agent/chat surface area LiteDuck removed. We keep the
-**hybrid (declarative-manifest + shell-command) model**: a plugin emits **data**; LiteDuck
-renders it with **trusted built-in components**. No plugin-supplied JS/HTML ever executes.
+A full JS/HTML webview page (VS Code-extension style) was originally **rejected**, and this
+note described the declarative-only model on that basis.
+
+> **Superseded in part by [ADR-002](../docs/adr-002-plugin-ui-extension-host.md) (2026-05-28).**
+> A plugin MAY now ship an executable UI — but isolated on the `plugin://` custom scheme
+> (separate origin, own CSP, no host/Tauri access), not in the host window. The declarative
+> model below remains the **default + fallback**; the no-AI deny-list is unchanged. The
+> "no plugin JS ever executes" statement no longer holds for the isolated host.
+
+We keep the **hybrid (declarative-manifest + shell-command) model** as the default: a plugin
+emits **data**; LiteDuck renders it with **trusted built-in components**.
 
 ## Design
 

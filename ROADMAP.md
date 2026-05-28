@@ -129,8 +129,12 @@ Directions, not commitments — all within the editor-only charter.
 
 ### Plugins & extensibility
 
-- Manifest-based plugin system — the sanctioned extension point. First-party Jira and
-  BWOC plugins ship alongside it; install third-party plugins from a GitHub registry.
+- Manifest-based plugin system — the sanctioned extension point. The app ships lean (no
+  bundled plugins); install Jira, BWOC, and third-party plugins on demand from the GitHub
+  registry. Commands render via built-in declarative views (`table`/`keyvalue`/…).
+- Plugin UI host (ADR-002, Phase 1) — a plugin may ship its own executable UI, served from
+  the isolated `plugin://` custom scheme (separate origin, own CSP, no host/Tauri access) and
+  driven by a `postMessage` command bridge. Charter-safe: no AI surface, deny-list intact.
 - VS Code-style workspace shell with context-aware right-click menus and an OS-junk
   (`.DS_Store` etc.) file filter.
 
