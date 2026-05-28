@@ -30,6 +30,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,75 @@ pub struct PluginRunResult {
     pub stdout: String,
     pub stderr: String,
     pub exit_code: i32,
+}
+
+// ── Registry (GitHub) ─────────────────────────────────────────────────────────
+
+/// The official published plugin registry repo: `bemindlabs/liteduck-plugins`.
+const REGISTRY_REPO: &str = "bemindlabs/liteduck-plugins";
+/// Default branch the registry + plugin files are read from.
+const REGISTRY_BRANCH: &str = "main";
+
+/// Default registry URL — the raw `registry.json` on the official repo's main
+/// branch. Overridable per-call so a fork/private mirror can be pointed at.
+const DEFAULT_REGISTRY_URL: &str =
+    "https://raw.githubusercontent.com/bemindlabs/liteduck-plugins/main/registry.json";
+
+/// User-Agent sent on every GitHub request (GitHub's API rejects requests with
+/// no UA).
+const USER_AGENT: &str = "LiteDuck-Plugins";
+
+/// Hosts network egress is permitted to. Any `download_url` the Contents API
+/// returns must resolve to one of these — we never follow a redirect to an
+/// arbitrary host.
+const ALLOWED_HOSTS: &[&str] = &["raw.githubusercontent.com", "api.github.com"];
+
+/// A single entry in the registry's `plugins` array. Mirrors the published
+/// `registry.json` schema. Unknown fields are ignored; absent optional fields
+/// default so a slightly newer registry still parses.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub network: bool,
+    #[serde(default)]
+    pub author: String,
+    /// Relative source path within the repo, e.g. `plugins/<id>/`.
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub verified: bool,
+}
+
+/// The parsed top-level `registry.json` document.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct RegistryDoc {
+    #[serde(default)]
+    schema_version: serde_json::Value,
+    #[serde(default)]
+    updated_at: String,
+    #[serde(default)]
+    plugins: Vec<RegistryEntry>,
+}
+
+/// One file entry as returned by the GitHub Contents API.
+#[derive(Debug, Clone, Deserialize)]
+struct ContentsEntry {
+    name: String,
+    /// `"file"` or `"dir"`.
+    #[serde(rename = "type")]
+    entry_type: String,
+    /// Raw download URL (`null` for directories).
+    download_url: Option<String>,
 }
 
 // ── Path resolution ───────────────────────────────────────────────────────────
@@ -225,6 +295,258 @@ pub fn install_plugin_inner(source: &str) -> Result<InstalledPlugin, String> {
     })
 }
 
+// ── Registry fetch + install ──────────────────────────────────────────────────
+
+/// Build a blocking HTTP client with a User-Agent + short timeout. Redirects
+/// are disabled so a registry host can never bounce us to an arbitrary origin —
+/// every URL we hit is checked against [`ALLOWED_HOSTS`] up front.
+fn http_client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .user_agent(USER_AGENT)
+        .timeout(Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))
+}
+
+/// Reject any URL whose host is not in [`ALLOWED_HOSTS`]. This caps network
+/// egress to the GitHub registry + raw hosts even when the registry document
+/// (or the Contents API) hands us a `download_url`.
+fn assert_allowed_host(url: &str) -> Result<(), String> {
+    let parsed =
+        reqwest::Url::parse(url).map_err(|e| format!("invalid URL '{url}': {e}"))?;
+    match parsed.host_str() {
+        Some(host) if ALLOWED_HOSTS.contains(&host) => Ok(()),
+        Some(host) => Err(format!(
+            "refusing to fetch from disallowed host '{host}' (only {} are permitted)",
+            ALLOWED_HOSTS.join(", ")
+        )),
+        None => Err(format!("URL '{url}' has no host")),
+    }
+}
+
+/// Map a reqwest response status into a friendly error, calling out the GitHub
+/// unauthenticated rate limit (60 req/hr) explicitly so the UI can show it.
+fn status_error(context: &str, status: reqwest::StatusCode) -> String {
+    if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+    {
+        format!(
+            "{context}: GitHub returned {} — likely the unauthenticated API rate limit \
+             (60 requests/hour). Try again later.",
+            status.as_u16()
+        )
+    } else {
+        format!("{context}: GitHub returned status {}", status.as_u16())
+    }
+}
+
+/// Fetch + parse `registry.json`. `registry_url` overrides the official default.
+pub fn registry_fetch_inner(registry_url: Option<&str>) -> Result<Vec<RegistryEntry>, String> {
+    let url = registry_url.unwrap_or(DEFAULT_REGISTRY_URL);
+    assert_allowed_host(url)?;
+
+    let client = http_client()?;
+    let resp = client
+        .get(url)
+        .send()
+        .map_err(|e| format!("Failed to fetch registry: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(status_error("Failed to fetch registry", resp.status()));
+    }
+    let text = resp
+        .text()
+        .map_err(|e| format!("Failed to read registry body: {e}"))?;
+    let doc: RegistryDoc =
+        serde_json::from_str(&text).map_err(|e| format!("Failed to parse registry.json: {e}"))?;
+    Ok(doc.plugins)
+}
+
+/// List a directory in the registry repo via the GitHub Contents API.
+fn list_contents(
+    client: &reqwest::blocking::Client,
+    repo_path: &str,
+) -> Result<Vec<ContentsEntry>, String> {
+    let url = format!(
+        "https://api.github.com/repos/{REGISTRY_REPO}/contents/{repo_path}?ref={REGISTRY_BRANCH}"
+    );
+    assert_allowed_host(&url)?;
+    let resp = client
+        .get(&url)
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .map_err(|e| format!("Failed to list {repo_path}: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(status_error(
+            &format!("Failed to list '{repo_path}'"),
+            resp.status(),
+        ));
+    }
+    resp.json::<Vec<ContentsEntry>>()
+        .map_err(|e| format!("Failed to parse Contents API response for '{repo_path}': {e}"))
+}
+
+/// Fetch the raw bytes of a single file `download_url` (host-checked).
+fn fetch_file_bytes(
+    client: &reqwest::blocking::Client,
+    download_url: &str,
+) -> Result<Vec<u8>, String> {
+    assert_allowed_host(download_url)?;
+    let resp = client
+        .get(download_url)
+        .send()
+        .map_err(|e| format!("Failed to download {download_url}: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(status_error(
+            &format!("Failed to download '{download_url}'"),
+            resp.status(),
+        ));
+    }
+    resp.bytes()
+        .map(|b| b.to_vec())
+        .map_err(|e| format!("Failed to read bytes from {download_url}: {e}"))
+}
+
+/// Recursively download a Contents API directory into `dest_dir`, preserving the
+/// exec bit on `.sh` files. Handles one or more levels of nesting (`type=="dir"`
+/// recurses) — current plugins are flat, but a subdir won't crash.
+fn download_contents_into(
+    client: &reqwest::blocking::Client,
+    repo_path: &str,
+    dest_dir: &Path,
+) -> Result<(), String> {
+    fs::create_dir_all(dest_dir)
+        .map_err(|e| format!("Failed to create {}: {e}", dest_dir.display()))?;
+    let entries = list_contents(client, repo_path)?;
+    for entry in entries {
+        match entry.entry_type.as_str() {
+            "file" => {
+                let url = entry.download_url.ok_or_else(|| {
+                    format!("file '{}' has no download_url", entry.name)
+                })?;
+                let bytes = fetch_file_bytes(client, &url)?;
+                let dest = dest_dir.join(&entry.name);
+                fs::write(&dest, &bytes)
+                    .map_err(|e| format!("Failed to write {}: {e}", dest.display()))?;
+                preserve_exec_bit(&dest);
+            }
+            "dir" => {
+                let sub_repo_path = format!("{repo_path}/{}", entry.name);
+                let sub_dest = dest_dir.join(&entry.name);
+                download_contents_into(client, &sub_repo_path, &sub_dest)?;
+            }
+            // Ignore symlinks/submodules — out of scope for flat plugin dirs.
+            other => log::warn!(
+                "skipping unsupported Contents entry '{}' (type '{other}')",
+                entry.name
+            ),
+        }
+    }
+    Ok(())
+}
+
+/// Install a plugin straight from the GitHub registry repo.
+///
+/// Flow (security-critical ordering):
+///   1. Resolve the registry entry → its `source` path (default `plugins/<id>/`).
+///   2. **Fetch + validate the `plugin.json` manifest FIRST.** It is parsed and
+///      run through [`validate_manifest`] (the scope-ceiling deny-list) before
+///      *any* file is written to `~/.liteduck/plugins/`. A deny-listed or
+///      malformed plugin therefore leaves no trace on disk.
+///   3. Download every file in the source dir into a staging directory under
+///      the plugins root (`.staging-<id>`), preserving the `.sh` exec bit.
+///   4. Atomically move staging → `~/.liteduck/plugins/<id>/`, overwriting any
+///      existing install (reinstall/upgrade semantics).
+pub fn install_from_registry_inner(
+    plugin_id: &str,
+    registry_url: Option<&str>,
+) -> Result<InstalledPlugin, String> {
+    // Guard the id early — it builds both a repo path and a dest dir path.
+    if plugin_id.trim().is_empty()
+        || plugin_id.contains('/')
+        || plugin_id.contains('\\')
+        || plugin_id.contains("..")
+    {
+        return Err(format!("invalid plugin id '{plugin_id}'"));
+    }
+
+    // Resolve the plugin's source path from the registry (falls back to the
+    // conventional layout when the entry omits it or the fetch fails).
+    let source_path = match registry_fetch_inner(registry_url) {
+        Ok(entries) => entries
+            .into_iter()
+            .find(|e| e.id == plugin_id)
+            .map(|e| e.source)
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| format!("plugins/{plugin_id}")),
+        Err(_) => format!("plugins/{plugin_id}"),
+    };
+    // Normalise: strip a trailing slash so Contents API paths are clean.
+    let source_path = source_path.trim_end_matches('/').to_string();
+
+    let client = http_client()?;
+
+    // ── Step 1: fetch + validate plugin.json BEFORE writing anything ──────────
+    let manifest_url = format!("{source_path}/plugin.json");
+    let entries = list_contents(&client, &source_path)?;
+    let manifest_entry = entries
+        .iter()
+        .find(|e| e.entry_type == "file" && e.name == "plugin.json")
+        .ok_or_else(|| {
+            format!("no plugin.json found in registry source '{manifest_url}'")
+        })?;
+    let manifest_dl = manifest_entry
+        .download_url
+        .clone()
+        .ok_or_else(|| "plugin.json has no download_url".to_string())?;
+    let manifest_bytes = fetch_file_bytes(&client, &manifest_dl)?;
+    let manifest: PluginManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|e| format!("Failed to parse fetched plugin.json: {e}"))?;
+    // The critical security gate — runs before any disk write below.
+    validate_manifest(&manifest)?;
+    // The registry id and the manifest id must agree (defence-in-depth: the
+    // dest dir is derived from the validated manifest, never the request).
+    if manifest.id != plugin_id {
+        return Err(format!(
+            "registry id '{plugin_id}' does not match the fetched manifest id '{}'",
+            manifest.id
+        ));
+    }
+
+    // ── Step 2: stage all files under the plugins root, then move atomically ──
+    let root = plugins_dir();
+    fs::create_dir_all(&root).map_err(|e| format!("Failed to create plugins dir: {e}"))?;
+    let staging = root.join(format!(".staging-{}", manifest.id));
+    if staging.exists() {
+        let _ = fs::remove_dir_all(&staging);
+    }
+    // Download into staging; clean up on any failure so a partial fetch never
+    // becomes a half-installed plugin.
+    if let Err(e) = download_contents_into(&client, &source_path, &staging) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(e);
+    }
+
+    let dest = root.join(&manifest.id);
+    if dest.exists() {
+        if let Err(e) = fs::remove_dir_all(&dest) {
+            let _ = fs::remove_dir_all(&staging);
+            return Err(format!(
+                "Failed to replace existing plugin '{}': {e}",
+                manifest.id
+            ));
+        }
+    }
+    fs::rename(&staging, &dest).map_err(|e| {
+        let _ = fs::remove_dir_all(&staging);
+        format!("Failed to install plugin '{}': {e}", manifest.id)
+    })?;
+
+    Ok(InstalledPlugin {
+        manifest,
+        dir: dest.to_string_lossy().to_string(),
+    })
+}
+
 /// Remove `~/.liteduck/plugins/<id>/`.
 pub fn uninstall_plugin_inner(id: &str) -> Result<(), String> {
     if id.contains('/') || id.contains('\\') || id.contains("..") {
@@ -289,6 +611,21 @@ pub fn run_command_inner(
     })
 }
 
+/// On Unix, set the executable bit (`0o755`) on `path` when it is a `*.sh`
+/// script so the shell template can invoke it directly. No-op on non-Unix and
+/// for non-`.sh` files.
+fn preserve_exec_bit(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if path.extension().and_then(|e| e.to_str()) == Some("sh") {
+            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+}
+
 /// Recursively copy `src` into `dst`. On Unix, `*.sh` scripts get the executable
 /// bit so the shell template can invoke them directly.
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
@@ -303,13 +640,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
         } else {
             fs::copy(&from, &to)
                 .map_err(|e| format!("Failed to copy {}: {e}", from.display()))?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                if to.extension().and_then(|e| e.to_str()) == Some("sh") {
-                    let _ = fs::set_permissions(&to, fs::Permissions::from_mode(0o755));
-                }
-            }
+            preserve_exec_bit(&to);
         }
     }
     Ok(())
@@ -344,6 +675,27 @@ pub fn plugin_run_command(
     params: Option<HashMap<String, String>>,
 ) -> Result<PluginRunResult, String> {
     run_command_inner(&plugin_id, &command_id, &params.unwrap_or_default())
+}
+
+/// Fetch the published plugin registry (`registry.json`) and return its entries.
+/// `registry_url` overrides the official default
+/// (`bemindlabs/liteduck-plugins@main`). Read-only — no disk writes.
+#[tauri::command]
+pub fn plugin_registry_fetch(
+    registry_url: Option<String>,
+) -> Result<Vec<RegistryEntry>, String> {
+    registry_fetch_inner(registry_url.as_deref())
+}
+
+/// Install a plugin straight from the GitHub registry repo by id. The manifest
+/// is fetched + validated (scope-ceiling deny-list) BEFORE any file is written
+/// to `~/.liteduck/plugins/`. Reinstalls/upgrades overwrite an existing copy.
+#[tauri::command]
+pub fn plugin_install_from_registry(
+    plugin_id: String,
+    registry_url: Option<String>,
+) -> Result<InstalledPlugin, String> {
+    install_from_registry_inner(&plugin_id, registry_url.as_deref())
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────────
@@ -435,6 +787,79 @@ mod tests {
 
         assert_eq!(res.exit_code, 0);
         assert_eq!(res.stdout, "duck");
+    }
+
+    #[test]
+    fn registry_doc_parses_official_schema() {
+        // Mirrors the published registry.json shape, including a slightly newer
+        // unknown top-level field to confirm forward-compat parsing.
+        let json = r#"{
+            "schemaVersion": 1,
+            "updatedAt": "2026-05-28T00:00:00Z",
+            "extraFutureField": true,
+            "plugins": [
+                {"id":"jira","name":"Jira","version":"1.0.0","description":"Jira integration",
+                 "kind":"integration","network":true,"author":"bemindlabs",
+                 "source":"plugins/jira/","tags":["issues"],"verified":true},
+                {"id":"bwoc","name":"BWOC","version":"0.1.0","description":"BWOC bridge",
+                 "kind":"integration","network":false,"author":"bemindlabs",
+                 "source":"plugins/bwoc/","tags":[],"verified":false}
+            ]
+        }"#;
+        let doc: RegistryDoc = serde_json::from_str(json).unwrap();
+        assert_eq!(doc.plugins.len(), 2);
+        let jira = &doc.plugins[0];
+        assert_eq!(jira.id, "jira");
+        assert!(jira.network);
+        assert!(jira.verified);
+        assert_eq!(jira.source, "plugins/jira/");
+        let bwoc = &doc.plugins[1];
+        assert!(!bwoc.network);
+        assert!(!bwoc.verified);
+    }
+
+    #[test]
+    fn registry_entry_tolerates_missing_optional_fields() {
+        let entry: RegistryEntry =
+            serde_json::from_str(r#"{"id":"min","name":"Minimal"}"#).unwrap();
+        assert_eq!(entry.id, "min");
+        assert!(entry.version.is_empty());
+        assert!(!entry.verified);
+        assert!(entry.tags.is_empty());
+    }
+
+    #[test]
+    fn allowed_host_gate_accepts_github_and_rejects_others() {
+        assert!(assert_allowed_host(
+            "https://raw.githubusercontent.com/bemindlabs/liteduck-plugins/main/registry.json"
+        )
+        .is_ok());
+        assert!(assert_allowed_host(
+            "https://api.github.com/repos/bemindlabs/liteduck-plugins/contents/plugins/jira"
+        )
+        .is_ok());
+        // A non-GitHub host (and a sneaky look-alike) must be refused.
+        assert!(assert_allowed_host("https://evil.example.com/plugin.json").is_err());
+        assert!(
+            assert_allowed_host("https://raw.githubusercontent.com.evil.com/x").is_err()
+        );
+    }
+
+    #[test]
+    fn install_from_registry_rejects_bad_id_without_network() {
+        // A traversal id is rejected before any HTTP call is made.
+        let err = install_from_registry_inner("../evil", None).unwrap_err();
+        assert!(err.contains("invalid plugin id"), "got: {err}");
+    }
+
+    #[test]
+    fn manifest_gate_refuses_denied_kind_from_fetched_bytes() {
+        // Simulates the validate-before-write gate on fetched manifest bytes:
+        // a deny-listed kind must error out before any file would be written.
+        let bytes = br#"{"id":"sneaky","name":"S","version":"1","kind":"agent"}"#;
+        let manifest: PluginManifest = serde_json::from_slice(bytes).unwrap();
+        let err = validate_manifest(&manifest).unwrap_err();
+        assert!(err.contains("deny-list"), "got: {err}");
     }
 
     #[test]

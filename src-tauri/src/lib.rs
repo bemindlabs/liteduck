@@ -271,10 +271,11 @@ pub fn run() {
             // Integrations (e.g. BWOC, Jira) live here as opt-in plugins, never
             // in core — see resources/plugins/.
             plugins::plugin_list,
-            plugins::plugin_list,
             plugins::plugin_install,
             plugins::plugin_uninstall,
             plugins::plugin_run_command,
+            plugins::plugin_registry_fetch,
+            plugins::plugin_install_from_registry,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

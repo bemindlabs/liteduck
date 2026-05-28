@@ -46,6 +46,27 @@ export interface PluginRunResult {
   exit_code: number;
 }
 
+/**
+ * A single entry in the published plugin registry
+ * (`bemindlabs/liteduck-plugins` → `registry.json`). Mirrors
+ * `RegistryEntry` in `src-tauri/src/plugins.rs`.
+ */
+export interface RegistryEntry {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  kind: string;
+  /** Whether the plugin declares it needs network access. */
+  network: boolean;
+  author: string;
+  /** Relative source path within the repo, e.g. `plugins/<id>/`. */
+  source: string;
+  tags: string[];
+  /** Whether the registry marks this plugin as verified. */
+  verified: boolean;
+}
+
 // ── API wrappers ──────────────────────────────────────────────────────────────
 
 /** List installed plugins under `~/.liteduck/plugins/`. Lazy. */
@@ -73,5 +94,31 @@ export async function pluginRunCommand(
     pluginId,
     commandId,
     params: params ?? null,
+  });
+}
+
+/**
+ * Fetch the published plugin registry. Reads `registry.json` from
+ * `bemindlabs/liteduck-plugins@main` by default; pass `registryUrl` to point at
+ * a fork/mirror. Read-only — nothing is written to disk.
+ */
+export async function pluginRegistryFetch(registryUrl?: string): Promise<RegistryEntry[]> {
+  return invoke<RegistryEntry[]>("plugin_registry_fetch", {
+    registryUrl: registryUrl ?? null,
+  });
+}
+
+/**
+ * Install a plugin straight from the GitHub registry by id. The manifest is
+ * fetched + validated (scope-ceiling deny-list) before any file is written;
+ * reinstalls overwrite an existing copy.
+ */
+export async function pluginInstallFromRegistry(
+  pluginId: string,
+  registryUrl?: string,
+): Promise<InstalledPlugin> {
+  return invoke<InstalledPlugin>("plugin_install_from_registry", {
+    pluginId,
+    registryUrl: registryUrl ?? null,
   });
 }

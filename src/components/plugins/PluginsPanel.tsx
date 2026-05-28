@@ -13,20 +13,39 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { Boxes, Globe, Lock, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+  BadgeCheck,
+  Boxes,
+  Download,
+  Globe,
+  Lock,
+  Play,
+  Plus,
+  RefreshCw,
+  Store,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { createLogger } from "@/lib/logger";
 import {
   type InstalledPlugin,
   type PluginCommand,
+  type RegistryEntry,
   pluginInstall,
+  pluginInstallFromRegistry,
   pluginList,
+  pluginRegistryFetch,
   pluginRunCommand,
   pluginUninstall,
 } from "@/lib/plugins";
 
 const logger = createLogger("PluginsPanel");
+
+/** Public registry repo the Browse view reads from (provenance line). */
+const REGISTRY_REPO = "bemindlabs/liteduck-plugins";
+
+type PluginsTab = "installed" | "available";
 
 /** Render a result-table cell value as text, JSON-encoding non-primitives. */
 function cellText(value: unknown): string {
@@ -48,11 +67,20 @@ interface CommandRun {
 }
 
 export function PluginsPanel() {
+  const [tab, setTab] = useState<PluginsTab>("installed");
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [run, setRun] = useState<CommandRun | null>(null);
+
+  // Browse / Available state.
+  const [registry, setRegistry] = useState<RegistryEntry[]>([]);
+  const [registryLoading, setRegistryLoading] = useState(false);
+  const [registryError, setRegistryError] = useState<string | null>(null);
+  const [registryLoaded, setRegistryLoaded] = useState(false);
+
+  const installedIds = new Set(plugins.map((p) => p.id));
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -67,9 +95,47 @@ export function PluginsPanel() {
     }
   }, []);
 
+  const refreshRegistry = useCallback(async () => {
+    setRegistryLoading(true);
+    setRegistryError(null);
+    try {
+      setRegistry(await pluginRegistryFetch());
+      setRegistryLoaded(true);
+    } catch (e) {
+      setRegistryError(String(e));
+      logger.error("Failed to fetch plugin registry", e);
+    } finally {
+      setRegistryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Lazily fetch the registry the first time the Available tab is opened.
+  useEffect(() => {
+    if (tab === "available" && !registryLoaded && !registryLoading) {
+      void refreshRegistry();
+    }
+  }, [tab, registryLoaded, registryLoading, refreshRegistry]);
+
+  const handleInstallFromRegistry = useCallback(
+    async (entry: RegistryEntry) => {
+      setBusy(`registry:${entry.id}`);
+      setRegistryError(null);
+      try {
+        const installed = await pluginInstallFromRegistry(entry.id);
+        logger.info(`Installed plugin '${installed.id}' from registry`);
+        await refresh();
+      } catch (e) {
+        setRegistryError(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refresh],
+  );
 
   const handleInstall = useCallback(async () => {
     const selected = await openDialog({ directory: true, multiple: false, title: "Install plugin folder" });
@@ -138,6 +204,8 @@ export function PluginsPanel() {
     }
   }, []);
 
+  const installedView = tab === "installed";
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--color-background)]">
       {/* Header */}
@@ -147,25 +215,67 @@ export function PluginsPanel() {
           <h1 className="text-sm font-semibold">Plugins</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => void refresh()} disabled={loading}>
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-            Refresh
-          </Button>
-          <Button size="sm" onClick={() => void handleInstall()} disabled={busy === "install"}>
-            <Plus className="h-4 w-4" />
-            Install from folder
-          </Button>
+          {installedView ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => void refresh()} disabled={loading}>
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                Refresh
+              </Button>
+              <Button size="sm" onClick={() => void handleInstall()} disabled={busy === "install"}>
+                <Plus className="h-4 w-4" />
+                Install from folder
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void refreshRegistry()}
+              disabled={registryLoading}
+            >
+              <RefreshCw className={cn("h-4 w-4", registryLoading && "animate-spin")} />
+              Refresh
+            </Button>
+          )}
         </div>
       </div>
 
-      {error && (
+      {/* Tabs */}
+      <div className="flex shrink-0 items-center gap-1 border-b border-[var(--color-border)] px-4">
+        <TabButton
+          active={installedView}
+          onClick={() => setTab("installed")}
+          icon={<Boxes className="h-4 w-4" />}
+          label="Installed"
+          count={plugins.length}
+        />
+        <TabButton
+          active={!installedView}
+          onClick={() => setTab("available")}
+          icon={<Store className="h-4 w-4" />}
+          label="Available"
+          count={registryLoaded ? registry.length : undefined}
+        />
+      </div>
+
+      {installedView && error && (
         <div className="shrink-0 border-b border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 px-4 py-2 text-xs text-[var(--color-destructive)]">
           {error}
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {plugins.length === 0 && !loading ? (
+      {!installedView ? (
+        <AvailableView
+          entries={registry}
+          loading={registryLoading}
+          error={registryError}
+          installedIds={installedIds}
+          busy={busy}
+          onInstall={handleInstallFromRegistry}
+        />
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {plugins.length === 0 && !loading ? (
           <div className="mx-auto mt-12 max-w-md text-center text-sm text-[var(--color-muted-foreground)]">
             <Boxes className="mx-auto mb-3 h-10 w-10 opacity-40" />
             <p>No plugins installed.</p>
@@ -254,8 +364,192 @@ export function PluginsPanel() {
               </li>
             ))}
           </ul>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A tab in the Plugins panel header (Installed / Available). */
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors",
+        active
+          ? "border-[var(--color-primary)] text-[var(--color-foreground)]"
+          : "border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]",
+      )}
+    >
+      {icon}
+      {label}
+      {count !== undefined && (
+        <span className="rounded-full bg-[var(--color-muted)] px-1.5 text-[10px] text-[var(--color-muted-foreground)]">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/**
+ * The Browse / Available view: lists registry entries from the public repo with
+ * their capability ask (kind, network, declared paths via the manifest) and an
+ * Install / Reinstall button per entry.
+ */
+function AvailableView({
+  entries,
+  loading,
+  error,
+  installedIds,
+  busy,
+  onInstall,
+}: {
+  entries: RegistryEntry[];
+  loading: boolean;
+  error: string | null;
+  installedIds: Set<string>;
+  busy: string | null;
+  onInstall: (entry: RegistryEntry) => void;
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      {/* Provenance line */}
+      <p className="mb-3 text-[11px] text-[var(--color-muted-foreground)]">
+        Browsing plugins from{" "}
+        <code className="rounded bg-[var(--color-muted)] px-1 py-0.5">{REGISTRY_REPO}</code>. Each
+        plugin's declared capabilities are shown before install — review them first.
+      </p>
+
+      {error && (
+        <div className="mb-3 rounded border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 px-3 py-2 text-xs text-[var(--color-destructive)]">
+          {error}
+        </div>
+      )}
+
+      {loading && entries.length === 0 ? (
+        <div className="mx-auto mt-12 max-w-md text-center text-sm text-[var(--color-muted-foreground)]">
+          <RefreshCw className="mx-auto mb-3 h-8 w-8 animate-spin opacity-40" />
+          <p>Fetching registry…</p>
+        </div>
+      ) : entries.length === 0 && !error ? (
+        <div className="mx-auto mt-12 max-w-md text-center text-sm text-[var(--color-muted-foreground)]">
+          <Store className="mx-auto mb-3 h-10 w-10 opacity-40" />
+          <p>No plugins available in the registry.</p>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {entries.map((entry) => {
+            const installed = installedIds.has(entry.id);
+            const installing = busy === `registry:${entry.id}`;
+            return (
+              <li
+                key={entry.id}
+                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{entry.name}</span>
+                      {entry.version && (
+                        <span className="text-xs text-[var(--color-muted-foreground)]">
+                          v{entry.version}
+                        </span>
+                      )}
+                      {entry.kind && (
+                        <span className="rounded bg-[var(--color-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-secondary-foreground)]">
+                          {entry.kind}
+                        </span>
+                      )}
+                      <span
+                        title={
+                          entry.network
+                            ? "Declares network access"
+                            : "No network access declared"
+                        }
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]",
+                          entry.network
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            : "bg-[var(--color-muted)] text-[var(--color-muted-foreground)]",
+                        )}
+                      >
+                        {entry.network ? (
+                          <Globe className="h-3 w-3" />
+                        ) : (
+                          <Lock className="h-3 w-3" />
+                        )}
+                        {entry.network ? "network" : "no network"}
+                      </span>
+                      {entry.verified && (
+                        <span
+                          title="Verified by the registry"
+                          className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400"
+                        >
+                          <BadgeCheck className="h-3 w-3" />
+                          verified
+                        </span>
+                      )}
+                    </div>
+                    {entry.author && (
+                      <p className="mt-1 text-[10px] text-[var(--color-muted-foreground)]">
+                        by {entry.author}
+                      </p>
+                    )}
+                    {entry.description && (
+                      <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                        {entry.description}
+                      </p>
+                    )}
+                    {entry.tags.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {entry.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded bg-[var(--color-muted)] px-1.5 py-0.5 text-[10px] text-[var(--color-muted-foreground)]"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    variant={installed ? "outline" : "default"}
+                    size="sm"
+                    onClick={() => onInstall(entry)}
+                    disabled={installing}
+                    title={installed ? "Reinstall / upgrade" : "Install from registry"}
+                  >
+                    {installing ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    {installing ? "Installing…" : installed ? "Reinstall" : "Install"}
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
