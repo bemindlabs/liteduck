@@ -6,9 +6,10 @@
 **Platforms:** macOS-first (Homebrew) — Windows & Linux planned
 
 LiteDuck is an **editor-only** desktop app: a file browser + editor, an integrated
-terminal, Git, and Settings. It has no AI/LLM, agents, chat, or cloud services — and
-this roadmap keeps it that way. Every item below sharpens the core editing experience
-or the reliability of the native app beneath it.
+terminal, Git, Settings, and a manifest-based plugin system (the sanctioned extension
+point — integrations live in plugins, never in core). The core has no AI/LLM, agents,
+chat, or cloud services — and this roadmap keeps it that way. Every item below sharpens
+the core editing experience or the reliability of the native app beneath it.
 
 > **Scope guardrail.** Features that would reintroduce AI, autonomous agents, remote
 > orchestration, or always-on cloud services are explicitly out of scope. See
@@ -57,7 +58,7 @@ Near-term priorities grouped by area, roughly in delivery order.
 
 ### Terminal
 
-- **Terminal UX** — Split-pane and tmux-window management polish; configurable
+- **Terminal UX** — Split-pane and full-view (maximize) polish; configurable
   shell/profile per workspace.
 
 ### Git
@@ -106,9 +107,8 @@ Directions, not commitments — all within the editor-only charter.
 
 ### Terminal
 
-- Embedded PTY terminal (xterm.js) with tabs, split panes, and tmux-backed sessions that
-  survive app restarts.
-- tmux window operations — create, rename, close, and switch.
+- Embedded PTY terminal (xterm.js) with tabs and split panes.
+- Full-view (maximize) mode for the active terminal, plus drag-to-terminal for files.
 
 ### Git
 
@@ -124,13 +124,21 @@ Directions, not commitments — all within the editor-only charter.
 - JSON config files as the source of truth (`~/.LiteDuck` + workspace `.LiteDuck`), with
   SQLite kept only as a rebuildable runtime index.
 
+### Plugins & extensibility
+
+- Manifest-based plugin system — the sanctioned extension point. First-party Jira and
+  BWOC plugins ship alongside it; install third-party plugins from a GitHub registry.
+- VS Code-style workspace shell with context-aware right-click menus and an OS-junk
+  (`.DS_Store` etc.) file filter.
+
 ### Platform & distribution
 
-- Tauri v2 desktop builds for macOS (DMG via Homebrew cask). Windows (NSIS/MSI) and
-  Linux (deb/rpm/AppImage) packaging is planned.
-- Auto-updater against GitHub Releases; Homebrew cask; CalVer versioning.
+- Tauri v2 desktop build for macOS, distributed as a **build-from-source Homebrew
+  formula** (`brew install bemindlabs/liteduck/liteduck` compiles locally). Updates
+  via `brew upgrade`; CalVer versioning. No prebuilt DMG, no Mac App Store, and no
+  in-app updater. Windows and Linux packaging is planned.
 - Quality gate (TypeScript, ESLint, Prettier, Vitest, `cargo check`/`clippy`/`fmt`/`test`)
-  with a signed, notarized release pipeline.
+  in CI.
 
 ---
 

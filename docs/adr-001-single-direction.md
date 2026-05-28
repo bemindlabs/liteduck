@@ -33,7 +33,7 @@ part users relied on every minute, and it was buried under everything else.
 LiteDuck keeps exactly four capabilities:
 
 1. **File browser + editor**
-2. **Integrated terminal** — PTY, tabs, splits, tmux
+2. **Integrated terminal** — PTY, tabs, splits, full-view mode (tmux later removed — see [CHANGELOG](../CHANGELOG.md))
 3. **Git** — status, log, diffs, branches, worktrees (libgit2)
 4. **Settings** — modular, keychain-backed secrets, biometric lock, device identity
 

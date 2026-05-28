@@ -7,8 +7,8 @@
 <p align="center"><strong>A lightweight code editor</strong> — fast, focused, and out of your way.</p>
 
 <p align="center">
-  A file browser + editor, an integrated terminal, and Git in a single fast native desktop app
-  for macOS (Windows &amp; Linux planned) — no AI, no clutter.
+  A file browser + editor, an integrated terminal, Git, and a manifest-based plugin system in a
+  single fast native desktop app for macOS (Windows &amp; Linux planned) — no AI, no clutter.
 </p>
 
 <p align="center">
@@ -47,9 +47,11 @@ brew upgrade liteduck
 
 | Feature | Description |
 |---------|-------------|
-| **File Manager** | Tree view, preview (code, images, markdown), inline editing, new file/folder, open in VS Code |
-| **Terminal** | Tabs, split panes, tmux sessions, PTY |
+| **Workspace Shell** | VS Code-style layout: activity rail, file-tree side panel, editor area, collapsible terminal dock, and status bar — all visible at once |
+| **File Manager** | Tree view, preview (code, images, markdown), inline editing, new file/folder, open in VS Code; context menus + drag a file/folder onto the terminal to insert its path |
+| **Terminal** | Tabs, split panes, full-view mode (Cmd+Shift+`), raw PTY |
 | **Git** | Branch management, status, commits, diffs, worktrees |
+| **Plugins** | Manifest-based plugin system — install from a local folder or the GitHub registry; scope-limited (no chat/agent/LLM kinds) |
 | **Setup Wizard** | First-run wizard: welcome, workspace, initial project |
 | **Settings** | Modular sections, config (global), auto-save, biometric lock |
 
@@ -131,8 +133,13 @@ src/                          # Frontend (React + TypeScript)
     LandingPage.tsx           #   Landing / workspace picker
     settings/SettingsPage.tsx #   App settings (modular sections)
   components/                 # Reusable UI components (incl. ui/ shadcn primitives)
+    workspace/                #   VS Code-style shell (ActivityRail, SidePanel, EditorArea, TerminalDock, StatusBar)
+    plugins/                  #   PluginsPanel — install/list/run plugins
   hooks/                      # Custom React hooks (useConfig, useKeyboardShortcuts, …)
   lib/                        # Tauri IPC wrappers and utilities (one file per domain)
+    plugins.ts                #   Plugin install/list/run + registry fetch (→ plugins.rs)
+    version.ts                #   App version via get_app_version (no network)
+  utils/                      # Helpers (shellQuote — drag-to-terminal path quoting)
   contexts/                   # React contexts (Workspace, Biometric)
 src-tauri/                    # Backend (Rust, Tauri v2)
   src/
@@ -145,9 +152,10 @@ src-tauri/                    # Backend (Rust, Tauri v2)
     home.rs                   #   ~/.liteduck home: config, profile, memory notes
     agent_memory.rs           #   Markdown note store backing home memory
     app_menu.rs               #   Native application menu
-    terminal.rs / pty.rs      #   Terminal and PTY/tmux handling
+    terminal.rs / pty.rs      #   Terminal and raw PTY handling
     files.rs                  #   File listing, read/write, rename/delete
     git.rs                    #   Git operations + worktrees (libgit2)
+    plugins.rs                #   Plugin manifest loader, install/run, registry fetch
     device_identity.rs        #   Device identity generation
     biometric.rs              #   Biometric authentication
     event_sink.rs / file_logger.rs / bash_validator.rs  # Event bus, logging, shell validation
