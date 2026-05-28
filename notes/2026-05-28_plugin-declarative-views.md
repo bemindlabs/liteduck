@@ -33,15 +33,25 @@ Each command gains an optional `view` field (default `text` = today's behavior):
   runs + renders it as the plugin's **landing page** when the plugin is opened from the
   activity rail (instead of a bare command list).
 
-#### Plugin-level fields — activity-rail pinning
+#### Plugin-level fields — surface + activity-rail pinning
 
+- **`surface`** (optional, `"panel"` | `"page"`, default `"panel"`):
+  - `"panel"` — the plugin appears inside the Plugins panel (the master-detail list →
+    detail view); today's default.
+  - `"page"` — the plugin opens as a **full page in the editor-area slot**, exactly like
+    Git / Settings render full-width. Auto-runs its `default` command as the page body.
+    **Open files are preserved** — the editor's open-file tabs are WorkspaceShell state and
+    are *not* destroyed when a page surface is shown; switching back to Files restores the
+    same tabs (identical to how Git/Settings already behave). It replaces the editor view
+    while active, it does not close it.
 - **`icon`** (optional string) — a name from LiteDuck's **built-in icon set** (lucide). A
   plugin only *names* a host-provided icon; it never ships an SVG/asset, so there is no
   content surface (charter-safe). Unknown/absent → the generic plugin (Boxes) icon.
 - **`pinned`** (optional bool, default `false`) — when true, the plugin gets **its own icon
   in the activity rail** (below the shared Plugins icon). Clicking it opens the plugin's
   page directly (auto-running its `default` command if one is set). **Opt-in** to avoid rail
-  clutter — un-pinned plugins stay reachable through the Plugins panel.
+  clutter — un-pinned plugins stay reachable through the Plugins panel. Pairs naturally with
+  `surface: "page"` — a pinned page plugin behaves like a first-class workspace view.
 
 ### Output contracts (what the command writes to stdout per `view`)
 
@@ -87,9 +97,10 @@ keep working untouched until their manifests opt in.
 3. **Phase 3 (optional)** — a Refresh affordance (re-run the command), param-driven views
    (run with `LITEDUCK_PARAM_*` from a small form), and persisting a plugin page as an
    editor tab.
-4. **Phase 4 — activity-rail pinning** — manifest `icon` (lucide name) + `pinned`; pinned
-   plugins render an icon in the activity rail (below the Plugins icon) that opens the
-   plugin's page directly. Opt-in; the rail stays uncluttered by default.
+4. **Phase 4 — page surface + activity-rail pinning** — manifest `surface: "page"` (opens
+   the plugin full-width in the editor-area slot, preserving open file tabs like
+   Git/Settings) + `icon` (lucide name) + `pinned` (an activity-rail icon below the Plugins
+   icon that opens the page directly). All opt-in; the rail stays uncluttered by default.
 
 ## Open questions for the operator
 
