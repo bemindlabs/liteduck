@@ -1,5 +1,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import type { Options as SanitizeSchema } from "rehype-sanitize";
 import { useState, useEffect, useRef, useId } from "react";
 import { Copy, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -107,6 +110,37 @@ function MermaidDiagram({ chart }: { chart: string }) {
   );
 }
 
+// ── Sanitization schema ──────────────────────────────────────────────────────
+//
+// Raw/inline HTML in markdown (e.g. `<p align="center">`, `<img>`, `<kbd>`,
+// `<details>`/`<summary>`, `<sub>`, `<br>`, badge `<a><img></a>`) is parsed by
+// `rehypeRaw` and then run through `rehypeSanitize`. Pipeline order is critical:
+// rehypeRaw FIRST (raw HTML → hast), then rehypeSanitize SECOND (strip anything
+// unsafe). rehypeRaw must NEVER run without rehypeSanitize after it.
+//
+// We start from GitHub's `defaultSchema` (a safe allow-list: permits p, a, img,
+// kbd, details, summary, sub, sup, br, code, pre, blockquote, tables, etc.;
+// strips `<script>`, event-handler attrs like `onerror`, and neutralizes
+// `javascript:`/`vbscript:`/`data:` URLs) and extend it MINIMALLY: explicitly
+// allow the `align` attribute on the block/table elements README authors reach
+// for. We deliberately do NOT broaden to `style`, `script`, `iframe`, `object`,
+// `on*` handlers, or new URL protocols.
+const ALIGN_TAGS = ["p", "div", "img", "table", "th", "td"] as const;
+
+const sanitizeSchema: SanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    // Merge per-tag `align` onto each element's existing allow-list. (`align`
+    // already lives in the global `*` list in defaultSchema, so these are
+    // belt-and-suspenders — they keep the intent explicit and resilient if the
+    // upstream default ever changes.)
+    ...Object.fromEntries(
+      ALIGN_TAGS.map((tag) => [tag, [...(defaultSchema.attributes?.[tag] ?? []), "align"]]),
+    ),
+  },
+};
+
 // ── Markdown component ───────────────────────────────────────────────────────
 
 interface MarkdownProps {
@@ -118,6 +152,7 @@ export function Markdown({ content, className }: MarkdownProps) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
       className={cn("markdown-body", className)}
       components={{
         // ── Headings ─────────────────────────────────────────────
@@ -153,8 +188,15 @@ export function Markdown({ content, className }: MarkdownProps) {
         ),
 
         // ── Paragraphs & text ────────────────────────────────────
-        p: ({ children }) => (
-          <p className="text-sm leading-relaxed text-[var(--color-foreground)] mb-3">{children}</p>
+        // Forward the sanitized `align` attr (README HTML uses
+        // `<p align="center">`); all other props come pre-sanitized.
+        p: ({ node: _node, children, ...props }) => (
+          <p
+            {...props}
+            className="text-sm leading-relaxed text-[var(--color-foreground)] mb-3"
+          >
+            {children}
+          </p>
         ),
         strong: ({ children }) => (
           <strong className="font-semibold text-[var(--color-foreground)]">{children}</strong>
@@ -267,13 +309,19 @@ export function Markdown({ content, className }: MarkdownProps) {
           </div>
         ),
         thead: ({ children }) => <thead className="bg-[var(--color-muted)]">{children}</thead>,
-        th: ({ children }) => (
-          <th className="border border-[var(--color-border)] px-3 py-1.5 text-left text-xs font-semibold text-[var(--color-foreground)]">
+        th: ({ node: _node, children, ...props }) => (
+          <th
+            {...props}
+            className="border border-[var(--color-border)] px-3 py-1.5 text-left text-xs font-semibold text-[var(--color-foreground)]"
+          >
             {children}
           </th>
         ),
-        td: ({ children }) => (
-          <td className="border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-foreground)]">
+        td: ({ node: _node, children, ...props }) => (
+          <td
+            {...props}
+            className="border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-foreground)]"
+          >
             {children}
           </td>
         ),
@@ -282,8 +330,11 @@ export function Markdown({ content, className }: MarkdownProps) {
         hr: () => <hr className="border-[var(--color-border)] my-4" />,
 
         // ── Images ───────────────────────────────────────────────
-        img: ({ src, alt }) => (
+        // Forward sanitized attrs (src/alt/width/height/align) so README HTML
+        // `<img>` (badges, centered logos) renders faithfully.
+        img: ({ node: _node, src, alt, ...props }) => (
           <img
+            {...props}
             src={src}
             alt={alt ?? ""}
             className="max-w-full rounded-md border border-[var(--color-border)] my-3"
