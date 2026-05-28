@@ -610,31 +610,137 @@ pub fn uninstall_plugin_inner(id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Read a plugin's declared executable-UI bundle (ADR-002 / the plugin-UI-host
-/// design note). Resolves the installed plugin, requires a `ui.entry`, validates
-/// the entry is a bare filename (no path separators / `..`), and returns the
-/// bundle text. The host only *reads* the file — it never executes it; the
-/// frontend loads it into a sandboxed, opaque-origin iframe.
-pub fn read_ui_inner(plugin_id: &str) -> Result<String, String> {
-    if plugin_id.contains('/') || plugin_id.contains('\\') || plugin_id.contains("..") {
-        return Err(format!("invalid plugin id '{plugin_id}'"));
+// ── Plugin UI host (`plugin://` custom scheme — ADR-002) ──────────────────────
+//
+// A plugin's executable UI is served from a SEPARATE origin (the `plugin://`
+// custom scheme) so it is cross-origin to the host app (cannot reach the host
+// DOM or the Tauri `invoke` bridge) and runs under its OWN restrictive CSP set
+// on the response — never the host window's CSP. The host↔plugin contract is a
+// versioned `postMessage` bridge (the bootstrap below); the host validates every
+// `run-command` against the plugin's declared commands. This mirrors VS Code's
+// `vscode-webview://` design (see `notes/2026-05-28_plugin-ui-host-design.md`).
+
+/// CSP applied to every `plugin://` response. `connect-src 'none'` denies the
+/// frame any network; `'unsafe-inline'` is scoped to this isolated origin only
+/// (it never touches the host window CSP) so the host-authored bootstrap can run.
+const PLUGIN_FRAME_CSP: &str = "default-src 'none'; script-src 'self' 'unsafe-inline'; \
+style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; \
+connect-src 'none'; base-uri 'none'; form-action 'none'";
+
+const PLUGIN_SHELL_CSS: &str =
+    "html,body{margin:0;height:100%;color-scheme:light dark}\
+     body{font:13px/1.5 -apple-system,system-ui,sans-serif}";
+
+/// Host-authored bridge bootstrap injected into every plugin UI shell. Exposes a
+/// minimal `window.liteduck` (runCommand/log + context) that talks to the host
+/// over `postMessage`; the plugin's own bundle loads after it and uses that API.
+const PLUGIN_BOOTSTRAP_JS: &str = r#"
+(function(){
+  var seq=0, pending={};
+  window.liteduck={
+    context:null,
+    runCommand:function(commandId,params){
+      var id=String(++seq);
+      return new Promise(function(resolve){
+        pending[id]=resolve;
+        parent.postMessage({v:1,type:'run-command',payload:{requestId:id,commandId:commandId,params:params||{}}},'*');
+      });
+    },
+    log:function(level,msg){ parent.postMessage({v:1,type:'log',payload:{level:level,msg:String(msg)}},'*'); }
+  };
+  window.addEventListener('message',function(e){
+    var m=e.data; if(!m||m.v!==1) return;
+    if(m.type==='init'){ window.liteduck.context=m.payload.context;
+      if(typeof window.liteduck.onContext==='function'){ try{window.liteduck.onContext(m.payload.context);}catch(_){} } }
+    else if(m.type==='command-result'){ var r=pending[m.payload.requestId];
+      if(r){ delete pending[m.payload.requestId]; r(m.payload); } }
+  });
+  parent.postMessage({v:1,type:'ready'},'*');
+})();
+"#;
+
+/// A resolved `plugin://` asset response (status + content-type + per-response
+/// CSP + bytes). Pure/host-agnostic so it is unit-testable without Tauri's http
+/// types; `lib.rs` maps it onto `http::Response`.
+#[derive(Debug, Clone)]
+pub struct PluginAssetResponse {
+    pub status: u16,
+    pub content_type: String,
+    pub csp: String,
+    pub body: Vec<u8>,
+}
+
+fn plugin_asset_not_found(msg: &str) -> PluginAssetResponse {
+    PluginAssetResponse {
+        status: 404,
+        content_type: "text/plain; charset=utf-8".to_string(),
+        csp: PLUGIN_FRAME_CSP.to_string(),
+        body: msg.as_bytes().to_vec(),
     }
-    let plugin = list_plugins_inner()?
-        .into_iter()
-        .find(|p| p.manifest.id == plugin_id)
-        .ok_or_else(|| format!("plugin '{plugin_id}' is not installed"))?;
-    let ui = plugin
-        .manifest
-        .ui
-        .as_ref()
-        .ok_or_else(|| format!("plugin '{plugin_id}' declares no UI bundle"))?;
+}
+
+fn plugin_shell_html(entry: &str) -> String {
+    format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\">\
+<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\
+<style>{css}</style></head><body><div id=\"app\"></div>\
+<script>{boot}</script>\
+<script src=\"./{entry}\"></script></body></html>",
+        css = PLUGIN_SHELL_CSS,
+        boot = PLUGIN_BOOTSTRAP_JS,
+        entry = entry,
+    )
+}
+
+/// Resolve a `plugin://localhost/<id>/<file?>` request to a response. Serves the
+/// host-authored shell HTML for `/<id>/` (or `index.html`) and the plugin's
+/// declared `ui.entry` bundle for `/<id>/<entry>`. Everything else (and any
+/// path-traversal / undeclared file) is 404. The bundle is only *read* — the
+/// host never executes plugin code; the isolated frame does.
+pub fn resolve_plugin_asset(path: &str) -> PluginAssetResponse {
+    let trimmed = path.trim_start_matches('/');
+    let mut parts = trimmed.splitn(2, '/');
+    let plugin_id = parts.next().unwrap_or("");
+    let rest = parts.next().unwrap_or("");
+    if plugin_id.is_empty() || plugin_id.contains("..") || plugin_id.contains('\\') {
+        return plugin_asset_not_found("invalid plugin id");
+    }
+    let plugin = match list_plugins_inner() {
+        Ok(ps) => ps.into_iter().find(|p| p.manifest.id == plugin_id),
+        Err(_) => None,
+    };
+    let Some(plugin) = plugin else {
+        return plugin_asset_not_found("plugin not installed");
+    };
+    let Some(ui) = plugin.manifest.ui.as_ref() else {
+        return plugin_asset_not_found("plugin declares no UI bundle");
+    };
     let entry = ui.entry.as_str();
     if entry.is_empty() || entry.contains('/') || entry.contains('\\') || entry.contains("..") {
-        return Err(format!("invalid ui entry '{entry}' for plugin '{plugin_id}'"));
+        return plugin_asset_not_found("invalid ui entry");
     }
-    let path = PathBuf::from(&plugin.dir).join(entry);
-    fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read UI bundle {}: {e}", path.display()))
+
+    if rest.is_empty() || rest == "index.html" {
+        return PluginAssetResponse {
+            status: 200,
+            content_type: "text/html; charset=utf-8".to_string(),
+            csp: PLUGIN_FRAME_CSP.to_string(),
+            body: plugin_shell_html(entry).into_bytes(),
+        };
+    }
+    if rest == entry {
+        let file = PathBuf::from(&plugin.dir).join(entry);
+        return match fs::read(&file) {
+            Ok(body) => PluginAssetResponse {
+                status: 200,
+                content_type: "text/javascript; charset=utf-8".to_string(),
+                csp: PLUGIN_FRAME_CSP.to_string(),
+                body,
+            },
+            Err(e) => plugin_asset_not_found(&format!("failed to read bundle: {e}")),
+        };
+    }
+    plugin_asset_not_found("not found")
 }
 
 /// Run a plugin's contributed command. The command's `run` template is spawned
@@ -787,13 +893,6 @@ pub fn plugin_run_command(
     )
 }
 
-/// Read a plugin's declared executable-UI bundle (ADR-002) so the frontend can
-/// load it into a sandboxed iframe. Read-only; the host never executes the code.
-#[tauri::command]
-pub fn plugin_read_ui(plugin_id: String) -> Result<String, String> {
-    read_ui_inner(&plugin_id)
-}
-
 /// Fetch the published plugin registry (`registry.json`) and return its entries.
 /// `registry_url` overrides the official default
 /// (`bemindlabs/liteduck-plugins@main`). Read-only — no disk writes.
@@ -913,12 +1012,27 @@ mod tests {
     }
 
     #[test]
-    fn read_ui_rejects_path_traversal_in_id() {
-        // The plugin-id guard fires before any filesystem access, so this needs
-        // no installed plugin / home override.
-        for bad in ["../etc", "a/b", "..\\x"] {
-            assert!(read_ui_inner(bad).unwrap_err().contains("invalid plugin id"));
+    fn resolve_plugin_asset_rejects_traversal_and_unknown() {
+        // The id guard fires before any filesystem access (no home override
+        // needed): traversal in the id, and an unknown plugin, both 404.
+        for bad in ["/../etc/passwd", "/..\\x/", "/"] {
+            let r = resolve_plugin_asset(bad);
+            assert_eq!(r.status, 404, "path {bad:?} should 404");
         }
+        // A well-formed but not-installed id resolves to a 404, never a file.
+        let r = resolve_plugin_asset("/definitely-not-installed/ui.js");
+        assert_eq!(r.status, 404);
+        // Every response carries the locked-down plugin-frame CSP.
+        assert!(r.csp.contains("connect-src 'none'"), "csp: {}", r.csp);
+        assert!(r.csp.contains("default-src 'none'"), "csp: {}", r.csp);
+    }
+
+    #[test]
+    fn plugin_shell_html_embeds_entry_and_bootstrap() {
+        let html = plugin_shell_html("ui.js");
+        assert!(html.contains("src=\"./ui.js\""), "shell must load the entry: {html}");
+        assert!(html.contains("window.liteduck"), "shell must include the bridge bootstrap");
+        assert!(html.contains("type='run-command'") || html.contains("run-command"));
     }
 
     #[test]

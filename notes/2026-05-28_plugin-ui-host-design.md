@@ -141,10 +141,32 @@ loaded in a **cross-origin iframe**. This mirrors VS Code's `vscode-webview://` 
 host↔plugin **postMessage bridge, command gating, and `event.source` auth are unchanged**; only
 the *delivery + isolation mechanism* changes from `srcdoc` to a custom scheme.
 
-**Status:** groundwork landed (manifest `ui` field, `plugin_read_ui`, frontend types). The
-custom-scheme renderer + the bwoc proving bundle + PluginsPanel wiring are **held pending the
-operator's decision** to build the protocol (a real subsystem, larger than the original spike
-framing).
+### As built (Phase 1, 2026-05-28)
+
+The custom-scheme renderer is implemented:
+
+- **Rust** — `register_uri_scheme_protocol("plugin", …)` (lib.rs) → `plugins::resolve_plugin_asset`
+  serves `plugin://localhost/<id>/` (host-authored shell HTML + inline bridge bootstrap) and
+  `/<id>/<entry>` (the declared bundle), each with the locked-down `PLUGIN_FRAME_CSP`
+  (`default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline'; …`). Path-traversal
+  and undeclared files → 404.
+- **Host CSP** — one scoped change: `frame-src 'self' plugin: http://plugin.localhost` so the host
+  window may *embed* the plugin frame. `script-src` stays `'self'` — the host never runs plugin
+  code; the plugin's own (separate-origin) response CSP governs the frame.
+- **Frontend** — `PluginHostFrame` embeds `plugin://localhost/<id>/` in a cross-origin iframe and
+  runs the `ready`/`init`/`run-command`/`command-result` bridge, authenticating by
+  `event.source === frame.contentWindow` and gating `run-command` to declared commands.
+- **Isolation (Phase 1)** rests on **cross-origin separation** (`plugin://` ≠ the app origin → SOP
+  blocks host/Tauri access) + the per-response CSP (`connect-src 'none'`). The `sandbox` attribute
+  is **deferred to Phase 2** as defence-in-depth: a `sandbox="allow-scripts"` frame gets an opaque
+  origin where `script-src 'self'` no longer matches the bundle, so the CSP must switch to an
+  explicit-scheme `script-src plugin: http://plugin.localhost 'unsafe-inline'` at the same time.
+- **Proving plugin** — `bwoc` ships `ui.js`; its `plugin.json` declares `ui: { entry, fallback }`.
+  Declarative `view`s remain as the `fallback`.
+
+**Open for review:** verify Tauri does not inject its IPC into the cross-origin `plugin://` frame
+(belt-and-braces: `connect-src 'none'` already blocks `ipc://`). Phase 2 = sandbox attr + the
+install-time "ships executable UI" consent + capability grants.
 
 ## Phasing
 

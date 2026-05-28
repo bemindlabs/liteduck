@@ -180,6 +180,27 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Plugin UI host (ADR-002): serve a plugin's executable UI from the
+        // `plugin://` custom scheme — a SEPARATE origin, cross-origin to the host
+        // app (no host DOM / Tauri access) and under its own restrictive CSP set
+        // per response (see `plugins::resolve_plugin_asset`). The frontend embeds
+        // `plugin://localhost/<id>/` in an iframe; the host↔plugin postMessage
+        // bridge (validated frontend-side) is the only channel.
+        .register_uri_scheme_protocol("plugin", |_ctx, request| {
+            let path = request.uri().path().to_string();
+            let asset = plugins::resolve_plugin_asset(&path);
+            tauri::http::Response::builder()
+                .status(asset.status)
+                .header(tauri::http::header::CONTENT_TYPE, asset.content_type)
+                .header("Content-Security-Policy", asset.csp)
+                .body(asset.body)
+                .unwrap_or_else(|_| {
+                    tauri::http::Response::builder()
+                        .status(500)
+                        .body(Vec::new())
+                        .expect("static 500 response")
+                })
+        })
         .manage({
             let store: std::sync::Arc<dyn liteduck_core::traits::SecretStore> =
                 std::sync::Arc::new(keyring_store::KeyringSecretStore::new());
@@ -281,7 +302,6 @@ pub fn run() {
             plugins::plugin_install,
             plugins::plugin_uninstall,
             plugins::plugin_run_command,
-            plugins::plugin_read_ui,
             plugins::plugin_registry_fetch,
             plugins::plugin_install_from_registry,
         ])

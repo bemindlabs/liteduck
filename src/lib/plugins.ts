@@ -169,12 +169,14 @@ export async function pluginRunCommand(
 }
 
 /**
- * Read a plugin's declared executable-UI bundle (ADR-002) so it can be loaded
- * into a sandboxed iframe. Read-only — the host never executes the code itself.
- * Rejects plugins with no `ui` entry and any path-traversal in the entry name.
+ * Build the `plugin://` URL for a plugin's UI host document (ADR-002). The UI is
+ * served from this **separate origin** (cross-origin to the host app, under its
+ * own CSP) and embedded in an iframe — the host never reads/executes the bundle
+ * itself. macOS/Linux use `plugin://localhost/<id>/`; Windows uses
+ * `http://plugin.localhost/<id>/` (handled by Tauri's scheme mapping).
  */
-export async function pluginReadUi(pluginId: string): Promise<string> {
-  return invoke<string>("plugin_read_ui", { pluginId });
+export function pluginUiUrl(pluginId: string): string {
+  return `plugin://localhost/${encodeURIComponent(pluginId)}/`;
 }
 
 /**
