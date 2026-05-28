@@ -10,13 +10,13 @@
     {
       "id": "bwoc.detect",
       "title": "BWOC: Detect CLI",
-      "run": "sh bwoc.sh detect",
+      "run": "sh \"$LITEDUCK_PLUGIN_DIR/bwoc.sh\" detect",
       "args": []
     },
     {
       "id": "bwoc.list",
       "title": "BWOC: List Agents",
-      "run": "sh bwoc.sh list",
+      "run": "sh \"$LITEDUCK_PLUGIN_DIR/bwoc.sh\" list",
       "args": []
     }
   ]
