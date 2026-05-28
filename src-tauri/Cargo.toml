@@ -14,6 +14,13 @@ edition = "2021"
 name = "bemind_liteduck_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+# Capitalised so the dev-mode binary (and therefore the Dock label when
+# running `npm run tauri:dev`) reads "LiteDuck" instead of the lowercase
+# Cargo package slug.  Production .app bundles use tauri.conf.json:productName.
+name = "LiteDuck"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
