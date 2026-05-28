@@ -1,58 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
-import { Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { TerminalTab } from "@/hooks/useTerminal";
 import { cn } from "@/lib/utils";
 import { TerminalPane } from "./terminal/TerminalPane";
-
-// ── KillTabButton (inline confirm) ───────────────────────────────────────────
-
-interface KillTabButtonProps {
-  tab: TerminalTab;
-  onKill: (id: string) => void;
-}
-
-function KillTabButton({ tab, onKill }: KillTabButtonProps) {
-  const [confirming, setConfirming] = useState(false);
-
-  if (confirming) {
-    return (
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onKill(tab.id);
-          setConfirming(false);
-        }}
-        onBlur={() => setTimeout(() => setConfirming(false), 200)}
-        className="ml-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold transition-all text-destructive bg-destructive/10 hover:bg-destructive/20"
-        aria-label={`Confirm kill tmux session ${tab.tmuxSession}`}
-        title="Confirm kill"
-        tabIndex={-1}
-      >
-        Kill?
-      </button>
-    );
-  }
-
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        setConfirming(true);
-      }}
-      className={cn(
-        "ml-0.5 shrink-0 rounded p-0.5 transition-all",
-        "opacity-0 group-hover:opacity-100",
-        "text-[var(--color-muted-foreground)] hover:text-destructive",
-      )}
-      aria-label={`Kill tmux session ${tab.tmuxSession}`}
-      title={`Kill tmux session "${tab.tmuxSession}"`}
-      tabIndex={-1}
-    >
-      <Trash2 className="h-3 w-3" />
-    </button>
-  );
-}
 
 // ── TabLabel (inline rename) ──────────────────────────────────────────────────
 
@@ -135,7 +86,6 @@ interface TabBarProps {
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
-  onKillTab?: (id: string) => void;
   onRenameTab?: (id: string, newName: string) => void;
   actions?: React.ReactNode;
 }
@@ -145,7 +95,6 @@ export function TabBar({
   activeTabId,
   onSelectTab,
   onCloseTab,
-  onKillTab,
   onRenameTab,
   actions,
 }: TabBarProps) {
@@ -184,8 +133,6 @@ export function TabBar({
 
           <TabLabel tab={tab} onRename={onRenameTab} />
 
-          {tab.tmuxSession && onKillTab && <KillTabButton tab={tab} onKill={onKillTab} />}
-
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -196,8 +143,8 @@ export function TabBar({
               "opacity-0 group-hover:opacity-100",
               "hover:text-[var(--color-destructive)]",
             )}
-            aria-label={tab.tmuxSession ? `Detach ${tab.label}` : `Close ${tab.label}`}
-            title={tab.tmuxSession ? `Detach tab (session keeps running)` : `Close tab`}
+            aria-label={`Close ${tab.label}`}
+            title="Close tab"
             tabIndex={-1}
           >
             <X className="h-3 w-3" />
@@ -255,7 +202,6 @@ export function TerminalPanes({
 interface TerminalTabsProps extends TerminalPanesProps {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
-  onKillTab?: (id: string) => void;
   onRenameTab?: (id: string, newName: string) => void;
   actions?: React.ReactNode;
 }
@@ -265,7 +211,6 @@ export default function TerminalTabs({
   activeTabId: activeTabIdProp,
   onSelectTab,
   onCloseTab,
-  onKillTab,
   onRenameTab,
   onInput,
   onResize,
@@ -291,7 +236,6 @@ export default function TerminalTabs({
         activeTabId={activeTabId}
         onSelectTab={handleSelectTab}
         onCloseTab={onCloseTab}
-        onKillTab={onKillTab}
         onRenameTab={onRenameTab}
         actions={actions}
       />

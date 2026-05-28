@@ -24,32 +24,6 @@ test.describe("Terminal Page", () => {
     await expect(tabs).toHaveCount(initialCount + 1);
   });
 
-  test("should show tmux session picker when tmux sessions exist", async ({ page }) => {
-    // Override terminal_list_tmux to return sessions
-    await page.addInitScript(() => {
-      const tauri = (window as Window & {
-        __TAURI_INTERNALS__: {
-          invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
-        };
-      }).__TAURI_INTERNALS__;
-      const baseInvoke = tauri.invoke.bind(tauri);
-      tauri.invoke = async (cmd: string, args?: Record<string, unknown>) => {
-        if (cmd === "terminal_list_tmux") {
-          return [
-            { name: "aidlc-0", windows: 1, created: "1700000000", attached: false },
-            { name: "aidlc-1", windows: 2, created: "1700001000", attached: false },
-          ];
-        }
-        return baseInvoke(cmd, args);
-      };
-    });
-    await page.goto("/terminal");
-    // Tmux sessions should be shown for restoration
-    await expect(page.getByText("aidlc-0").or(page.getByText("Restore"))).toBeVisible({
-      timeout: 5000,
-    });
-  });
-
   test("should close a terminal tab", async ({ page }) => {
     await page.goto("/terminal");
     // Create a tab first

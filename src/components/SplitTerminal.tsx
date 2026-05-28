@@ -9,7 +9,7 @@
  */
 
 import { Group, Panel, Separator, type GroupProps } from "react-resizable-panels";
-import { PanelRight, PanelBottom, Columns2, Rows2, X, Plus } from "lucide-react";
+import { PanelRight, PanelBottom, X, Plus } from "lucide-react";
 import TerminalTabs from "@/components/TerminalTabs";
 import type { UseTerminalReturn } from "@/hooks/useTerminal";
 import { cn } from "@/lib/utils";
@@ -44,14 +44,6 @@ export interface SplitCallbacks {
   onSplit: (paneId: string, direction: SplitDirection) => void;
   /** Remove a leaf pane (sibling takes the full space). */
   onUnsplit: (paneId: string) => void;
-  /**
-   * Send a tmux split-window keystroke to the active tab of the given pane.
-   * Only called when the active tab is tmux-backed.
-   *
-   * `horizontal: true`  → side-by-side (Ctrl-B %)
-   * `horizontal: false` → top/bottom   (Ctrl-B ")
-   */
-  onTmuxSplit: (paneId: string, horizontal: boolean) => void;
   /** How many leaf panes currently exist (split disabled at 4). */
   leafCount: number;
 }
@@ -115,8 +107,6 @@ function LeafPaneView({ pane, callbacks, isOnly }: LeafPaneViewProps) {
     activeTabId,
     setActiveTabId,
     closeTab,
-    killTmuxSession,
-    renameTmuxSession,
     writeToSession,
     resizeSession,
     registerXterm,
@@ -126,49 +116,9 @@ function LeafPaneView({ pane, callbacks, isOnly }: LeafPaneViewProps) {
   const hasTerminals = tabs.length > 0;
   const canSplit = callbacks.leafCount < 4;
 
-  // Determine whether the currently active tab in this pane is tmux-backed so
-  // we can show the tmux-level split buttons.
-  const activeTab = tabs.find((t) => t.id === activeTabId);
-  const isTmuxTab = Boolean(activeTab?.tmuxSession);
-
   // Pane action buttons rendered inline in the tab bar's actions slot.
   const paneActions = (
     <div className="flex items-center gap-0.5" aria-label="Pane actions">
-      {/* Tmux-level splits — only for tmux-backed tabs */}
-      {isTmuxTab && (
-        <>
-          <button
-            onClick={() => callbacks.onTmuxSplit(pane.id, true)}
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded",
-              "text-[var(--color-muted-foreground)]",
-              "hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
-              "transition-colors",
-            )}
-            title="Tmux split right (Ctrl-B %)"
-            aria-label="Split tmux pane vertically"
-          >
-            <Columns2 className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => callbacks.onTmuxSplit(pane.id, false)}
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded",
-              "text-[var(--color-muted-foreground)]",
-              "hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
-              "transition-colors",
-            )}
-            title='Tmux split down (Ctrl-B ")'
-            aria-label="Split tmux pane horizontally"
-          >
-            <Rows2 className="h-3.5 w-3.5" />
-          </button>
-
-          {/* Divider between tmux-level and app-level split controls */}
-          <div className="mx-0.5 h-3.5 w-px bg-[var(--color-border)]" aria-hidden />
-        </>
-      )}
-
       {/* App-level splits */}
       {canSplit && (
         <>
@@ -228,8 +178,6 @@ function LeafPaneView({ pane, callbacks, isOnly }: LeafPaneViewProps) {
           activeTabId={activeTabId}
           onSelectTab={setActiveTabId}
           onCloseTab={closeTab}
-          onKillTab={killTmuxSession}
-          onRenameTab={renameTmuxSession}
           onInput={writeToSession}
           onResize={resizeSession}
           onRegisterXterm={registerXterm}

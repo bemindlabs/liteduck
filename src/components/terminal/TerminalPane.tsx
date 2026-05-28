@@ -106,7 +106,7 @@ export function TerminalPane({
         if (key === "a") return false;
         // Ctrl+X: cut
         if (key === "x" && term.hasSelection()) return false;
-        // All other Ctrl+key -> terminal (Ctrl+B tmux, Ctrl+L clear, Ctrl+D EOF, etc.)
+        // All other Ctrl+key -> terminal (Ctrl+L clear, Ctrl+D EOF, etc.)
         return true;
       }
 
