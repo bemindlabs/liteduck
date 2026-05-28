@@ -1,0 +1,23 @@
+{
+  "id": "bwoc",
+  "name": "BWOC Orchestration",
+  "version": "0.1.0",
+  "description": "Optional, read-only integration with the external BWOC agent-orchestration CLI. Detects the binary and lists the registered agent roster. LiteDuck never spawns or modifies agents.",
+  "kind": "integration",
+  "network": false,
+  "paths": [],
+  "commands": [
+    {
+      "id": "bwoc.detect",
+      "title": "BWOC: Detect CLI",
+      "run": "sh bwoc.sh detect",
+      "args": []
+    },
+    {
+      "id": "bwoc.list",
+      "title": "BWOC: List Agents",
+      "run": "sh bwoc.sh list",
+      "args": []
+    }
+  ]
+}

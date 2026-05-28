@@ -5,8 +5,6 @@ pub mod agent_memory;
 pub mod app_menu;
 pub mod bash_validator;
 pub mod biometric;
-#[cfg(not(target_os = "ios"))]
-pub mod bwoc;
 pub mod db;
 pub mod device_identity;
 pub mod event_sink;
@@ -269,10 +267,10 @@ pub fn run() {
             home::home_migration_run,
             // Template resolution (~/.liteduck/templates/workspace/)
             workspace::home_templates_list,
-            // BWOC integration (optional)
-            bwoc::bwoc_detect,
-            bwoc::bwoc_list,
-            // Plugin system (Hybrid manifest + shell — desktop only)
+            // Plugin system (Hybrid manifest + shell — desktop only).
+            // Integrations (e.g. BWOC, Jira) live here as opt-in plugins, never
+            // in core — see resources/plugins/.
+            plugins::plugin_list,
             plugins::plugin_list,
             plugins::plugin_install,
             plugins::plugin_uninstall,
