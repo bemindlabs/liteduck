@@ -337,9 +337,43 @@ fn epoch_to_iso(epoch_secs: u64) -> String {
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
+/// OS / desktop-environment clutter that should never appear in the file tree,
+/// regardless of the `show_hidden` toggle. `show_hidden` is for *user* dotfiles
+/// (`.gitignore`, `.env`, `.github/`…) — these entries are machine droppings
+/// the user never authored and never wants to see.
+fn is_os_system_entry(name: &str) -> bool {
+    const EXACT: &[&str] = &[
+        // macOS
+        ".DS_Store",
+        ".AppleDouble",
+        ".LSOverride",
+        ".Spotlight-V100",
+        ".Trashes",
+        ".fseventsd",
+        ".DocumentRevisions-V100",
+        ".TemporaryItems",
+        ".VolumeIcon.icns",
+        ".com.apple.timemachine.donotpresent",
+        ".apdisk",
+        // Windows
+        "Thumbs.db",
+        "ehthumbs.db",
+        "Desktop.ini",
+        "$RECYCLE.BIN",
+        "System Volume Information",
+        // Linux desktop envs
+        ".directory",
+    ];
+    EXACT.contains(&name)
+        // AppleDouble resource forks ("._<name>") and Linux per-mount trash dirs.
+        || name.starts_with("._")
+        || name.starts_with(".Trash-")
+}
+
 /// List the contents of a directory, sorted: directories first (alphabetical),
-/// then files (alphabetical). Hidden entries (name starts with `.`) are
-/// included when `show_hidden` is true.
+/// then files (alphabetical). User dotfiles (name starts with `.`) are included
+/// when `show_hidden` is true. OS/system clutter (`.DS_Store`, `Thumbs.db`, …)
+/// is always omitted — see [`is_os_system_entry`].
 #[tauri::command]
 pub fn files_list_dir(
     path: String,
@@ -371,6 +405,12 @@ pub fn files_list_dir(
 
         let entry_name = entry.file_name();
         let name_str = entry_name.to_string_lossy();
+
+        // Always omit OS/system clutter (.DS_Store, Thumbs.db, …), even when
+        // show_hidden is true — the user never authored these.
+        if is_os_system_entry(&name_str) {
+            continue;
+        }
 
         // Skip hidden files/directories unless show_hidden is true.
         if !show_hidden.unwrap_or(false) && name_str.starts_with('.') {
