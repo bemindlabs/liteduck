@@ -135,6 +135,11 @@ export function PluginHostFrame({
       ref={frameRef}
       title={`${plugin.name} UI`}
       src={pluginUiUrl(plugin.id)}
+      // `allow-scripts` only (no `allow-same-origin`) → opaque origin: scripts run
+      // but the frame cannot reach the host DOM/storage or the Tauri bridge, and
+      // top-level navigation / popups / form submission are blocked. The plugin's
+      // own response CSP names sources by scheme so its bundle still loads.
+      sandbox="allow-scripts"
       className="h-full w-full border-0 bg-[var(--color-background)]"
     />
   );

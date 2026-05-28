@@ -628,9 +628,14 @@ pub fn uninstall_plugin_inner(id: &str) -> Result<(), String> {
 /// CSP applied to every `plugin://` response. `connect-src 'none'` denies the
 /// frame any network; `'unsafe-inline'` is scoped to this isolated origin only
 /// (it never touches the host window CSP) so the host-authored bootstrap can run.
-const PLUGIN_FRAME_CSP: &str = "default-src 'none'; script-src 'self' 'unsafe-inline'; \
-style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; \
-connect-src 'none'; base-uri 'none'; form-action 'none'";
+/// Script/img/font sources are named by **scheme** (`plugin:` / `http://plugin.localhost`)
+/// rather than `'self'` because the frame is `sandbox`ed to an **opaque origin**
+/// (Phase 2 hardening), where `'self'` would no longer match the plugin's own URLs.
+const PLUGIN_FRAME_CSP: &str =
+    "default-src 'none'; script-src 'unsafe-inline' plugin: http://plugin.localhost; \
+style-src 'unsafe-inline'; img-src plugin: http://plugin.localhost data:; \
+font-src plugin: http://plugin.localhost data:; connect-src 'none'; \
+base-uri 'none'; form-action 'none'";
 
 const PLUGIN_SHELL_CSS: &str =
     "html,body{margin:0;height:100%;color-scheme:light dark}\

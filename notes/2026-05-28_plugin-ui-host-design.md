@@ -156,11 +156,13 @@ The custom-scheme renderer is implemented:
 - **Frontend** — `PluginHostFrame` embeds `plugin://localhost/<id>/` in a cross-origin iframe and
   runs the `ready`/`init`/`run-command`/`command-result` bridge, authenticating by
   `event.source === frame.contentWindow` and gating `run-command` to declared commands.
-- **Isolation (Phase 1)** rests on **cross-origin separation** (`plugin://` ≠ the app origin → SOP
-  blocks host/Tauri access) + the per-response CSP (`connect-src 'none'`). The `sandbox` attribute
-  is **deferred to Phase 2** as defence-in-depth: a `sandbox="allow-scripts"` frame gets an opaque
-  origin where `script-src 'self'` no longer matches the bundle, so the CSP must switch to an
-  explicit-scheme `script-src plugin: http://plugin.localhost 'unsafe-inline'` at the same time.
+- **Isolation** rests on **cross-origin separation** (`plugin://` ≠ the app origin → SOP blocks
+  host/Tauri access) + the per-response CSP (`connect-src 'none'`). **Phase 2 adds the `sandbox`
+  attribute** (`allow-scripts` only → opaque origin, no top-nav/popups/forms) as defence-in-depth;
+  because an opaque origin breaks `script-src 'self'`, the CSP now names sources by scheme
+  (`script-src 'unsafe-inline' plugin: http://plugin.localhost`). If a webview ever fails to serve
+  the opaque-origin custom-scheme frame, the `ready`-handshake timeout falls back to declarative —
+  so the hardening can never leave a blank page.
 - **Proving plugin** — `bwoc` ships `ui.js`; its `plugin.json` declares `ui: { entry, fallback }`.
   Declarative `view`s remain as the `fallback`.
 

@@ -144,8 +144,11 @@ describe("PluginsPanel command toolbar", () => {
     pluginList.mockResolvedValue([jiraUiPlugin]);
     render(<PluginsPanel initialPluginId="jira" />);
 
-    // The plugin's own UI iframe is shown instead of the declarative toolbar.
-    expect(await screen.findByTitle("Jira Cloud UI")).toBeInTheDocument();
+    // The plugin's own UI iframe is shown instead of the declarative toolbar,
+    // sandboxed to scripts-only (opaque origin — no host/Tauri access).
+    const frame = await screen.findByTitle("Jira Cloud UI");
+    expect(frame).toBeInTheDocument();
+    expect(frame).toHaveAttribute("sandbox", "allow-scripts");
     expect(screen.queryByRole("button", { name: /View Issue/ })).not.toBeInTheDocument();
   });
 
