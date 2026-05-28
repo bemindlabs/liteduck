@@ -84,14 +84,27 @@ function NetworkBadge({ network }: { network: boolean }) {
   );
 }
 
-export function PluginsPanel() {
+export interface PluginsPanelProps {
+  /**
+   * When set, the panel opens straight to this plugin's detail page (auto-running
+   * its `default` command) and the master list + tab chrome are hidden — this is
+   * the **full-page surface** used by `surface: "page"` plugins pinned to the
+   * activity rail. Absent → the normal master-detail Plugins panel.
+   */
+  initialPluginId?: string;
+}
+
+export function PluginsPanel({ initialPluginId }: PluginsPanelProps = {}) {
+  // Full-page mode: opened to a single plugin from the activity rail. Hides the
+  // master list / tabs and shows just that plugin's detail page (no Back).
+  const pageMode = initialPluginId !== undefined;
   // The active workspace. Plugin commands run with this as their CWD so
   // workspace-scoped tools (e.g. `bwoc list`) resolve the open workspace rather
   // than the plugin's install dir. Empty string ("") = no workspace open.
   const { workspace } = useWorkspace();
   const [tab, setTab] = useState<PluginsTab>("installed");
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState(initialPluginId ?? null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -249,7 +262,47 @@ export function PluginsPanel() {
     [handleRun],
   );
 
+  // Full-page mode: once the plugin list resolves, open the requested plugin so
+  // its `default` command auto-runs as the page body. Re-fires if the operator
+  // switches the rail to a different pinned plugin (initialPluginId changes).
+  useEffect(() => {
+    if (initialPluginId === undefined) return;
+    const target = plugins.find((p) => p.id === initialPluginId);
+    if (!target) return;
+    setSelectedId(initialPluginId);
+    setRun(null);
+    const landing = target.commands.find((c) => c.default);
+    if (landing) void handleRun(target, landing);
+  }, [initialPluginId, plugins, handleRun]);
+
   const installedView = tab === "installed";
+
+  // Full-page surface: render just the selected plugin's detail page (no master
+  // list, no tabs, no Back). The activity rail / Files icon is how you leave.
+  if (pageMode) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden bg-[var(--color-background)]">
+        {error && (
+          <div className="shrink-0 border-b border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 px-4 py-2 text-xs text-[var(--color-destructive)]">
+            {error}
+          </div>
+        )}
+        {selected ? (
+          <PluginDetail
+            plugin={selected}
+            run={run}
+            busy={busy}
+            onRun={handleRun}
+            onUninstall={handleUninstall}
+          />
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-center text-sm text-[var(--color-muted-foreground)]">
+            {loading ? "Loading plugin…" : `Plugin '${initialPluginId}' is not installed.`}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--color-background)]">
@@ -477,7 +530,8 @@ function PluginDetail({
   plugin: InstalledPlugin;
   run: CommandRun | null;
   busy: string | null;
-  onBack: () => void;
+  /** Absent in full-page mode — the activity rail is how you leave the page. */
+  onBack?: () => void;
   onRun: (plugin: InstalledPlugin, command: PluginCommand) => void;
   onUninstall: (id: string) => void;
 }) {
@@ -485,12 +539,17 @@ function PluginDetail({
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      {/* Back affordance */}
+      {/* Back affordance (master-detail) + uninstall. The Back button is hidden
+          in full-page mode where the activity rail handles navigation. */}
       <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" />
-          All plugins
-        </Button>
+        {onBack ? (
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" />
+            All plugins
+          </Button>
+        ) : (
+          <span />
+        )}
         <Button
           variant="ghost"
           size="sm"

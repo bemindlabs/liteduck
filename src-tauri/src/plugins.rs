@@ -89,6 +89,23 @@ pub struct PluginManifest {
     /// not OS-enforced in v1 (user-trust). A real sandbox is a future phase.
     #[serde(default)]
     pub paths: Vec<String>,
+    /// Declarative workspace surface for the plugin: `panel` (default — appears
+    /// inside the Plugins panel master-detail) or `page` (opens full-width in the
+    /// editor-area slot like Git/Settings). The host never interprets this beyond
+    /// passing it through; it only selects which *built-in* container renders the
+    /// plugin's declarative views (no plugin JS/HTML executes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface: Option<String>,
+    /// Name of a host-provided icon (from LiteDuck's built-in lucide set) for the
+    /// activity rail. A plugin only *names* an icon — it never ships an SVG/asset.
+    /// Unknown/absent names fall back to the generic plugin icon on the frontend.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// When `true`, the plugin gets its own icon in the activity rail (below the
+    /// shared Plugins icon) that opens its page directly. Opt-in to avoid rail
+    /// clutter; absent → `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned: Option<bool>,
 }
 
 /// An installed plugin: its manifest plus the resolved on-disk directory.
@@ -780,6 +797,37 @@ mod tests {
         let json2 = serde_json::to_string(&m2.commands[0]).unwrap();
         assert!(!json2.contains("view"), "absent view should be omitted: {json2}");
         assert!(!json2.contains("default"), "absent default should be omitted: {json2}");
+    }
+
+    #[test]
+    fn surface_icon_pinned_parse_through() {
+        // A manifest declaring plugin-level surface/icon/pinned parses, and the
+        // fields survive a round-trip back to JSON (frontend passthrough).
+        let m: PluginManifest = serde_json::from_str(
+            r#"{"id":"bwoc","name":"BWOC","version":"1","kind":"integration",
+                "surface":"page","icon":"users","pinned":true}"#,
+        )
+        .unwrap();
+        assert_eq!(m.surface.as_deref(), Some("page"));
+        assert_eq!(m.icon.as_deref(), Some("users"));
+        assert_eq!(m.pinned, Some(true));
+
+        // Absent → None for all three (back-compat: panel surface, no rail icon).
+        let m2: PluginManifest =
+            serde_json::from_str(r#"{"id":"y","name":"Y","version":"1","kind":"tool"}"#).unwrap();
+        assert_eq!(m2.surface, None);
+        assert_eq!(m2.icon, None);
+        assert_eq!(m2.pinned, None);
+
+        // Round-trip: serialized JSON includes the set fields, omits the absent.
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("\"surface\":\"page\""), "got: {json}");
+        assert!(json.contains("\"icon\":\"users\""), "got: {json}");
+        assert!(json.contains("\"pinned\":true"), "got: {json}");
+        let json2 = serde_json::to_string(&m2).unwrap();
+        assert!(!json2.contains("surface"), "absent surface omitted: {json2}");
+        assert!(!json2.contains("icon"), "absent icon omitted: {json2}");
+        assert!(!json2.contains("pinned"), "absent pinned omitted: {json2}");
     }
 
     #[test]

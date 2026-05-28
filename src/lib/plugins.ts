@@ -34,6 +34,13 @@ export interface PluginCommand {
 }
 
 /**
+ * Workspace surface a plugin renders as:
+ * - `"panel"` (default) — inside the Plugins panel master-detail list.
+ * - `"page"` — full-width in the editor-area slot, like Git/Settings.
+ */
+export type PluginSurface = "panel" | "page";
+
+/**
  * A parsed `plugin.json` manifest. `kind` must be in the host allow-list
  * (`integration` | `formatter` | `linter` | `previewer` | `tool`); the loader
  * refuses `chat` / `agent` / `llm` (scope-ceiling deny-list).
@@ -49,6 +56,22 @@ export interface PluginManifest {
   network: boolean;
   /** Host filesystem scopes the plugin declares it needs. */
   paths: string[];
+  /**
+   * Declarative workspace surface. Absent → `"panel"`. A `"page"` plugin opens
+   * full-width in the editor-area slot (preserving open file tabs).
+   */
+  surface?: PluginSurface;
+  /**
+   * Name of a host-provided icon (lucide). The frontend resolves it to a
+   * built-in component — a plugin only *names* an icon, never ships an SVG.
+   * Unknown/absent → the generic plugin (Boxes) icon.
+   */
+  icon?: string;
+  /**
+   * When `true`, the plugin gets its own activity-rail icon (below the shared
+   * Plugins icon) that opens its page directly. Absent → `false`. Opt-in.
+   */
+  pinned?: boolean;
 }
 
 /** An installed plugin: its manifest plus the resolved on-disk directory. */

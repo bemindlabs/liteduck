@@ -29,8 +29,12 @@ import { StatusBar } from "./StatusBar";
 import { type EditorTab } from "./EditorTabs";
 import { ROUTES, panelFromPath, type WorkspacePanel } from "@/lib/routes";
 import type { FileEntry } from "@/lib/files";
+import { type InstalledPlugin, pluginList } from "@/lib/plugins";
+import { createLogger } from "@/lib/logger";
 import { PageLoading } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+
+const logger = createLogger("WorkspaceShell");
 
 // GitPage is heavy (multi-repo scan, large tabs) — keep lazy. It renders in the
 // editor area (full width) when the "git" panel is active, mirroring how the
@@ -75,6 +79,13 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
     // Initial panel is derived from URL when possible; default to files.
     return panelFromPath(location.pathname) ?? "files";
   });
+  /**
+   * When set, a specific plugin's **page** surface is open in the editor-area
+   * slot (full-width, like Git/Settings). This is *editor-area state only* — it
+   * never clears the open file tabs below, so switching back to Files restores
+   * them. Set by clicking a pinned `surface: "page"` plugin's rail icon.
+   */
+  const [activePluginId, setActivePluginId] = useState<string | null>(null);
   const [sidePanelWidth, setSidePanelWidth] = useState(240);
   const [terminalOpen, setTerminalOpen] = useState(true);
   /**
@@ -88,6 +99,28 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
   const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  // ── Pinned plugins (activity-rail icons) ─────────────────────────────────────
+
+  // Installed plugins drive the per-plugin activity-rail icons. Fetched lazily
+  // (mirrors PluginsPanel) — only those with `pinned: true` get a rail icon.
+  const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void pluginList()
+      .then((list) => {
+        if (!cancelled) setInstalledPlugins(list);
+      })
+      .catch((e: unknown) => logger.error("Failed to list plugins for activity rail", e));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const pinnedPlugins = useMemo(
+    () => installedPlugins.filter((p) => p.pinned),
+    [installedPlugins],
+  );
 
   // ── URL ↔ panel sync ───────────────────────────────────────────────────────
 
@@ -137,6 +170,10 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
   const handleRailSelect = useCallback(
     (panel: WorkspacePanel) => {
+      // Selecting any shared panel leaves an open plugin page (its rail icon is
+      // mutually exclusive with the shared icons). Tabs are untouched.
+      setActivePluginId(null);
+
       // Settings / notifications are full-page Outlets — the side panel has no
       // useful body for them. Clicking the rail icon just ensures we're on the
       // route; it never expands/collapses a vestigial side panel. (URL→panel
@@ -160,6 +197,22 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
       }
     },
     [activePanel, location.pathname, navigate],
+  );
+
+  // Clicking a pinned plugin's rail icon opens its full-page surface in the
+  // editor-area slot. This only swaps the editor-area *view* — the open file
+  // tabs are preserved (switching to Files restores them), exactly like Git /
+  // Settings. Re-clicking the active plugin's icon closes it back to Files.
+  const handleOpenPluginPage = useCallback(
+    (pluginId: string) => {
+      setActivePluginId((current) => (current === pluginId ? null : pluginId));
+      // Leaving a /settings or /notifications Outlet so the editor-area slot is
+      // free to host the plugin page.
+      if (routeOverridesEditor(location.pathname)) {
+        void navigate(ROUTES.HOME);
+      }
+    },
+    [location.pathname, navigate],
   );
 
   // ── Editor tab handlers ────────────────────────────────────────────────────
@@ -204,31 +257,43 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
     [tabs, activeTabId],
   );
 
-  const showOutlet = routeOverridesEditor(location.pathname);
+  // A pinned plugin's page surface takes precedence over everything else in the
+  // editor-area slot (it's the most explicit user action). Open file tabs stay
+  // in `tabs` state untouched, so switching back to Files restores them.
+  const showPluginPage = activePluginId !== null;
+
+  const showOutlet = !showPluginPage && routeOverridesEditor(location.pathname);
 
   // Git renders full-width in the editor area (like settings / notifications),
   // never in the narrow side panel — its internal file-list + diff two-column
   // layout is unusable at ~240px. The rail icon still highlights via
   // `activePanel`; the editor area shows GitPage when this is true.
-  const showGit = activePanel === "git";
+  const showGit = !showPluginPage && activePanel === "git";
 
   // Plugins render full-width in the editor area too (same pattern as Git):
   // the manifest list + command output need room beyond the ~240px side panel.
-  const showPlugins = activePanel === "plugins";
+  const showPlugins = !showPluginPage && activePanel === "plugins";
 
   // The side panel only has a useful body for "files". For
   // "git" / "settings" / "notifications" the editor area shows the full page,
   // so the side panel stays collapsed even though the rail icon still
   // highlights via `activePanel`. This is what makes Cmd+, behave like
-  // clicking the rail Settings icon (no auto-expand of a vestigial pointer).
-  const showFilesSidePanel = activePanel === "files";
+  // clicking the rail Settings icon (no auto-expand of a vestigial pointer). A
+  // plugin page also takes over the editor area, so the files tree hides too.
+  const showFilesSidePanel = !showPluginPage && activePanel === "files";
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <ActivityRail active={activePanel} onSelect={handleRailSelect} />
+        <ActivityRail
+          active={showPluginPage ? null : activePanel}
+          onSelect={handleRailSelect}
+          pinnedPlugins={pinnedPlugins}
+          activePluginId={activePluginId}
+          onSelectPlugin={handleOpenPluginPage}
+        />
 
         {showFilesSidePanel && (
           <SidePanel
@@ -244,7 +309,16 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
           {/* Editor-area slot — hidden (not unmounted) when the terminal is
               maximized so the dock can fill the full column height. */}
           <div className={cn("flex-1 min-h-0 overflow-hidden", terminalMaximized && "hidden")}>
-            {showOutlet ? (
+            {activePluginId !== null ? (
+              <Suspense fallback={<PageLoading />}>
+                <div className="h-full overflow-hidden">
+                  {/* Full-page plugin surface: opens straight to the pinned
+                      plugin, auto-running its `default` command. Reuses the
+                      PluginsPanel detail renderer via initialPluginId. */}
+                  <PluginsPanel initialPluginId={activePluginId} />
+                </div>
+              </Suspense>
+            ) : showOutlet ? (
               <div className="h-full overflow-y-auto">
                 <Suspense fallback={<PageLoading />}>
                   <Outlet />

@@ -8,10 +8,13 @@
  * behaviour). The shell decides what "active" means when nothing is selected.
  */
 
+import { createElement } from "react";
 import { Bell, Boxes, FolderTree, GitBranch, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LiteDuckLogo } from "@/components/LiteDuckLogo";
+import { resolvePluginIcon } from "@/components/plugins/pluginIcon";
 import type { WorkspacePanel } from "@/lib/routes";
+import type { InstalledPlugin } from "@/lib/plugins";
 
 interface RailItem {
   id: WorkspacePanel;
@@ -39,9 +42,25 @@ export interface ActivityRailProps {
    * otherwise it should switch to that panel (and uncollapse if needed).
    */
   onSelect: (panel: WorkspacePanel) => void;
+  /**
+   * Pinned plugins (`pinned: true`) get their own icon below the shared Plugins
+   * icon. A plugin only *names* a host icon (resolved to a built-in lucide
+   * component); unknown/absent names fall back to the generic plugin icon.
+   */
+  pinnedPlugins?: InstalledPlugin[];
+  /** The plugin whose page is currently open (rail-icon highlight), or null. */
+  activePluginId?: string | null;
+  /** Called when a pinned plugin's icon is clicked — opens its page surface. */
+  onSelectPlugin?: (pluginId: string) => void;
 }
 
-export function ActivityRail({ active, onSelect }: ActivityRailProps) {
+export function ActivityRail({
+  active,
+  onSelect,
+  pinnedPlugins = [],
+  activePluginId = null,
+  onSelectPlugin,
+}: ActivityRailProps) {
   return (
     <nav
       aria-label="Workspace activity"
@@ -55,6 +74,15 @@ export function ActivityRail({ active, onSelect }: ActivityRailProps) {
         {TOP_ITEMS.map((item) => (
           <RailButton key={item.id} item={item} active={active} onSelect={onSelect} />
         ))}
+        {/* Per-plugin pinned icons, directly below the shared Plugins icon. */}
+        {pinnedPlugins.map((plugin) => (
+          <PluginRailButton
+            key={plugin.id}
+            plugin={plugin}
+            active={activePluginId === plugin.id}
+            onSelect={onSelectPlugin}
+          />
+        ))}
       </div>
 
       <div className="mt-auto flex flex-col gap-1">
@@ -63,6 +91,48 @@ export function ActivityRail({ active, onSelect }: ActivityRailProps) {
         ))}
       </div>
     </nav>
+  );
+}
+
+/**
+ * A pinned plugin's activity-rail icon. The icon is resolved from the plugin's
+ * declared `icon` name to a built-in lucide component (unknown/absent → the
+ * generic plugin icon). Clicking it opens the plugin's page surface.
+ */
+function PluginRailButton({
+  plugin,
+  active,
+  onSelect,
+}: {
+  plugin: InstalledPlugin;
+  active: boolean;
+  onSelect?: (pluginId: string) => void;
+}) {
+  // Resolve the declared icon name to a built-in lucide component, then render
+  // it via createElement (not as a capitalized JSX tag) so the static-component
+  // lint stays happy with the dynamic-but-trusted lookup.
+  const icon = resolvePluginIcon(plugin.icon);
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect?.(plugin.id)}
+      title={plugin.name}
+      aria-label={plugin.name}
+      aria-pressed={active}
+      className={cn(
+        "relative flex h-9 w-9 items-center justify-center rounded-md transition-colors",
+        "text-[var(--color-muted-foreground)] hover:bg-[var(--color-sidebar-accent)] hover:text-[var(--color-sidebar-accent-foreground)]",
+        active && "bg-[var(--color-sidebar-accent)] text-[var(--color-sidebar-accent-foreground)]",
+      )}
+    >
+      {createElement(icon, { className: "h-4 w-4" })}
+      {active && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-[var(--color-primary)]"
+        />
+      )}
+    </button>
   );
 }
 
