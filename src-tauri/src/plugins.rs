@@ -313,8 +313,7 @@ fn http_client() -> Result<reqwest::blocking::Client, String> {
 /// egress to the GitHub registry + raw hosts even when the registry document
 /// (or the Contents API) hands us a `download_url`.
 fn assert_allowed_host(url: &str) -> Result<(), String> {
-    let parsed =
-        reqwest::Url::parse(url).map_err(|e| format!("invalid URL '{url}': {e}"))?;
+    let parsed = reqwest::Url::parse(url).map_err(|e| format!("invalid URL '{url}': {e}"))?;
     match parsed.host_str() {
         Some(host) if ALLOWED_HOSTS.contains(&host) => Ok(()),
         Some(host) => Err(format!(
@@ -420,9 +419,9 @@ fn download_contents_into(
     for entry in entries {
         match entry.entry_type.as_str() {
             "file" => {
-                let url = entry.download_url.ok_or_else(|| {
-                    format!("file '{}' has no download_url", entry.name)
-                })?;
+                let url = entry
+                    .download_url
+                    .ok_or_else(|| format!("file '{}' has no download_url", entry.name))?;
                 let bytes = fetch_file_bytes(client, &url)?;
                 let dest = dest_dir.join(&entry.name);
                 fs::write(&dest, &bytes)
@@ -491,9 +490,7 @@ pub fn install_from_registry_inner(
     let manifest_entry = entries
         .iter()
         .find(|e| e.entry_type == "file" && e.name == "plugin.json")
-        .ok_or_else(|| {
-            format!("no plugin.json found in registry source '{manifest_url}'")
-        })?;
+        .ok_or_else(|| format!("no plugin.json found in registry source '{manifest_url}'"))?;
     let manifest_dl = manifest_entry
         .download_url
         .clone()
@@ -580,9 +577,7 @@ pub fn run_command_inner(
         .commands
         .iter()
         .find(|c| c.id == command_id)
-        .ok_or_else(|| {
-            format!("plugin '{plugin_id}' has no command '{command_id}'")
-        })?;
+        .ok_or_else(|| format!("plugin '{plugin_id}' has no command '{command_id}'"))?;
 
     let mut command = Command::new("sh");
     command.arg("-c").arg(&cmd.run);
@@ -638,8 +633,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
         if from.is_dir() {
             copy_dir_recursive(&from, &to)?;
         } else {
-            fs::copy(&from, &to)
-                .map_err(|e| format!("Failed to copy {}: {e}", from.display()))?;
+            fs::copy(&from, &to).map_err(|e| format!("Failed to copy {}: {e}", from.display()))?;
             preserve_exec_bit(&to);
         }
     }
@@ -681,9 +675,7 @@ pub fn plugin_run_command(
 /// `registry_url` overrides the official default
 /// (`bemindlabs/liteduck-plugins@main`). Read-only — no disk writes.
 #[tauri::command]
-pub fn plugin_registry_fetch(
-    registry_url: Option<String>,
-) -> Result<Vec<RegistryEntry>, String> {
+pub fn plugin_registry_fetch(registry_url: Option<String>) -> Result<Vec<RegistryEntry>, String> {
     registry_fetch_inner(registry_url.as_deref())
 }
 
@@ -713,10 +705,9 @@ mod tests {
 
     #[test]
     fn allowed_kind_loads() {
-        let m: PluginManifest = serde_json::from_str(
-            r#"{"id":"x","name":"X","version":"1","kind":"integration"}"#,
-        )
-        .unwrap();
+        let m: PluginManifest =
+            serde_json::from_str(r#"{"id":"x","name":"X","version":"1","kind":"integration"}"#)
+                .unwrap();
         assert!(validate_manifest(&m).is_ok());
     }
 
@@ -728,7 +719,10 @@ mod tests {
             ))
             .unwrap();
             let err = validate_manifest(&m).unwrap_err();
-            assert!(err.contains("deny-list"), "kind {kind} should be denied: {err}");
+            assert!(
+                err.contains("deny-list"),
+                "kind {kind} should be denied: {err}"
+            );
         }
     }
 
@@ -741,10 +735,9 @@ mod tests {
 
     #[test]
     fn id_with_traversal_is_rejected() {
-        let m: PluginManifest = serde_json::from_str(
-            r#"{"id":"../evil","name":"X","version":"1","kind":"tool"}"#,
-        )
-        .unwrap();
+        let m: PluginManifest =
+            serde_json::from_str(r#"{"id":"../evil","name":"X","version":"1","kind":"tool"}"#)
+                .unwrap();
         assert!(validate_manifest(&m).is_err());
     }
 
@@ -756,8 +749,16 @@ mod tests {
         let root = plugins_dir();
         fs::create_dir_all(&root).unwrap();
 
-        write_manifest(&root, "good", r#"{"id":"good","name":"G","version":"1","kind":"tool"}"#);
-        write_manifest(&root, "bad", r#"{"id":"bad","name":"B","version":"1","kind":"agent"}"#);
+        write_manifest(
+            &root,
+            "good",
+            r#"{"id":"good","name":"G","version":"1","kind":"tool"}"#,
+        );
+        write_manifest(
+            &root,
+            "bad",
+            r#"{"id":"bad","name":"B","version":"1","kind":"agent"}"#,
+        );
 
         let list = list_plugins_inner().unwrap();
         std::env::remove_var("LITEDUCK_HOME");
@@ -840,9 +841,7 @@ mod tests {
         .is_ok());
         // A non-GitHub host (and a sneaky look-alike) must be refused.
         assert!(assert_allowed_host("https://evil.example.com/plugin.json").is_err());
-        assert!(
-            assert_allowed_host("https://raw.githubusercontent.com.evil.com/x").is_err()
-        );
+        assert!(assert_allowed_host("https://raw.githubusercontent.com.evil.com/x").is_err());
     }
 
     #[test]
