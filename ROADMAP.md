@@ -63,6 +63,9 @@ Near-term priorities grouped by area, roughly in delivery order.
 
 ### Git
 
+- **Writable Git workflow** — Stage / unstage, commit, push, and discard from the
+  Changes view. Requires the write-capable `git2` IPC commands (`git_add` /
+  `git_reset` / `git_commit` / `git_discard_file`) the current read-only surface lacks.
 - **Multi-root & submodules** — Support workspaces with multiple `.git` roots and
   submodules; a repository switcher scoping status, diff, log, and staging to the
   selected repo.
@@ -112,9 +115,9 @@ Directions, not commitments — all within the editor-only charter.
 
 ### Git
 
-- Status, commit log, diffs, branch management, stage/unstage, commit/push/discard
-  (libgit2).
-- Git worktrees — create and switch without leaving LiteDuck.
+- Status, commit log, diffs, branch listing, repo init, and multi-repo scan (libgit2).
+  The Changes view is read-only today — staging/commit is on the roadmap below.
+- Git worktrees — create, remove, and prune without leaving LiteDuck.
 
 ### Settings & security
 
