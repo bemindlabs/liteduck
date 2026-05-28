@@ -19,9 +19,10 @@ interface ShortcutRowEditorProps {
     action: ShortcutBinding["action"],
     patch: { key: string; mod: boolean; shift: boolean },
   ) => void;
+  conflict?: string | null;
 }
 
-function ShortcutRowEditor({ binding, override, onChange }: ShortcutRowEditorProps) {
+function ShortcutRowEditor({ binding, override, onChange, conflict }: ShortcutRowEditorProps) {
   const current = override ?? {
     key: binding.key,
     mod: binding.mod,
@@ -47,35 +48,47 @@ function ShortcutRowEditor({ binding, override, onChange }: ShortcutRowEditorPro
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 py-2">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[var(--color-foreground)] truncate">
-          {binding.label}
-          {isModified && (
-            <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning-subtle">
-              modified
-            </span>
-          )}
-        </p>
-        <p className="text-xs text-[var(--color-muted-foreground)] truncate">
-          {binding.description}
-        </p>
-      </div>
+    <div className="py-2">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-[var(--color-foreground)] truncate">
+            {binding.label}
+            {isModified && (
+              <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning bg-warning-subtle">
+                modified
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-[var(--color-muted-foreground)] truncate">
+            {binding.description}
+          </p>
+        </div>
 
-      <input
-        type="text"
-        readOnly
-        value={formatShortcut({ ...binding, ...current })}
-        onKeyDown={handleKeyCapture}
-        placeholder="Press shortcut..."
-        className={cn(
-          "w-36 shrink-0 cursor-pointer rounded-md border border-[var(--color-input)] bg-[var(--color-background)]",
-          "px-2 py-1 text-center text-xs font-mono text-[var(--color-foreground)]",
-          "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]",
-          "placeholder:text-[var(--color-muted-foreground)]",
-        )}
-        title="Click and press your desired shortcut key combination"
-      />
+        <input
+          type="text"
+          readOnly
+          value={formatShortcut({ ...binding, ...current })}
+          onKeyDown={handleKeyCapture}
+          placeholder="Press shortcut..."
+          aria-invalid={conflict ? true : undefined}
+          className={cn(
+            "w-36 shrink-0 cursor-pointer rounded-md border bg-[var(--color-background)]",
+            "px-2 py-1 text-center text-xs font-mono text-[var(--color-foreground)]",
+            "focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]",
+            "placeholder:text-[var(--color-muted-foreground)]",
+            conflict ? "border-[var(--color-destructive)]" : "border-[var(--color-input)]",
+          )}
+          title="Click and press your desired shortcut key combination"
+        />
+      </div>
+      {conflict && (
+        <p
+          className="mt-1 text-right text-xs text-[var(--color-destructive)]"
+          role="alert"
+        >
+          Conflicts with: {conflict}
+        </p>
+      )}
     </div>
   );
 }
@@ -95,6 +108,30 @@ export function ShortcutsSection({ onSaved }: ShortcutsSectionProps) {
       seen.add(b.action);
       return true;
     });
+  })();
+
+  // Detect duplicate key combos across bindings (effective = override ?? default).
+  // Returns a map of action → human label of the *other* action it conflicts with.
+  const conflicts: Record<string, string> = (() => {
+    const combo = (b: { key: string; mod: boolean; shift?: boolean }) =>
+      `${b.mod ? "M" : ""}${b.shift ? "S" : ""}-${b.key.toLowerCase()}`;
+    const seen = new Map<string, ShortcutBinding>();
+    const out: Record<string, string> = {};
+    for (const binding of primaryBindings) {
+      const ovr = overrides[binding.action];
+      const effective = ovr
+        ? { key: ovr.key, mod: ovr.mod, shift: ovr.shift ?? false }
+        : { key: binding.key, mod: binding.mod, shift: binding.shift ?? false };
+      const k = combo(effective);
+      const prior = seen.get(k);
+      if (prior) {
+        out[binding.action] = prior.label;
+        out[prior.action] = binding.label;
+      } else {
+        seen.set(k, binding);
+      }
+    }
+    return out;
   })();
 
   function handleChange(
@@ -154,6 +191,7 @@ export function ShortcutsSection({ onSaved }: ShortcutsSectionProps) {
             binding={binding}
             override={overrides[binding.action]}
             onChange={handleChange}
+            conflict={conflicts[binding.action] ?? null}
           />
         ))}
       </div>

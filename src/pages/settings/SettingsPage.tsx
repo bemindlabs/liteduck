@@ -250,19 +250,6 @@ export default function SettingsPage() {
     }
   }, [loading, location.hash, location.key]);
 
-  // ── Cmd/Ctrl+S ────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        void handleSave();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
-
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleChange = useCallback((key: string, value: string) => {
@@ -278,7 +265,7 @@ export default function SettingsPage() {
     }
   }, []);
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveStatus("saving");
     setErrorMessage("");
@@ -292,20 +279,35 @@ export default function SettingsPage() {
         if (!ok) throw new Error("Biometric authentication required to save secrets");
       }
 
+      // Clamp numeric ranges before persisting (font_size 10–24, scrollback 100–50000).
+      // Build a payload copy so we never mutate the values state directly.
+      const payload: Record<string, string> = { ...values };
+      const fontSize = parseInt(payload.font_size, 10);
+      if (!Number.isNaN(fontSize)) {
+        payload.font_size = String(Math.min(24, Math.max(10, fontSize)));
+      }
+      const scrollback = parseInt(payload.terminal_scrollback, 10);
+      if (!Number.isNaN(scrollback)) {
+        payload.terminal_scrollback = String(Math.min(50000, Math.max(100, scrollback)));
+      }
+      if (payload.font_size !== values.font_size || payload.terminal_scrollback !== values.terminal_scrollback) {
+        setValues(payload);
+      }
+
       // Save plain keys
-      await Promise.all(PLAIN_KEYS.map((key) => saveSetting(key, values[key] ?? "", false)));
+      await Promise.all(PLAIN_KEYS.map((key) => saveSetting(key, payload[key] ?? "", false)));
 
       // Save secret keys (skip empty)
       await Promise.all(
         SECRET_KEYS.map((key) => {
-          const value = values[key] ?? "";
+          const value = payload[key] ?? "";
           if (value === "") return Promise.resolve();
           return saveSetting(key, value, true);
         }),
       );
 
       // Auto-initialize workspace templates
-      const wsDir = values.workspace_directory;
+      const wsDir = payload.workspace_directory;
       if (wsDir) {
         workspaceInit(wsDir).catch(() => {
           /* noop */
@@ -313,7 +315,7 @@ export default function SettingsPage() {
       }
 
       // Apply theme immediately
-      const themeVal = values.theme;
+      const themeVal = payload.theme;
       if (themeVal === "light" || themeVal === "dark" || themeVal === "system") {
         let dark: boolean;
         if (themeVal === "system") {
@@ -332,7 +334,20 @@ export default function SettingsPage() {
       setErrorMessage(message);
       setSaveStatus("error");
     }
-  }
+  }, [values, bioEnabled, bioUnlocked, bioUnlock]);
+
+  // ── Cmd/Ctrl+S ────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        void handleSave();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleSave]);
 
   const navigate = useNavigate();
 

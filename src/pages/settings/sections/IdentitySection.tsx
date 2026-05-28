@@ -134,8 +134,8 @@ export function IdentitySection() {
               </Button>
             </div>
             <p className="text-xs text-[var(--color-muted-foreground)]">
-              A display name for this device. Leave blank to use device ID prefix. Changes are
-              broadcast to connected peers immediately.
+              A display name for this device. Leave blank to use the device ID prefix. Stored
+              locally only.
             </p>
           </div>
 

@@ -1,6 +1,26 @@
 import { Palette } from "lucide-react";
 import { SettingField, type FieldDef } from "../components/SettingField";
 
+// Inline numeric range guards. Save still proceeds (the page-level handler
+// clamps before persisting) — this only surfaces a helper hint.
+const NUMERIC_RANGES: Record<string, { min: number; max: number }> = {
+  font_size: { min: 10, max: 24 },
+  terminal_scrollback: { min: 100, max: 50000 },
+};
+
+function validateNumericRange(key: string, raw: string): string | null {
+  if (!Object.prototype.hasOwnProperty.call(NUMERIC_RANGES, key) || raw === "") return null;
+  const range = NUMERIC_RANGES[key];
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    return `Must be a whole number between ${range.min} and ${range.max}.`;
+  }
+  if (n < range.min || n > range.max) {
+    return `Out of range (${range.min}–${range.max}). Will be clamped on save.`;
+  }
+  return null;
+}
+
 const FIELDS: FieldDef[] = [
   {
     key: "theme",
@@ -23,7 +43,7 @@ const FIELDS: FieldDef[] = [
     key: "font_size",
     label: "Font Size",
     placeholder: "14",
-    helpText: "Base font size in pixels for terminals and editors.",
+    helpText: "Base font size in pixels for terminals and editors (10–24).",
   },
   {
     key: "sidebar_position",
@@ -45,7 +65,7 @@ const FIELDS: FieldDef[] = [
     key: "terminal_scrollback",
     label: "Scrollback Lines",
     placeholder: "10000",
-    helpText: "Number of scrollback lines retained per terminal session.",
+    helpText: "Number of scrollback lines retained per terminal session (100–50000).",
   },
 ];
 
@@ -72,20 +92,29 @@ export function GeneralSection({ values, onChange, onDeleteSecret }: GeneralSect
       </div>
 
       <div className="space-y-4">
-        {FIELDS.map((field) => (
-          <div key={field.key} className="space-y-1.5">
-            <SettingField def={field} value={values[field.key] ?? ""} onChange={onChange} />
-            {field.isSecret && values[field.key] && (
-              <button
-                type="button"
-                onClick={() => onDeleteSecret(field.key)}
-                className="text-xs text-[var(--color-destructive)] hover:underline"
-              >
-                Clear stored secret
-              </button>
-            )}
-          </div>
-        ))}
+        {FIELDS.map((field) => {
+          const value = values[field.key] ?? "";
+          const validationError = validateNumericRange(field.key, value);
+          return (
+            <div key={field.key} className="space-y-1.5">
+              <SettingField
+                def={field}
+                value={value}
+                onChange={onChange}
+                error={validationError}
+              />
+              {field.isSecret && values[field.key] && (
+                <button
+                  type="button"
+                  onClick={() => onDeleteSecret(field.key)}
+                  className="text-xs text-[var(--color-destructive)] hover:underline"
+                >
+                  Clear stored secret
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
