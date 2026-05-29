@@ -35,7 +35,10 @@ class Liteduck < Formula
     system "npm", "run", "tauri", "build", "--", "--bundles", "app"
 
     # The Tauri build emits the .app under the release bundle directory.
-    app_bundle = "src-tauri/target/release/bundle/macos/LiteDuck.app"
+    # Because the repo root carries a Cargo workspace manifest, the Cargo
+    # target dir (and therefore the Tauri bundle) lives at the workspace root
+    # `target/…`, NOT under `src-tauri/target/…`.
+    app_bundle = "target/release/bundle/macos/LiteDuck.app"
     prefix.install app_bundle => "LiteDuck.app"
 
     # Expose the inner Mach-O on PATH so `liteduck` launches the app binary.
