@@ -45,20 +45,6 @@ class Liteduck < Formula
     bin.install_symlink prefix/"LiteDuck.app/Contents/MacOS/LiteDuck" => "liteduck"
   end
 
-  # Surface the .app in /Applications so Finder, Launchpad, and Spotlight find
-  # it (a formula keeps the bundle under the Homebrew prefix; a cask would do
-  # this natively, but LiteDuck ships source-only). The link targets the stable
-  # `opt` path so `brew upgrade` keeps it pointing at the current version.
-  #
-  # Homebrew does NOT remove files outside its prefix on uninstall, so the link
-  # is cleaned up here on reinstall/upgrade and flagged in `caveats` for
-  # uninstall. We never clobber a real (non-symlink) app already at that path.
-  def post_install
-    target = "/Applications/LiteDuck.app"
-    File.delete(target) if File.symlink?(target)
-    File.symlink("#{opt_prefix}/LiteDuck.app", target) unless File.exist?(target)
-  end
-
   def caveats
     <<~EOS
       LiteDuck is built from source and is NOT code-signed or notarized.
@@ -68,11 +54,14 @@ class Liteduck < Formula
 
       The app bundle lives at:
         #{opt_prefix}/LiteDuck.app
-      and is symlinked into /Applications/LiteDuck.app for Launchpad/Spotlight.
 
-      `brew uninstall` cannot remove that symlink (it is outside the Homebrew
-      prefix) — delete it by hand if you uninstall:
-        rm /Applications/LiteDuck.app
+      To show it in Finder / Launchpad / Spotlight, symlink it into /Applications.
+      Homebrew can't do this itself — its install sandbox forbids writing outside
+      the prefix — so run this once (re-run after a major upgrade if needed):
+        ln -sfn "#{opt_prefix}/LiteDuck.app" /Applications/LiteDuck.app
+
+      (Targets the stable `opt` path, so `brew upgrade` keeps it current. Remove
+      with `rm /Applications/LiteDuck.app` if you uninstall.)
     EOS
   end
 
