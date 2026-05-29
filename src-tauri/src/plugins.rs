@@ -320,11 +320,100 @@ pub fn list_plugins_inner() -> Result<Vec<InstalledPlugin>, String> {
     Ok(out)
 }
 
+/// A user-data file captured from an existing install so a reinstall doesn't
+/// nuke the user's edits (e.g. `auth.toml` with real credentials). Top-level
+/// only; subdirectory user-data isn't a current convention.
+struct PreservedUserData {
+    filename: String,
+    bytes: Vec<u8>,
+    /// Unix permission bits to restore (0 = use the OS default).
+    mode: u32,
+}
+
+/// Read the existing-install manifest's declared `paths` and capture any
+/// non-empty top-level user-data files (e.g. `auth.toml`) so they survive a
+/// reinstall's wipe-and-copy. A best-effort read — any failure (no manifest,
+/// unreadable file) just returns an empty list and the reinstall proceeds.
+fn collect_user_data_to_preserve(dest: &Path) -> Vec<PreservedUserData> {
+    let Ok(text) = fs::read_to_string(dest.join("plugin.json")) else {
+        return Vec::new();
+    };
+    let Ok(manifest) = serde_json::from_str::<PluginManifest>(&text) else {
+        return Vec::new();
+    };
+    let mut saved = Vec::new();
+    for declared in &manifest.paths {
+        // Take just the filename — paths typically point inside the plugin dir
+        // (`~/.liteduck/plugins/<id>/auth.toml`), and only top-level user-data
+        // is supported. Subdirectory user-data isn't a current convention.
+        let Some(name) = Path::new(declared).file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let path = dest.join(name);
+        if !path.is_file() {
+            continue;
+        }
+        let Ok(bytes) = fs::read(&path) else {
+            continue;
+        };
+        if bytes.is_empty() {
+            // Never restore a placeholder over an incoming real file.
+            continue;
+        }
+        saved.push(PreservedUserData {
+            filename: name.to_string(),
+            bytes,
+            mode: unix_mode(&path),
+        });
+    }
+    saved
+}
+
+/// Write captured user-data files back into the freshly-copied plugin dir,
+/// restoring their original permissions. A best-effort step: a write failure is
+/// logged but never aborts the reinstall (the rest of the plugin is already in
+/// place; the user can re-add the missing credential by hand).
+fn restore_user_data(dest: &Path, saved: Vec<PreservedUserData>) {
+    for item in saved {
+        let path = dest.join(&item.filename);
+        if let Err(e) = fs::write(&path, &item.bytes) {
+            log::warn!("failed to restore user-data {}: {e}", path.display());
+            continue;
+        }
+        if item.mode != 0 {
+            apply_unix_mode(&path, item.mode);
+        }
+    }
+}
+
+#[cfg(unix)]
+fn unix_mode(p: &Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    fs::metadata(p).map(|m| m.permissions().mode()).unwrap_or(0)
+}
+#[cfg(not(unix))]
+fn unix_mode(_p: &Path) -> u32 {
+    0
+}
+
+#[cfg(unix)]
+fn apply_unix_mode(p: &Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(p, fs::Permissions::from_mode(mode));
+}
+#[cfg(not(unix))]
+fn apply_unix_mode(_p: &Path, _mode: u32) {}
+
 /// Copy a plugin folder at `source` into `~/.liteduck/plugins/<id>/`.
 ///
 /// The source must contain a valid `plugin.json`. The destination id is taken
 /// from the (validated) manifest, never from the source folder name. Returns
 /// the freshly-installed plugin.
+///
+/// **User-data preservation:** when reinstalling over an existing plugin, any
+/// top-level file named in the *existing* manifest's `paths` (e.g. `auth.toml`)
+/// is captured before the wipe and restored after the copy — so a reinstall
+/// never silently nukes the user's filled-in credentials.
 pub fn install_plugin_inner(source: &str) -> Result<InstalledPlugin, String> {
     let src = PathBuf::from(source);
     if !src.is_dir() {
@@ -341,11 +430,16 @@ pub fn install_plugin_inner(source: &str) -> Result<InstalledPlugin, String> {
     fs::create_dir_all(&root).map_err(|e| format!("Failed to create plugins dir: {e}"))?;
     let dest = root.join(&manifest.id);
 
-    if dest.exists() {
+    let preserved = if dest.exists() {
+        let p = collect_user_data_to_preserve(&dest);
         fs::remove_dir_all(&dest)
             .map_err(|e| format!("Failed to replace existing plugin '{}': {e}", manifest.id))?;
-    }
+        p
+    } else {
+        Vec::new()
+    };
     copy_dir_recursive(&src, &dest)?;
+    restore_user_data(&dest, preserved);
 
     Ok(InstalledPlugin {
         manifest,
@@ -582,7 +676,10 @@ pub fn install_from_registry_inner(
     }
 
     let dest = root.join(&manifest.id);
-    if dest.exists() {
+    // Capture user-data (e.g. auth.toml with real creds) from the existing
+    // install before the wipe, then restore after the atomic swap.
+    let preserved = if dest.exists() {
+        let p = collect_user_data_to_preserve(&dest);
         if let Err(e) = fs::remove_dir_all(&dest) {
             let _ = fs::remove_dir_all(&staging);
             return Err(format!(
@@ -590,11 +687,15 @@ pub fn install_from_registry_inner(
                 manifest.id
             ));
         }
-    }
+        p
+    } else {
+        Vec::new()
+    };
     fs::rename(&staging, &dest).map_err(|e| {
         let _ = fs::remove_dir_all(&staging);
         format!("Failed to install plugin '{}': {e}", manifest.id)
     })?;
+    restore_user_data(&dest, preserved);
 
     Ok(InstalledPlugin {
         manifest,
@@ -1088,6 +1189,60 @@ mod tests {
         // Every response carries the locked-down plugin-frame CSP.
         assert!(r.csp.contains("connect-src 'none'"), "csp: {}", r.csp);
         assert!(r.csp.contains("default-src 'none'"), "csp: {}", r.csp);
+    }
+
+    #[test]
+    fn reinstall_preserves_user_data_declared_in_paths() {
+        // Reinstalling over an existing install must NOT clobber user-edited
+        // files declared in the manifest's `paths` (e.g. auth.toml with real
+        // credentials). Top-level only.
+        let _g = ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        std::env::set_var("LITEDUCK_HOME", tmp.path());
+
+        // v1: install a plugin that declares auth.toml as user-data + ships an
+        // empty placeholder for it.
+        let src1 = tempfile::tempdir().unwrap();
+        fs::write(
+            src1.path().join("plugin.json"),
+            r#"{"id":"acme","name":"Acme","version":"1","kind":"integration",
+                "paths":["~/.liteduck/plugins/acme/auth.toml"]}"#,
+        )
+        .unwrap();
+        fs::write(src1.path().join("auth.toml"), "").unwrap();
+        let installed = install_plugin_inner(src1.path().to_str().unwrap()).unwrap();
+
+        // User fills auth.toml with their real creds (mode 600).
+        let auth_path = PathBuf::from(&installed.dir).join("auth.toml");
+        fs::write(&auth_path, "email=\"a@b\"\ntoken=\"REAL\"\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&auth_path, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+
+        // v2: reinstall from a fresh source that again ships an empty
+        // placeholder auth.toml — the user's real one MUST survive.
+        let src2 = tempfile::tempdir().unwrap();
+        fs::write(
+            src2.path().join("plugin.json"),
+            r#"{"id":"acme","name":"Acme","version":"2","kind":"integration",
+                "paths":["~/.liteduck/plugins/acme/auth.toml"]}"#,
+        )
+        .unwrap();
+        fs::write(src2.path().join("auth.toml"), "").unwrap();
+        install_plugin_inner(src2.path().to_str().unwrap()).unwrap();
+
+        let after = fs::read_to_string(&auth_path).unwrap();
+        assert!(after.contains("REAL"), "user creds were clobbered: {after:?}");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(&auth_path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600, "permissions on preserved file were lost");
+        }
+
+        std::env::remove_var("LITEDUCK_HOME");
     }
 
     #[test]

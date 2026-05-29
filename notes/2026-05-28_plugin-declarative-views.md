@@ -42,8 +42,11 @@ Each command gains an optional `view` field (default `text` = today's behavior):
 #### Plugin-level fields — surface + activity-rail pinning
 
 - **`surface`** (optional, `"panel"` | `"page"`, default `"panel"`):
-  - `"panel"` — the plugin appears inside the Plugins panel (the master-detail list →
-    detail view); today's default.
+  - `"panel"` — was the in-panel master-detail flow; that flow has since been **removed**
+    (the Plugins panel is a pure manager — clicking a plugin opens it as a page). The
+    field is currently a no-op kept for backward compatibility; effectively every plugin
+    behaves like `"page"`. A future revision may either deprecate the field or reintroduce
+    a meaningful panel surface.
   - `"page"` — the plugin opens as a **full page in the editor-area slot**, exactly like
     Git / Settings render full-width. Auto-runs its `default` command as the page body.
     **Open files are preserved** — the editor's open-file tabs are WorkspaceShell state and
