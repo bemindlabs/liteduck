@@ -8,7 +8,6 @@
   "surface": "page",
   "icon": "users",
   "pinned": true,
-  "ui": { "entry": "ui.js", "fallback": "declarative" },
   "paths": [],
   "commands": [
     {
