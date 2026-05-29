@@ -26,6 +26,7 @@ vi.mock("@/lib/plugins", () => ({
   pluginUninstall: vi.fn(),
   pluginRegistryFetch: vi.fn(),
   pluginUiUrl: (id: string) => `plugin://localhost/${id}/`,
+  pluginOpenExternal: vi.fn(),
 }));
 
 import { PluginsPanel } from "./PluginsPanel";

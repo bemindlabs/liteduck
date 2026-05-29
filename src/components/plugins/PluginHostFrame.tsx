@@ -17,7 +17,12 @@
 
 import { useEffect, useRef } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { type InstalledPlugin, pluginRunCommand, pluginUiUrl } from "@/lib/plugins";
+import {
+  type InstalledPlugin,
+  pluginOpenExternal,
+  pluginRunCommand,
+  pluginUiUrl,
+} from "@/lib/plugins";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("PluginHostFrame");
@@ -32,6 +37,11 @@ interface BridgeMessage {
  *  bootstrap posts `ready` as soon as the shell loads, so this only elapses when
  *  the `plugin://` scheme / CSP is misbehaving (e.g. a webview quirk). */
 const READY_TIMEOUT_MS = 3000;
+
+/** Wire-protocol version this host implements. The bootstrap sends `v: 1` and
+ *  the host ignores any message whose `v` doesn't match, with a clear warning so
+ *  a future host upgrade can refuse old plugin bundles loudly instead of silently. */
+const BRIDGE_VERSION = 1;
 
 export function PluginHostFrame({
   plugin,
@@ -61,7 +71,15 @@ export function PluginHostFrame({
       const win = frameRef.current?.contentWindow;
       if (!win || e.source !== win) return;
       const m = e.data as BridgeMessage | null;
-      if (m?.v !== 1 || typeof m.type !== "string") return;
+      if (!m || typeof m.type !== "string") return;
+      if (m.v !== BRIDGE_VERSION) {
+        // Same-frame source, unknown wire version → loud refusal rather than
+        // silently running mismatched code.
+        logger.warn(
+          `plugin '${plugin.id}' sent message with unsupported bridge version v=${String(m.v)} (host expects ${BRIDGE_VERSION})`,
+        );
+        return;
+      }
 
       if (m.type === "ready") {
         ready = true;
@@ -120,6 +138,19 @@ export function PluginHostFrame({
       if (m.type === "log") {
         const p = (m.payload ?? {}) as { msg?: string };
         logger.info(`[plugin:${plugin.id}] ${p.msg ?? ""}`);
+        return;
+      }
+
+      if (m.type === "open-external") {
+        const { url } = (m.payload ?? {}) as { url?: string };
+        if (typeof url !== "string") return;
+        // Host-side validation is authoritative (plugins.rs `validate_open_external`):
+        // https-only + the plugin must have declared `network: true`. Errors are
+        // logged but never thrown back into the frame (no command-result for this
+        // fire-and-forget capability).
+        void pluginOpenExternal(plugin.id, url).catch((err: unknown) => {
+          logger.warn(`plugin '${plugin.id}' open-external denied: ${String(err)}`);
+        });
       }
     }
 

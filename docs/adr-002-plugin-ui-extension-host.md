@@ -113,8 +113,10 @@ gating, phasing — is specified in `notes/2026-05-28_plugin-ui-host-design.md`.
 - [x] Phase 3a — author SDK: typed `window.liteduck` bridge (`liteduck-plugins/sdk/bridge.d.ts`),
       authoring guide, a copy-paste `templates/ui-plugin/`, the `ui` JSON-schema, and a bundling
       recipe.
-- [ ] Phase 3b — capability grants (gated `open-external`), bridge versioning policy, and
-      (optional) bundle signing.
+- [x] Phase 3b — gated `open-external` capability (`https://` only, requires manifest
+      `network: true`) + bridge versioning constant (`BRIDGE_VERSION = 1`, loud refusal of
+      unknown versions). Authoritative gating lives in `plugins::validate_open_external`.
+- [ ] Phase 3c — (optional) bundle signing for third-party UI plugins.
 
 ---
 

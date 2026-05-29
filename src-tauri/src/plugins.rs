@@ -615,6 +615,42 @@ pub fn uninstall_plugin_inner(id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Gate the plugin UI `open-external` capability (ADR-002 Phase 3b). Checks the
+/// plugin-id shape + the URL scheme before resolving the manifest so the cheap
+/// rejections are testable without a real install. Allowed only when:
+///   • the URL is `https://` (no `http`, `file:`, `javascript:`, opaque schemes),
+///   • the plugin is installed, and
+///   • its manifest declares `network: true` (the capability the install consent
+///     surfaced). The shell-command sandbox is unchanged: nothing else is granted.
+pub fn validate_open_external(plugin_id: &str, url: &str) -> Result<(), String> {
+    if plugin_id.is_empty()
+        || plugin_id.contains('/')
+        || plugin_id.contains('\\')
+        || plugin_id.contains("..")
+    {
+        return Err(format!("invalid plugin id '{plugin_id}'"));
+    }
+    // Case-insensitive scheme check — and *only* https:// (no protocol-relative
+    // `//foo`, no `http://`). Length guard avoids absurd payloads.
+    if url.len() > 4096 {
+        return Err("url too long".to_string());
+    }
+    let lower = url.to_ascii_lowercase();
+    if !lower.starts_with("https://") {
+        return Err(format!("open-external only allows https:// URLs (got: {url})"));
+    }
+    let plugin = list_plugins_inner()?
+        .into_iter()
+        .find(|p| p.manifest.id == plugin_id)
+        .ok_or_else(|| format!("plugin '{plugin_id}' is not installed"))?;
+    if !plugin.manifest.network {
+        return Err(format!(
+            "plugin '{plugin_id}' does not declare `network: true` — open-external denied"
+        ));
+    }
+    Ok(())
+}
+
 // ── Plugin UI host (`plugin://` custom scheme — ADR-002) ──────────────────────
 //
 // A plugin's executable UI is served from a SEPARATE origin (the `plugin://`
@@ -656,7 +692,8 @@ const PLUGIN_BOOTSTRAP_JS: &str = r#"
         parent.postMessage({v:1,type:'run-command',payload:{requestId:id,commandId:commandId,params:params||{}}},'*');
       });
     },
-    log:function(level,msg){ parent.postMessage({v:1,type:'log',payload:{level:level,msg:String(msg)}},'*'); }
+    log:function(level,msg){ parent.postMessage({v:1,type:'log',payload:{level:level,msg:String(msg)}},'*'); },
+    openExternal:function(url){ parent.postMessage({v:1,type:'open-external',payload:{url:String(url)}},'*'); }
   };
   window.addEventListener('message',function(e){
     var m=e.data; if(!m||m.v!==1) return;
@@ -903,6 +940,22 @@ pub fn plugin_run_command(
     )
 }
 
+/// Open an external URL on behalf of a plugin's UI (ADR-002 capability grant).
+/// Validates via [`validate_open_external`] before delegating to the system
+/// opener — only `https://` URLs and only plugins that declared `network: true`.
+#[tauri::command]
+pub fn plugin_open_external(
+    app: tauri::AppHandle,
+    plugin_id: String,
+    url: String,
+) -> Result<(), String> {
+    validate_open_external(&plugin_id, &url)?;
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| format!("failed to open url: {e}"))
+}
+
 /// Fetch the published plugin registry (`registry.json`) and return its entries.
 /// `registry_url` overrides the official default
 /// (`bemindlabs/liteduck-plugins@main`). Read-only — no disk writes.
@@ -1035,6 +1088,26 @@ mod tests {
         // Every response carries the locked-down plugin-frame CSP.
         assert!(r.csp.contains("connect-src 'none'"), "csp: {}", r.csp);
         assert!(r.csp.contains("default-src 'none'"), "csp: {}", r.csp);
+    }
+
+    #[test]
+    fn validate_open_external_cheap_rejections() {
+        // The id-shape + URL-scheme checks fire before any filesystem access,
+        // so they're testable without an installed plugin / home override.
+        assert!(validate_open_external("../bad", "https://example.com")
+            .unwrap_err()
+            .contains("invalid plugin id"));
+        assert!(validate_open_external("ok", "http://example.com")
+            .unwrap_err()
+            .contains("https://"));
+        assert!(validate_open_external("ok", "javascript:alert(1)")
+            .unwrap_err()
+            .contains("https://"));
+        assert!(validate_open_external("ok", "//example.com")
+            .unwrap_err()
+            .contains("https://"));
+        let huge = format!("https://{}", "a".repeat(5000));
+        assert!(validate_open_external("ok", &huge).unwrap_err().contains("too long"));
     }
 
     #[test]

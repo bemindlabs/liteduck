@@ -171,6 +171,15 @@ export async function pluginRunCommand(
 }
 
 /**
+ * Open an external URL on behalf of a plugin's UI (ADR-002 Phase 3b capability).
+ * Gated host-side: only `https://` URLs, only plugins that declared `network: true`.
+ * The plugin UI calls this via `window.liteduck.openExternal(url)` in its iframe.
+ */
+export async function pluginOpenExternal(pluginId: string, url: string): Promise<void> {
+  return invoke<undefined>("plugin_open_external", { pluginId, url });
+}
+
+/**
  * Build the `plugin://` URL for a plugin's UI host document (ADR-002). The UI is
  * served from this **separate origin** (cross-origin to the host app, under its
  * own CSP) and embedded in an iframe — the host never reads/executes the bundle
