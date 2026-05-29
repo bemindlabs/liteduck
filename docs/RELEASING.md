@@ -29,7 +29,8 @@ is just a git tag plus a one-line bump of the Homebrew formula.
    git push origin main --tags
    ```
 
-4. Update the Homebrew formula (version + `sha256`) — see below.
+4. Update the Homebrew formula (`url` + `sha256`; the version is scanned from
+   the url) — see below.
 
 That's it. Users pick up the new version with `brew upgrade liteduck`, which
 re-compiles the tagged source.
@@ -51,7 +52,8 @@ curl -fsSL -o "v${VERSION}.tar.gz" \
   "https://github.com/bemindlabs/liteduck/archive/refs/tags/v${VERSION}.tar.gz"
 shasum -a 256 "v${VERSION}.tar.gz"   # → the new sha256
 
-# 2. In HomebrewFormula/liteduck.rb: bump `url`, `version`, paste the sha256.
+# 2. In HomebrewFormula/liteduck.rb: bump `url` and paste the sha256
+#    (version is scanned from the url).
 # 3. Validate, commit, push.
 brew audit HomebrewFormula/liteduck.rb
 brew style HomebrewFormula/liteduck.rb
@@ -79,7 +81,7 @@ bump version (package.json / tauri.conf.json / Cargo.toml)
 git tag v<version> && git push --tags
         │
         ▼
-bump HomebrewFormula/liteduck.rb (url + version + sha256) && push
+bump HomebrewFormula/liteduck.rb (url + sha256) && push
         ▼
 users run `brew upgrade liteduck`  →  brew rebuilds from the tagged source
 ```

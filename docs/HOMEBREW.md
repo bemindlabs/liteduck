@@ -88,7 +88,7 @@ curl -fsSL -o "v${VERSION}.tar.gz" \
 shasum -a 256 "v${VERSION}.tar.gz"   # → new sha256
 
 # 2. In HomebrewFormula/liteduck.rb (this repo — the only copy):
-#    bump `url`, `version`, and paste the new sha256.
+#    bump `url` and paste the new sha256 (version is scanned from the url).
 # 3. Validate, commit, push.
 brew audit HomebrewFormula/liteduck.rb
 brew style HomebrewFormula/liteduck.rb

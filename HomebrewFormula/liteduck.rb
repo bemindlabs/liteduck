@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # LiteDuck — built from source.
 #
 # This is a build-from-source formula (not a cask): `brew install` compiles the
@@ -9,13 +11,13 @@
 # un-notarized*. macOS Gatekeeper may refuse to open it on the first launch;
 # right-click → Open (or `xattr -dr com.apple.quarantine` on the .app) clears it.
 #
-# On each release: bump `version` below and replace `sha256` with the digest of
-# the new source tarball — see docs/RELEASING.md and docs/HOMEBREW.md.
+# On each release: bump `url` to the new tag and replace `sha256` with the digest
+# of the new source tarball (the version is scanned from the url) — see
+# docs/RELEASING.md and docs/HOMEBREW.md.
 class Liteduck < Formula
   desc "Lightweight code editor with file browser, terminal, and Git"
   homepage "https://buildonclaw.cloud/products/liteduck"
   url "https://github.com/bemindlabs/liteduck/archive/refs/tags/v2026.5.29.tar.gz"
-  version "2026.5.29"
   sha256 "f8d7623bc8493c9d7d425c98516ba2a82b458bd0b8480e6c20cfabf4c1af6438"
   license "MIT"
 
@@ -53,7 +55,7 @@ class Liteduck < Formula
   end
 
   test do
-    assert_predicate prefix/"LiteDuck.app", :exist?
+    assert_path_exists prefix/"LiteDuck.app"
     assert_predicate prefix/"LiteDuck.app/Contents/MacOS/LiteDuck", :executable?
   end
 end
