@@ -101,9 +101,21 @@ export interface PluginsPanelProps {
    * moment it is installed/uninstalled, no reload needed.
    */
   onPluginsChanged?: () => void;
+  /**
+   * When provided, clicking a plugin in the Installed list opens it as its own
+   * full-area page (the editor-area surface used by pinned rail icons) instead
+   * of navigating to an in-panel detail "second page". This keeps the Plugins
+   * panel a pure *manager* (install / uninstall / browse) and avoids duplicating
+   * the per-plugin view that already lives on the dedicated page.
+   */
+  onOpenPluginPage?: (pluginId: string) => void;
 }
 
-export function PluginsPanel({ initialPluginId, onPluginsChanged }: PluginsPanelProps = {}) {
+export function PluginsPanel({
+  initialPluginId,
+  onPluginsChanged,
+  onOpenPluginPage,
+}: PluginsPanelProps = {}) {
   // Full-page mode: opened to a single plugin from the activity rail. Hides the
   // master list / tabs and shows just that plugin's detail page (no Back).
   const pageMode = initialPluginId !== undefined;
@@ -264,16 +276,23 @@ export function PluginsPanel({ initialPluginId, onPluginsChanged }: PluginsPanel
     [workspace],
   );
 
-  // When a plugin is opened, auto-run its `default: true` command (landing
-  // view) — but only once per selection and only if nothing has run yet.
+  // When a plugin is opened from the Installed list, prefer the host's
+  // **dedicated page surface** (the same view the pinned rail icon opens) so
+  // the Plugins panel never duplicates the per-plugin page as an in-panel
+  // "second page". Fallback (no host handler, e.g. in tests) is the legacy
+  // in-panel detail with its auto-run of the default command.
   const openPlugin = useCallback(
     (plugin: InstalledPlugin) => {
+      if (onOpenPluginPage) {
+        onOpenPluginPage(plugin.id);
+        return;
+      }
       setSelectedId(plugin.id);
       setRun(null);
       const landing = plugin.commands.find((c) => c.default);
       if (landing) void handleRun(plugin, landing);
     },
-    [handleRun],
+    [handleRun, onOpenPluginPage],
   );
 
   // Full-page mode: once the plugin list resolves, open the requested plugin so

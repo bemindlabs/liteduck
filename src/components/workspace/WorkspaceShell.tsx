@@ -347,7 +347,10 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
             ) : showPlugins ? (
               <Suspense fallback={<PageLoading />}>
                 <div className="h-full overflow-hidden">
-                  <PluginsPanel onPluginsChanged={() => void refreshPlugins()} />
+                  <PluginsPanel
+                    onPluginsChanged={() => void refreshPlugins()}
+                    onOpenPluginPage={handleOpenPluginPage}
+                  />
                 </div>
               </Suspense>
             ) : (
