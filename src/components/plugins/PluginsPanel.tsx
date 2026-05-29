@@ -140,7 +140,7 @@ export function PluginsPanel({
   // uninstall) — clicking a row opens the plugin's **dedicated page** via
   // onOpenPluginPage. The only PluginDetail render path is the page-mode
   // surface that opens directly to a single plugin (rail-pinned or list-click).
-  const selected = pageMode ? plugins.find((p) => p.id === initialPluginId) ?? null : null;
+  const selected = pageMode ? (plugins.find((p) => p.id === initialPluginId) ?? null) : null;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -258,9 +258,7 @@ export function PluginsPanel({
           view: command.view,
           raw: result.stdout,
           error:
-            result.exit_code !== 0
-              ? result.stderr.trim() || `exited ${result.exit_code}`
-              : null,
+            result.exit_code !== 0 ? result.stderr.trim() || `exited ${result.exit_code}` : null,
         });
       } catch (e) {
         setRun({
@@ -541,11 +539,7 @@ function PluginDetail({
   plugin: InstalledPlugin;
   run: CommandRun | null;
   busy: string | null;
-  onRun: (
-    plugin: InstalledPlugin,
-    command: PluginCommand,
-    params?: Record<string, string>,
-  ) => void;
+  onRun: (plugin: InstalledPlugin, command: PluginCommand, params?: Record<string, string>) => void;
   onUninstall: (id: string) => void;
 }) {
   const activeRun = run?.pluginId === plugin.id ? run : null;
@@ -559,9 +553,7 @@ function PluginDetail({
   const openCommand = plugin.commands.find((c) => c.id === openForm) ?? null;
   // The landing command — re-run by the Refresh control.
   const defaultCommand = plugin.commands.find((c) => c.default) ?? null;
-  const refreshBusy = defaultCommand
-    ? busy === `${plugin.id}:${defaultCommand.id}`
-    : false;
+  const refreshBusy = defaultCommand ? busy === `${plugin.id}:${defaultCommand.id}` : false;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -613,76 +605,76 @@ function PluginDetail({
         </div>
       ) : (
         <>
-      {/* Command toolbar */}
-      {plugin.commands.length > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-y border-[var(--color-border)] bg-[var(--color-muted)]/30 px-5 py-2.5">
-          {plugin.commands.map((command) => (
-            <CommandButton
-              key={command.id}
-              command={command}
-              active={activeRun?.commandId === command.id}
-              busy={busy === `${plugin.id}:${command.id}`}
-              expanded={openForm === command.id}
-              onClick={() => {
-                if (command.args.length > 0) {
-                  setOpenForm((id) => (id === command.id ? null : command.id));
-                } else {
-                  setOpenForm(null);
-                  onRun(plugin, command);
-                }
-              }}
-            />
-          ))}
-          {defaultCommand && (
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Re-run the default command"
-              onClick={() => {
-                setOpenForm(null);
-                onRun(plugin, defaultCommand);
-              }}
-              disabled={refreshBusy}
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", refreshBusy && "animate-spin")} />
-              Refresh
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Inline param form for the expanded arg-command (above the output). */}
-      {openCommand && (
-        <InlineParamForm
-          key={openCommand.id}
-          plugin={plugin}
-          command={openCommand}
-          busy={busy === `${plugin.id}:${openCommand.id}`}
-          onSubmit={(params) => onRun(plugin, openCommand, params)}
-        />
-      )}
-
-      {/* Output — the hero. Fills the remaining height and scrolls on its own. */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        {activeRun ? (
-          activeRun.error ? (
-            <div className="space-y-2">
-              <pre className="overflow-auto rounded border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 p-3 text-xs text-[var(--color-destructive)]">
-                {activeRun.error}
-              </pre>
-              {activeRun.raw.trim() && <OutputView view={activeRun.view} raw={activeRun.raw} />}
+          {/* Command toolbar */}
+          {plugin.commands.length > 0 && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-y border-[var(--color-border)] bg-[var(--color-muted)]/30 px-5 py-2.5">
+              {plugin.commands.map((command) => (
+                <CommandButton
+                  key={command.id}
+                  command={command}
+                  active={activeRun?.commandId === command.id}
+                  busy={busy === `${plugin.id}:${command.id}`}
+                  expanded={openForm === command.id}
+                  onClick={() => {
+                    if (command.args.length > 0) {
+                      setOpenForm((id) => (id === command.id ? null : command.id));
+                    } else {
+                      setOpenForm(null);
+                      onRun(plugin, command);
+                    }
+                  }}
+                />
+              ))}
+              {defaultCommand && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Re-run the default command"
+                  onClick={() => {
+                    setOpenForm(null);
+                    onRun(plugin, defaultCommand);
+                  }}
+                  disabled={refreshBusy}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", refreshBusy && "animate-spin")} />
+                  Refresh
+                </Button>
+              )}
             </div>
-          ) : (
-            <OutputView view={activeRun.view} raw={activeRun.raw} />
-          )
-        ) : (
-          <div className="rounded border border-dashed border-[var(--color-border)] p-6 text-center text-xs text-[var(--color-muted-foreground)]">
-            {plugin.commands.length > 0
-              ? "Run a command above to see its output here."
-              : "This plugin contributes no commands."}
+          )}
+
+          {/* Inline param form for the expanded arg-command (above the output). */}
+          {openCommand && (
+            <InlineParamForm
+              key={openCommand.id}
+              plugin={plugin}
+              command={openCommand}
+              busy={busy === `${plugin.id}:${openCommand.id}`}
+              onSubmit={(params) => onRun(plugin, openCommand, params)}
+            />
+          )}
+
+          {/* Output — the hero. Fills the remaining height and scrolls on its own. */}
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            {activeRun ? (
+              activeRun.error ? (
+                <div className="space-y-2">
+                  <pre className="overflow-auto rounded border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 p-3 text-xs text-[var(--color-destructive)]">
+                    {activeRun.error}
+                  </pre>
+                  {activeRun.raw.trim() && <OutputView view={activeRun.view} raw={activeRun.raw} />}
+                </div>
+              ) : (
+                <OutputView view={activeRun.view} raw={activeRun.raw} />
+              )
+            ) : (
+              <div className="rounded border border-dashed border-[var(--color-border)] p-6 text-center text-xs text-[var(--color-muted-foreground)]">
+                {plugin.commands.length > 0
+                  ? "Run a command above to see its output here."
+                  : "This plugin contributes no commands."}
+              </div>
+            )}
           </div>
-        )}
-      </div>
         </>
       )}
     </div>
@@ -723,11 +715,7 @@ function CommandButton({
       title={command.title}
       aria-expanded={hasArgs ? expanded : undefined}
     >
-      {busy ? (
-        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Play className="h-3.5 w-3.5" />
-      )}
+      {busy ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
       {shortCommandLabel(command.title)}
       {hasArgs &&
         (expanded ? (

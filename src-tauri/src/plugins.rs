@@ -738,7 +738,9 @@ pub fn validate_open_external(plugin_id: &str, url: &str) -> Result<(), String> 
     }
     let lower = url.to_ascii_lowercase();
     if !lower.starts_with("https://") {
-        return Err(format!("open-external only allows https:// URLs (got: {url})"));
+        return Err(format!(
+            "open-external only allows https:// URLs (got: {url})"
+        ));
     }
     let plugin = list_plugins_inner()?
         .into_iter()
@@ -774,8 +776,7 @@ style-src 'unsafe-inline'; img-src plugin: http://plugin.localhost data:; \
 font-src plugin: http://plugin.localhost data:; connect-src 'none'; \
 base-uri 'none'; form-action 'none'";
 
-const PLUGIN_SHELL_CSS: &str =
-    "html,body{margin:0;height:100%;color-scheme:light dark}\
+const PLUGIN_SHELL_CSS: &str = "html,body{margin:0;height:100%;color-scheme:light dark}\
      body{font:13px/1.5 -apple-system,system-ui,sans-serif}";
 
 /// Host-authored bridge bootstrap injected into every plugin UI shell. Exposes a
@@ -1117,8 +1118,14 @@ mod tests {
         assert!(json.contains("\"view\":\"table\""), "got: {json}");
         assert!(json.contains("\"default\":true"), "got: {json}");
         let json2 = serde_json::to_string(&m2.commands[0]).unwrap();
-        assert!(!json2.contains("view"), "absent view should be omitted: {json2}");
-        assert!(!json2.contains("default"), "absent default should be omitted: {json2}");
+        assert!(
+            !json2.contains("view"),
+            "absent view should be omitted: {json2}"
+        );
+        assert!(
+            !json2.contains("default"),
+            "absent default should be omitted: {json2}"
+        );
     }
 
     #[test]
@@ -1147,7 +1154,10 @@ mod tests {
         assert!(json.contains("\"icon\":\"users\""), "got: {json}");
         assert!(json.contains("\"pinned\":true"), "got: {json}");
         let json2 = serde_json::to_string(&m2).unwrap();
-        assert!(!json2.contains("surface"), "absent surface omitted: {json2}");
+        assert!(
+            !json2.contains("surface"),
+            "absent surface omitted: {json2}"
+        );
         assert!(!json2.contains("icon"), "absent icon omitted: {json2}");
         assert!(!json2.contains("pinned"), "absent pinned omitted: {json2}");
     }
@@ -1234,7 +1244,10 @@ mod tests {
         install_plugin_inner(src2.path().to_str().unwrap()).unwrap();
 
         let after = fs::read_to_string(&auth_path).unwrap();
-        assert!(after.contains("REAL"), "user creds were clobbered: {after:?}");
+        assert!(
+            after.contains("REAL"),
+            "user creds were clobbered: {after:?}"
+        );
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -1262,14 +1275,22 @@ mod tests {
             .unwrap_err()
             .contains("https://"));
         let huge = format!("https://{}", "a".repeat(5000));
-        assert!(validate_open_external("ok", &huge).unwrap_err().contains("too long"));
+        assert!(validate_open_external("ok", &huge)
+            .unwrap_err()
+            .contains("too long"));
     }
 
     #[test]
     fn plugin_shell_html_embeds_entry_and_bootstrap() {
         let html = plugin_shell_html("ui.js");
-        assert!(html.contains("src=\"./ui.js\""), "shell must load the entry: {html}");
-        assert!(html.contains("window.liteduck"), "shell must include the bridge bootstrap");
+        assert!(
+            html.contains("src=\"./ui.js\""),
+            "shell must load the entry: {html}"
+        );
+        assert!(
+            html.contains("window.liteduck"),
+            "shell must include the bridge bootstrap"
+        );
         assert!(html.contains("type='run-command'") || html.contains("run-command"));
     }
 

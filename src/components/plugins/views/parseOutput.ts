@@ -108,8 +108,7 @@ export function parseTable(raw: string): ParseResult<TableData> {
 
   return {
     ok: false,
-    error:
-      'expected { "columns": [...], "rows": [[...]] } or an array of objects for view "table"',
+    error: 'expected { "columns": [...], "rows": [[...]] } or an array of objects for view "table"',
   };
 }
 
@@ -202,9 +201,7 @@ export function parseKeyValue(raw: string): ParseResult<KeyValueData> {
   }
 
   if (isRecord(value)) {
-    const pairs = Object.entries(value).map(
-      ([k, v]) => [k, cellText(v)] as [string, string],
-    );
+    const pairs = Object.entries(value).map(([k, v]) => [k, cellText(v)] as [string, string]);
     return { ok: true, data: { pairs } };
   }
 

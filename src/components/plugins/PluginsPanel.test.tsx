@@ -115,7 +115,12 @@ describe("PluginsPanel command toolbar", () => {
     // empty project/jql/max_results are dropped so the script's defaults apply).
     await user.click(screen.getByRole("button", { name: /^Run$/ }));
     await waitFor(() => {
-      expect(pluginRunCommand).toHaveBeenCalledWith("jira", "jira.list", { assignee: "me" }, undefined);
+      expect(pluginRunCommand).toHaveBeenCalledWith(
+        "jira",
+        "jira.list",
+        { assignee: "me" },
+        undefined,
+      );
     });
   });
 

@@ -191,10 +191,7 @@ export function Markdown({ content, className }: MarkdownProps) {
         // Forward the sanitized `align` attr (README HTML uses
         // `<p align="center">`); all other props come pre-sanitized.
         p: ({ node: _node, children, ...props }) => (
-          <p
-            {...props}
-            className="text-sm leading-relaxed text-[var(--color-foreground)] mb-3"
-          >
+          <p {...props} className="text-sm leading-relaxed text-[var(--color-foreground)] mb-3">
             {children}
           </p>
         ),
