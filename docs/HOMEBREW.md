@@ -11,20 +11,23 @@ source.
 End users install with:
 
 ```bash
+brew tap bemindlabs/liteduck https://github.com/bemindlabs/liteduck
 brew install bemindlabs/liteduck/liteduck
 ```
 
-That shorthand resolves to the tap repository **`bemindlabs/homebrew-liteduck`**
-(Homebrew strips the `homebrew-` prefix) and the formula `Formula/liteduck.rb`
-inside it. The source archive it downloads is the GitHub-generated tarball for the
-release tag in **`bemindlabs/liteduck`**.
+There is **no separate `homebrew-liteduck` tap repo**. The formula lives in the
+LiteDuck project repo itself, in its `HomebrewFormula/` directory — a directory
+name Homebrew recognises specifically so a project can host its own formula. The
+two-argument `brew tap <name> <url>` form points the tap straight at
+`github.com/bemindlabs/liteduck` (the one-argument shorthand can't be used because
+it would look for a `homebrew-`-prefixed repo). The source archive the formula
+downloads is the GitHub-generated tarball for the release tag in the same repo.
 
 ## Moving parts
 
 | Thing | Where | Role |
 |---|---|---|
-| Formula source of truth | this repo → [`HomebrewFormula/liteduck.rb`](../HomebrewFormula/liteduck.rb) | Reviewed copy, kept in version control next to the app |
-| Published formula | `bemindlabs/homebrew-liteduck` → `Formula/liteduck.rb` | What `brew` actually reads |
+| Formula (source of truth + what `brew` reads) | this repo → [`HomebrewFormula/liteduck.rb`](../HomebrewFormula/liteduck.rb) | One copy, in version control next to the app; tapped directly |
 | Source archive | `bemindlabs/liteduck` → tag `v<version>` | The `.tar.gz` the formula downloads and compiles |
 
 The formula downloads one URL — the GitHub auto-generated source archive for the
@@ -46,68 +49,54 @@ user how to allow it (right-click → Open, or `xattr -dr com.apple.quarantine`)
 This is the deliberate cost of source distribution; signing would require a build
 pipeline and Apple credentials, which this project intentionally does not run.
 
-## One-time: create and publish the tap
+## No separate tap repo
 
-1. **Create the GitHub repo** `bemindlabs/homebrew-liteduck` (public). The
-   `homebrew-` prefix is required — `brew tap bemindlabs/liteduck` looks for it.
+The LiteDuck project repo **is** the tap. Because the formula lives in
+`HomebrewFormula/liteduck.rb` (already committed and version-controlled), there is
+nothing to create or seed — users tap the repo directly with the two-argument
+form and Homebrew finds the formula in that directory.
 
-2. **Lay out the tap:**
+```bash
+brew tap bemindlabs/liteduck https://github.com/bemindlabs/liteduck
+brew install bemindlabs/liteduck/liteduck
+```
 
-   ```bash
-   git clone https://github.com/bemindlabs/homebrew-liteduck.git
-   cd homebrew-liteduck
-   mkdir -p Formula
-   # Seed the published formula from this repo's source-of-truth copy:
-   cp /path/to/liteduck/HomebrewFormula/liteduck.rb Formula/liteduck.rb
-   ```
+**Smoke-test the end-user path** (this compiles from source, so it is slow):
 
-3. **Fill in the real sha256** (the source copy ships a zero-placeholder on
-   purpose — see "Checksum" below), then validate:
+```bash
+brew tap bemindlabs/liteduck https://github.com/bemindlabs/liteduck
+brew install bemindlabs/liteduck/liteduck
+brew test liteduck
+brew untap bemindlabs/liteduck   # reset
+```
 
-   ```bash
-   brew audit --new Formula/liteduck.rb
-   brew style Formula/liteduck.rb
-   ```
-
-4. **Commit and push:**
-
-   ```bash
-   git add Formula/liteduck.rb
-   git commit -m "Add LiteDuck formula"
-   git push origin main
-   ```
-
-5. **Smoke-test the end-user path** (this compiles from source, so it is slow):
-
-   ```bash
-   brew install bemindlabs/liteduck/liteduck
-   brew test liteduck
-   brew uninstall liteduck
-   ```
+> A dedicated `homebrew-liteduck` tap repo (so the shorter
+> `brew tap bemindlabs/liteduck` works without the explicit URL) is a possible
+> future change, but it would mean keeping two copies of the formula in sync.
+> The single-repo approach above keeps one source of truth.
 
 ## Bumping the formula on each release
 
 There is no automation — bump by hand on every tag:
 
 ```bash
-VERSION=2026.5.3
+VERSION=2026.5.29
 
 # 1. Fetch the source tarball GitHub auto-generates for the tag and hash it.
 curl -fsSL -o "v${VERSION}.tar.gz" \
   "https://github.com/bemindlabs/liteduck/archive/refs/tags/v${VERSION}.tar.gz"
 shasum -a 256 "v${VERSION}.tar.gz"   # → new sha256
 
-# 2. In Formula/liteduck.rb (tap) AND HomebrewFormula/liteduck.rb (this repo):
+# 2. In HomebrewFormula/liteduck.rb (this repo — the only copy):
 #    bump `url`, `version`, and paste the new sha256.
 # 3. Validate, commit, push.
-brew audit Formula/liteduck.rb
-brew style Formula/liteduck.rb
+brew audit HomebrewFormula/liteduck.rb
+brew style HomebrewFormula/liteduck.rb
 git commit -am "liteduck ${VERSION}" && git push
 ```
 
-> **Keep the two copies in sync.** The reviewed source of truth here
-> (`HomebrewFormula/liteduck.rb`) must never drift from what the tap serves
-> (`bemindlabs/homebrew-liteduck` → `Formula/liteduck.rb`).
+> **One copy.** Because the formula is tapped straight from this repo, there is no
+> second copy to keep in sync — bump `HomebrewFormula/liteduck.rb` and push.
 
 ## Checksum
 

@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
-  <a href="https://github.com/bemindlabs/homebrew-liteduck"><img src="https://img.shields.io/badge/Homebrew-FBB040?logo=homebrew&logoColor=black" alt="Homebrew" /></a>
+  <a href="https://github.com/bemindlabs/liteduck/blob/main/HomebrewFormula/liteduck.rb"><img src="https://img.shields.io/badge/Homebrew-FBB040?logo=homebrew&logoColor=black" alt="Homebrew" /></a>
   <a href="https://buildonclaw.cloud/products/liteduck"><img src="https://img.shields.io/badge/Website-buildonclaw.cloud-818cf8" alt="Website" /></a>
 </p>
 
@@ -22,12 +22,14 @@
 ### Homebrew (macOS)
 
 ```bash
+brew tap bemindlabs/liteduck https://github.com/bemindlabs/liteduck
 brew install bemindlabs/liteduck/liteduck
 ```
 
-This installs from the tap **`bemindlabs/homebrew-liteduck`** and **builds LiteDuck
-from source** — Homebrew compiles the Tauri app locally with Node + Rust. There is
-no prebuilt binary to download.
+The formula lives in this repo's `HomebrewFormula/` directory — there is **no
+separate tap repo**, so `brew tap` points straight at the LiteDuck repository.
+Homebrew then **builds LiteDuck from source** — it compiles the Tauri app locally
+with Node + Rust. There is no prebuilt binary to download.
 
 Update with Homebrew (there is **no in-app auto-updater**):
 

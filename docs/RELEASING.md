@@ -38,29 +38,35 @@ re-compiles the tagged source.
 
 ## Updating the Homebrew formula
 
-The tap repo **`bemindlabs/homebrew-liteduck`** serves `Formula/liteduck.rb`. The
-reviewed source of truth lives in this repo at
-[`HomebrewFormula/liteduck.rb`](../HomebrewFormula/liteduck.rb). On each release,
-update **both** copies:
+The formula lives in this repo at
+[`HomebrewFormula/liteduck.rb`](../HomebrewFormula/liteduck.rb) and is tapped
+straight from here — there is **no separate `homebrew-liteduck` tap repo and no
+second copy to mirror**. On each release, bump the one file:
 
 ```bash
-VERSION=2026.5.3
+VERSION=2026.5.29
 
 # 1. Fetch the source tarball GitHub auto-generates for the tag and hash it.
 curl -fsSL -o "v${VERSION}.tar.gz" \
   "https://github.com/bemindlabs/liteduck/archive/refs/tags/v${VERSION}.tar.gz"
 shasum -a 256 "v${VERSION}.tar.gz"   # → the new sha256
 
-# 2. In HomebrewFormula/liteduck.rb (and the tap's Formula/liteduck.rb):
-#    - bump `url`, `version`
-#    - paste the sha256
-# 3. Validate and push the tap.
-brew audit --new Formula/liteduck.rb
-brew style Formula/liteduck.rb
+# 2. In HomebrewFormula/liteduck.rb: bump `url`, `version`, paste the sha256.
+# 3. Validate, commit, push.
+brew audit HomebrewFormula/liteduck.rb
+brew style HomebrewFormula/liteduck.rb
 git commit -am "liteduck <version>" && git push
 ```
 
-See [HOMEBREW.md](HOMEBREW.md) for the full tap layout and one-time setup.
+Users install / upgrade with:
+
+```bash
+brew tap bemindlabs/liteduck https://github.com/bemindlabs/liteduck
+brew install bemindlabs/liteduck/liteduck
+brew upgrade liteduck
+```
+
+See [HOMEBREW.md](HOMEBREW.md) for how the single-repo tap works.
 
 ---
 
@@ -73,8 +79,7 @@ bump version (package.json / tauri.conf.json / Cargo.toml)
 git tag v<version> && git push --tags
         │
         ▼
-update HomebrewFormula/liteduck.rb (url + version + sha256)
-        │  mirror into bemindlabs/homebrew-liteduck → Formula/liteduck.rb
+bump HomebrewFormula/liteduck.rb (url + version + sha256) && push
         ▼
 users run `brew upgrade liteduck`  →  brew rebuilds from the tagged source
 ```

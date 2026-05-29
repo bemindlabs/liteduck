@@ -43,9 +43,12 @@ CI release pipeline, DMG releases, and in-app auto-updater have all been removed
 
 - **Added** — `HomebrewFormula/liteduck.rb` rewritten from a cask (prebuilt DMG)
   into a formula that compiles the Tauri app from the tagged GitHub source archive.
-  Install with `brew install bemindlabs/liteduck/liteduck`; update with
-  `brew upgrade liteduck`. The build is unsigned/un-notarized (Gatekeeper may need
-  right-click → Open on first launch) — the deliberate trade-off of source dist.
+  The LiteDuck repo doubles as its own Homebrew tap (no separate
+  `homebrew-liteduck` repo): install with
+  `brew tap bemindlabs/liteduck https://github.com/bemindlabs/liteduck` then
+  `brew install bemindlabs/liteduck/liteduck`; update with `brew upgrade liteduck`.
+  The build is unsigned/un-notarized (Gatekeeper may need right-click → Open on
+  first launch) — the deliberate trade-off of source dist.
 - **Removed** — in-app **auto-updater** (`updater.rs`, `src/lib/updater.ts`, the
   `UpdateChecker`/`UpdateDialog` UI, the "Check for Updates" menu item and its
   24-hour background check). The About section now just shows the version and
