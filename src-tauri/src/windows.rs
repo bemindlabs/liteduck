@@ -281,4 +281,55 @@ mod tests {
             _ => panic!("expected WebviewUrl::App"),
         }
     }
+
+    #[test]
+    fn unique_label_avoids_existing() {
+        let mut existing = HashSet::new();
+        let first = unique_window_label(&existing);
+        existing.insert(first.clone());
+        let second = unique_window_label(&existing);
+        assert_ne!(first, second);
+        assert!(!existing.contains(&second));
+        assert!(second.starts_with("window-"));
+    }
+
+    #[test]
+    fn registry_round_trips_upsert_list_remove() {
+        // Serialise against other tests that mutate LITEDUCK_HOME, then point
+        // the registry at a throwaway home so we never touch the real
+        // ~/.liteduck/windows.json.
+        let _guard = crate::test_env::ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("LITEDUCK_HOME", tmp.path().to_str().unwrap());
+
+        // Empty registry to start.
+        assert!(window_list().is_empty());
+
+        // Insert two windows.
+        upsert_window("main", Some("/ws/a".to_string()));
+        upsert_window("window-abc", Some("/ws/b".to_string()));
+        let listed = window_list();
+        assert_eq!(listed.len(), 2);
+
+        // Update an existing entry in place (no duplicate row).
+        upsert_window("main", Some("/ws/a2".to_string()));
+        let listed = window_list();
+        assert_eq!(listed.len(), 2);
+        let main = listed.iter().find(|w| w.label == "main").unwrap();
+        assert_eq!(main.workspace.as_deref(), Some("/ws/a2"));
+
+        // Clearing a workspace stores None (and the field is omitted in JSON).
+        upsert_window("window-abc", None);
+        let listed = window_list();
+        let abc = listed.iter().find(|w| w.label == "window-abc").unwrap();
+        assert!(abc.workspace.is_none());
+
+        // Remove drops just the named entry.
+        remove_window("main");
+        let listed = window_list();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].label, "window-abc");
+
+        std::env::remove_var("LITEDUCK_HOME");
+    }
 }

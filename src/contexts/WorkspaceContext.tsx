@@ -76,13 +76,23 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // gets to read it.
   const initialUrlWorkspaceRef = useRef(readUrlWorkspace());
 
+  // Whether this is a secondary window (opened via `window_open`, so the entry
+  // URL carries `?window=<label>`). Only the bundled main window lacks it.
+  // Secondary windows must NOT inherit the legacy global `workspace_directory`
+  // setting — a "New Window with Workspace…" is opened with no workspace
+  // precisely so the user can pick one, and falling back to the global setting
+  // would silently reopen the previous workspace and skip the picker entirely.
+  const isSecondaryWindowRef = useRef(readUrlWindowLabel() !== null);
+
   // Load persisted values on mount.
   //
   // Resolution order for THIS window's workspace:
   //   1. `?workspace=` URL query param (new windows opened via window_open)
   //   2. `~/.liteduck/windows.json` entry for this window's label
-  //   3. Legacy global `workspace_directory` setting (backward compat for the
-  //      bundled main window before it has a per-window registry entry)
+  //   3. Legacy global `workspace_directory` setting — ONLY for the main
+  //      window. Secondary windows stop at (2): an empty result there means
+  //      "show the workspace picker" (WorkspaceGate → /landing), not "reuse
+  //      the last global workspace".
   useEffect(() => {
     const native = hasNativeCapabilities();
 
@@ -123,7 +133,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         logger.warn("Failed to read windows registry", err);
       }
 
-      // (3) Legacy fallback.
+      // Secondary window with no workspace → leave empty so WorkspaceGate
+      // routes to the /landing picker. Do NOT fall through to the global
+      // setting, or "New Window with Workspace…" would silently reopen the
+      // previous workspace.
+      if (isSecondaryWindowRef.current) {
+        return;
+      }
+
+      // (3) Legacy fallback — main window only.
       const val = await getSetting("workspace_directory");
       if (val) setWorkspaceState(val);
     })();
