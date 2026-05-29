@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, State, WebviewWindow};
 
 use crate::pty::{CreateSessionResult, PtyManager, SessionInfo};
 
@@ -10,6 +10,10 @@ use crate::pty::{CreateSessionResult, PtyManager, SessionInfo};
 
 /// Spawn a new PTY session and return its UUID.
 ///
+/// The session is tagged with the calling window's Tauri label so its
+/// `pty-output` events only reach that webview (no cross-window leak) and
+/// `terminal_list` from another window won't enumerate it.
+///
 /// Pass an empty `cmd` string to use the user's default login shell.
 /// `args` may be empty.  `cwd` may be empty to inherit the process working
 /// directory.  `session_name` is currently unused; kept for API stability with
@@ -17,6 +21,7 @@ use crate::pty::{CreateSessionResult, PtyManager, SessionInfo};
 #[tauri::command]
 pub fn terminal_create(
     app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, Arc<PtyManager>>,
     cmd: String,
     args: Vec<String>,
@@ -29,7 +34,16 @@ pub fn terminal_create(
     let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
     let name_ref = session_name.as_deref();
 
-    let result = state.create_session(app, &cmd, &args_ref, &cwd, cols, rows, name_ref)?;
+    let result = state.create_session(
+        app,
+        window.label(),
+        &cmd,
+        &args_ref,
+        &cwd,
+        cols,
+        rows,
+        name_ref,
+    )?;
     Ok(result)
 }
 
@@ -64,8 +78,8 @@ pub fn terminal_close(state: State<'_, Arc<PtyManager>>, session_id: String) -> 
     Ok(())
 }
 
-/// Return a list of all known PTY sessions with their running status.
+/// Return a list of PTY sessions owned by the calling window.
 #[tauri::command]
-pub fn terminal_list(state: State<'_, Arc<PtyManager>>) -> Vec<SessionInfo> {
-    state.list_sessions()
+pub fn terminal_list(state: State<'_, Arc<PtyManager>>, window: WebviewWindow) -> Vec<SessionInfo> {
+    state.list_sessions(window.label())
 }

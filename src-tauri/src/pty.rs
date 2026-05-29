@@ -43,6 +43,11 @@ struct PtySession {
     child: Box<dyn Child + Send + Sync>,
     /// Background reader thread handle (detached; we join on close).
     _reader_thread: thread::JoinHandle<()>,
+    /// Tauri webview label that owns this session. Used so `list_sessions`
+    /// can scope to a single window and the reader thread can emit
+    /// `pty-output` to just that webview instead of broadcasting to every
+    /// window in the process.
+    window_label: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +92,7 @@ impl PtyManager {
     pub fn create_session(
         &self,
         app: AppHandle,
+        window_label: &str,
         cmd: &str,
         args: &[&str],
         cwd: &str,
@@ -170,6 +176,7 @@ impl PtyManager {
 
         let session_id = Uuid::new_v4().to_string();
         let sid_for_thread = session_id.clone();
+        let label_for_thread = window_label.to_string();
 
         // Spawn a background thread that drains the PTY and emits events.
         let reader_thread = thread::spawn(move || {
@@ -216,15 +223,18 @@ impl PtyManager {
                             session_id: sid_for_thread.clone(),
                             data: text,
                         };
-                        // Best-effort emit; ignore errors (window may be gone).
-                        let _ = app.emit("pty-output", payload);
+                        // Best-effort emit to just the owning window — never
+                        // broadcast, or a second window's xterm would see
+                        // bytes from the first window's shell.
+                        let _ = app.emit_to(label_for_thread.as_str(), "pty-output", payload);
                     }
                     Err(_) => break, // PTY closed or I/O error
                 }
             }
 
-            // Notify the frontend that this session's PTY has closed.
-            let _ = app.emit("pty-closed", sid_for_thread);
+            // Notify the owning window's frontend that this session's PTY
+            // has closed.
+            let _ = app.emit_to(label_for_thread.as_str(), "pty-closed", sid_for_thread);
         });
 
         let session = PtySession {
@@ -232,6 +242,7 @@ impl PtyManager {
             writer,
             child,
             _reader_thread: reader_thread,
+            window_label: window_label.to_string(),
         };
 
         self.sessions.lock().insert(session_id.clone(), session);
@@ -287,11 +298,17 @@ impl PtyManager {
         Ok(())
     }
 
-    /// Return a snapshot of all sessions and whether the child is still alive.
-    pub fn list_sessions(&self) -> Vec<SessionInfo> {
+    /// Return a snapshot of sessions owned by `window_label` along with
+    /// whether each child is still alive.
+    ///
+    /// Sessions are stored process-globally so close/write/resize keep
+    /// working with bare session IDs, but enumeration is scoped per window
+    /// so each window's terminal tab list only shows its own shells.
+    pub fn list_sessions(&self, window_label: &str) -> Vec<SessionInfo> {
         let mut sessions = self.sessions.lock();
         sessions
             .iter_mut()
+            .filter(|(_, session)| session.window_label == window_label)
             .map(|(id, session)| {
                 // try_wait: Ok(None) means still running.
                 let running = session

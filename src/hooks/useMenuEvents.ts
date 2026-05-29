@@ -11,6 +11,8 @@ interface MenuEventHandlers {
   onNewTerminalTab: () => void;
   onCloseTerminalTab: () => void;
   onOpenShortcutsHelp: () => void;
+  onNewWindow?: () => void;
+  onNewWindowPick?: () => void;
 }
 
 /**
@@ -26,6 +28,8 @@ export function useMenuEvents({
   onNewTerminalTab,
   onCloseTerminalTab,
   onOpenShortcutsHelp,
+  onNewWindow,
+  onNewWindowPick,
 }: MenuEventHandlers) {
   // Navigation events — menu items that navigate to a route
   useEffect(() => {
@@ -62,6 +66,12 @@ export function useMenuEvents({
           break;
 
         // File menu
+        case "new_window":
+          onNewWindow?.();
+          break;
+        case "new_window_pick":
+          onNewWindowPick?.();
+          break;
         case "new_terminal":
           onNewTerminalTab();
           break;
@@ -125,5 +135,7 @@ export function useMenuEvents({
     onNewTerminalTab,
     onCloseTerminalTab,
     onOpenShortcutsHelp,
+    onNewWindow,
+    onNewWindowPick,
   ]);
 }

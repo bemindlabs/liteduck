@@ -23,6 +23,8 @@ pub mod pty;
 pub mod settings;
 #[cfg(not(target_os = "ios"))]
 pub mod terminal;
+#[cfg(not(target_os = "ios"))]
+pub mod windows;
 pub mod workspace;
 
 // ── Shared test utilities ─────────────────────────────────────────────────────
@@ -149,6 +151,20 @@ pub fn run() {
 
         #[cfg(not(target_os = "ios"))]
         app.manage(std::sync::Arc::new(pty::PtyManager::new()));
+
+        // Per-window event-sink registry. Lets backend code emit_to a specific
+        // webview label (see `windows.rs` and `pty.rs`). Desktop only — iOS
+        // has a single fixed webview.
+        #[cfg(not(target_os = "ios"))]
+        {
+            let sinks = std::sync::Arc::new(windows::WindowSinks::new());
+            app.manage(sinks.clone());
+            if let Some(window) = app.get_webview_window("main") {
+                sinks.register("main", window);
+            } else {
+                log::warn!("setup: 'main' window not found — WindowSinks not seeded");
+            }
+        }
 
         // Wire TauriEventSink into managed state.
         if let Some(window) = app.get_webview_window("main") {
@@ -305,6 +321,11 @@ pub fn run() {
             plugins::plugin_open_external,
             plugins::plugin_registry_fetch,
             plugins::plugin_install_from_registry,
+            // Multi-window — desktop only (iOS has a single webview)
+            windows::window_open,
+            windows::window_list,
+            windows::window_set_workspace,
+            windows::window_current_label,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

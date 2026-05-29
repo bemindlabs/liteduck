@@ -1,5 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getSetting, saveSetting } from "@/lib/settings";
+import {
+  getCurrentWindowLabel,
+  listWindows,
+  readUrlWindowLabel,
+  readUrlWorkspace,
+  setWindowWorkspace,
+} from "@/lib/window";
+import { hasNativeCapabilities } from "@/lib/platform";
 import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("WorkspaceContext");
@@ -57,38 +65,97 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [recentWorkspaces, setRecentWorkspaces] = useState<RecentWorkspace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load persisted values on mount
+  // The Tauri label of this window. Used to scope workspace persistence so
+  // each window can point at a different workspace without overwriting the
+  // others. Falls back to "main" on web / first-window-before-IPC-resolves.
+  const windowLabelRef = useRef(readUrlWindowLabel() ?? "main");
+
+  // Snapshot the `?workspace=` query at render time so a BrowserRouter
+  // catch-all `<Navigate replace>` (e.g. when the entry URL is
+  // `/index.html?workspace=...`) can't drop the query before `useEffect`
+  // gets to read it.
+  const initialUrlWorkspaceRef = useRef(readUrlWorkspace());
+
+  // Load persisted values on mount.
+  //
+  // Resolution order for THIS window's workspace:
+  //   1. `?workspace=` URL query param (new windows opened via window_open)
+  //   2. `~/.liteduck/windows.json` entry for this window's label
+  //   3. Legacy global `workspace_directory` setting (backward compat for the
+  //      bundled main window before it has a per-window registry entry)
   useEffect(() => {
-    void Promise.all([
-      getSetting("workspace_directory").then((val) => {
+    const native = hasNativeCapabilities();
+
+    const resolveWindowLabel = native
+      ? getCurrentWindowLabel()
+          .then((label) => {
+            windowLabelRef.current = label;
+            return label;
+          })
+          .catch(() => windowLabelRef.current)
+      : Promise.resolve(windowLabelRef.current);
+
+    const resolveWorkspace = (async () => {
+      // (1) URL param wins (captured at render time — see ref comment above).
+      const fromUrl = initialUrlWorkspaceRef.current;
+      if (fromUrl) {
+        setWorkspaceState(fromUrl);
+        return;
+      }
+
+      if (!native) {
+        // Web / iOS: only the global setting exists.
+        const val = await getSetting("workspace_directory");
         if (val) setWorkspaceState(val);
-      }),
-      getSetting("workspace_remote_info").then((val) => {
-        if (val) {
-          try {
-            setRemoteInfo(JSON.parse(val) as RemoteInfo);
-          } catch {
-            // ignore
-          }
+        return;
+      }
+
+      // (2) Per-window registry.
+      const label = await resolveWindowLabel;
+      try {
+        const windows = await listWindows();
+        const entry = windows.find((w) => w.label === label);
+        if (entry?.workspace) {
+          setWorkspaceState(entry.workspace);
+          return;
         }
-      }),
-      getSetting("workspace_history").then((val) => {
-        if (val) {
-          try {
-            const parsed: unknown = JSON.parse(val);
-            if (Array.isArray(parsed)) {
-              // Migrate old string[] format to RecentWorkspace[]
-              const migrated: RecentWorkspace[] = (parsed as (string | RecentWorkspace)[]).map(
-                (entry) => (typeof entry === "string" ? { path: entry } : entry),
-              );
-              setRecentWorkspaces(migrated);
-            }
-          } catch {
-            // ignore malformed history
-          }
+      } catch (err: unknown) {
+        logger.warn("Failed to read windows registry", err);
+      }
+
+      // (3) Legacy fallback.
+      const val = await getSetting("workspace_directory");
+      if (val) setWorkspaceState(val);
+    })();
+
+    const remoteInfoLoad = getSetting("workspace_remote_info").then((val) => {
+      if (val) {
+        try {
+          setRemoteInfo(JSON.parse(val) as RemoteInfo);
+        } catch {
+          // ignore
         }
-      }),
-    ])
+      }
+    });
+
+    const historyLoad = getSetting("workspace_history").then((val) => {
+      if (val) {
+        try {
+          const parsed: unknown = JSON.parse(val);
+          if (Array.isArray(parsed)) {
+            // Migrate old string[] format to RecentWorkspace[]
+            const migrated: RecentWorkspace[] = (parsed as (string | RecentWorkspace)[]).map(
+              (entry) => (typeof entry === "string" ? { path: entry } : entry),
+            );
+            setRecentWorkspaces(migrated);
+          }
+        } catch {
+          // ignore malformed history
+        }
+      }
+    });
+
+    void Promise.all([resolveWorkspace, remoteInfoLoad, historyLoad])
       .catch((err: unknown) => {
         logger.warn("Failed to load workspace settings", err);
       })
@@ -109,6 +176,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const setWorkspace = useCallback(async (path: string, remote?: RemoteInfo) => {
     setWorkspaceState(path);
     setRemoteInfo(remote ?? null);
+
+    // Per-window persistence (multi-window). Best-effort: a failure here
+    // shouldn't block the in-memory switch — the legacy global setting below
+    // still preserves a usable single-window fallback.
+    if (hasNativeCapabilities()) {
+      try {
+        await setWindowWorkspace(windowLabelRef.current, path);
+      } catch (err: unknown) {
+        logger.warn("Failed to persist per-window workspace", err);
+      }
+    }
+
+    // Legacy global setting. Kept until WizardPage / migration flows are
+    // moved to per-window state. The last-writer-wins risk across multiple
+    // open windows is acceptable in Phase 1 — the per-window registry is the
+    // authoritative source on next launch.
     await saveSetting("workspace_directory", path);
     await saveSetting("workspace_remote_info", remote ? JSON.stringify(remote) : "");
 
