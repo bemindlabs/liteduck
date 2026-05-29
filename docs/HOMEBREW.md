@@ -39,7 +39,11 @@ https://github.com/bemindlabs/liteduck/archive/refs/tags/v2026.5.2.tar.gz
 
 `brew` then runs `npm ci` + `npm run tauri build -- --bundles app` and installs the
 resulting `LiteDuck.app` into the formula prefix, symlinking the inner binary onto
-`PATH` as `liteduck`.
+`PATH` as `liteduck`. A `post_install` step also symlinks the bundle into
+`/Applications/LiteDuck.app` (via the stable `opt` path) so Finder, Launchpad, and
+Spotlight find it — a formula keeps the app under the Homebrew prefix, so this link
+is what surfaces it like a cask would. `brew uninstall` can't remove that link (it
+lives outside the prefix); the `caveats` block tells the user to `rm` it.
 
 ## Unsigned build — the trade-off
 
