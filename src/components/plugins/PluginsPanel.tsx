@@ -17,7 +17,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
-  ArrowLeft,
   BadgeCheck,
   Boxes,
   ChevronDown,
@@ -125,7 +124,6 @@ export function PluginsPanel({
   const { workspace } = useWorkspace();
   const [tab, setTab] = useState<PluginsTab>("installed");
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
-  const [selectedId, setSelectedId] = useState(initialPluginId ?? null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +136,11 @@ export function PluginsPanel({
   const [registryLoaded, setRegistryLoaded] = useState(false);
 
   const installedIds = new Set(plugins.map((p) => p.id));
-  const selected = plugins.find((p) => p.id === selectedId) ?? null;
+  // The Plugins panel is a pure manager (Installed / Available + install /
+  // uninstall) — clicking a row opens the plugin's **dedicated page** via
+  // onOpenPluginPage. The only PluginDetail render path is the page-mode
+  // surface that opens directly to a single plugin (rail-pinned or list-click).
+  const selected = pageMode ? plugins.find((p) => p.id === initialPluginId) ?? null : null;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -224,7 +226,6 @@ export function PluginsPanel({
       try {
         await pluginUninstall(id);
         setRun((r) => (r?.pluginId === id ? null : r));
-        setSelectedId((s) => (s === id ? null : s));
         await refresh();
         onPluginsChanged?.();
       } catch (e) {
@@ -276,23 +277,11 @@ export function PluginsPanel({
     [workspace],
   );
 
-  // When a plugin is opened from the Installed list, prefer the host's
-  // **dedicated page surface** (the same view the pinned rail icon opens) so
-  // the Plugins panel never duplicates the per-plugin page as an in-panel
-  // "second page". Fallback (no host handler, e.g. in tests) is the legacy
-  // in-panel detail with its auto-run of the default command.
+  // When a plugin is opened from the Installed list, route to its dedicated
+  // page (the same view the pinned rail icon opens). No in-panel detail.
   const openPlugin = useCallback(
-    (plugin: InstalledPlugin) => {
-      if (onOpenPluginPage) {
-        onOpenPluginPage(plugin.id);
-        return;
-      }
-      setSelectedId(plugin.id);
-      setRun(null);
-      const landing = plugin.commands.find((c) => c.default);
-      if (landing) void handleRun(plugin, landing);
-    },
-    [handleRun, onOpenPluginPage],
+    (plugin: InstalledPlugin) => onOpenPluginPage?.(plugin.id),
+    [onOpenPluginPage],
   );
 
   // Full-page mode: once the plugin list resolves, open the requested plugin so
@@ -302,7 +291,6 @@ export function PluginsPanel({
     if (initialPluginId === undefined) return;
     const target = plugins.find((p) => p.id === initialPluginId);
     if (!target) return;
-    setSelectedId(initialPluginId);
     setRun(null);
     const landing = target.commands.find((c) => c.default);
     if (landing) void handleRun(target, landing);
@@ -403,18 +391,6 @@ export function PluginsPanel({
           installedIds={installedIds}
           busy={busy}
           onInstall={handleInstallFromRegistry}
-        />
-      ) : selected ? (
-        <PluginDetail
-          plugin={selected}
-          run={run}
-          busy={busy}
-          onBack={() => {
-            setSelectedId(null);
-            setRun(null);
-          }}
-          onRun={handleRun}
-          onUninstall={handleUninstall}
         />
       ) : (
         <InstalledList
@@ -559,15 +535,12 @@ function PluginDetail({
   plugin,
   run,
   busy,
-  onBack,
   onRun,
   onUninstall,
 }: {
   plugin: InstalledPlugin;
   run: CommandRun | null;
   busy: string | null;
-  /** Absent in full-page mode — the activity rail is how you leave the page. */
-  onBack?: () => void;
   onRun: (
     plugin: InstalledPlugin,
     command: PluginCommand,
@@ -592,17 +565,9 @@ function PluginDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Back affordance (master-detail) + uninstall. The Back button is hidden
-          in full-page mode where the activity rail handles navigation. */}
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
-        {onBack ? (
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" />
-            All plugins
-          </Button>
-        ) : (
-          <span />
-        )}
+      {/* Top action row — Uninstall only. The Plugins panel is the way to
+          leave a plugin page (or click another rail icon). */}
+      <div className="flex shrink-0 items-center justify-end border-b border-[var(--color-border)] px-4 py-2">
         <Button
           variant="ghost"
           size="sm"
