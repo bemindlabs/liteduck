@@ -54,14 +54,18 @@ class Liteduck < Formula
 
       The app bundle lives at:
         #{opt_prefix}/LiteDuck.app
+      Homebrew's install sandbox can't place it in /Applications itself. Add it
+      with ONE of:
 
-      To show it in Finder / Launchpad / Spotlight, symlink it into /Applications.
-      Homebrew can't do this itself — its install sandbox forbids writing outside
-      the prefix — so run this once (re-run after a major upgrade if needed):
+        # Symlink — auto-updates on `brew upgrade`; shows in Finder & Spotlight,
+        # but NOT Launchpad (Launchpad ignores symlinked apps):
         ln -sfn "#{opt_prefix}/LiteDuck.app" /Applications/LiteDuck.app
 
-      (Targets the stable `opt` path, so `brew upgrade` keeps it current. Remove
-      with `rm /Applications/LiteDuck.app` if you uninstall.)
+        # Copy — also shows in Launchpad, but is a snapshot: re-run after each
+        # `brew upgrade` to refresh it:
+        cp -R "#{opt_prefix}/LiteDuck.app" /Applications/LiteDuck.app
+
+      Remove with `rm -rf /Applications/LiteDuck.app` if you uninstall.
     EOS
   end
 

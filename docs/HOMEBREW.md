@@ -41,15 +41,20 @@ https://github.com/bemindlabs/liteduck/archive/refs/tags/v2026.5.2.tar.gz
 resulting `LiteDuck.app` into the formula prefix, symlinking the inner binary onto
 `PATH` as `liteduck`.
 
-A formula keeps the `.app` under the Homebrew prefix, so it does **not** appear in
-Finder / Launchpad / Spotlight the way a cask's `/Applications` install would.
-Homebrew's install sandbox forbids a formula from writing to `/Applications`
-(a `post_install` symlink there fails), so the `caveats` block instead gives the
-user a one-line command to create the link themselves (pointing at the stable
-`opt` path so it survives `brew upgrade`):
+A formula keeps the `.app` under the Homebrew prefix, so it does **not** land in
+`/Applications` the way a cask would. Homebrew's install sandbox also forbids a
+formula from writing to `/Applications` (a `post_install` symlink there fails at
+install time), so the `caveats` block gives the user a command to surface it
+themselves. Two options, with a trade-off:
 
 ```bash
+# Symlink — auto-updates on `brew upgrade`; shows in Finder & Spotlight,
+# but NOT Launchpad (Launchpad does not index symlinked apps):
 ln -sfn "$(brew --prefix)/opt/liteduck/LiteDuck.app" /Applications/LiteDuck.app
+
+# Copy — also shows in Launchpad, but is a snapshot: re-run after each
+# `brew upgrade` to refresh it:
+cp -R "$(brew --prefix)/opt/liteduck/LiteDuck.app" /Applications/LiteDuck.app
 ```
 
 ## Unsigned build — the trade-off
