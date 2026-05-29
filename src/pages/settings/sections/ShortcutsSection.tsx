@@ -82,10 +82,7 @@ function ShortcutRowEditor({ binding, override, onChange, conflict }: ShortcutRo
         />
       </div>
       {conflict && (
-        <p
-          className="mt-1 text-right text-xs text-[var(--color-destructive)]"
-          role="alert"
-        >
+        <p className="mt-1 text-right text-xs text-[var(--color-destructive)]" role="alert">
           Conflicts with: {conflict}
         </p>
       )}

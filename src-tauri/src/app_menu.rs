@@ -1,5 +1,5 @@
 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Emitter, Wry};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 
 /// Build the native application menu bar.
 ///
@@ -24,16 +24,29 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
         .build()?;
 
     // ── File menu ────────────────────────────────────────────────────────────
+    let new_window = MenuItemBuilder::with_id("new_window", "New Window")
+        .accelerator("CmdOrCtrl+Shift+N")
+        .build(app)?;
+    let new_window_pick =
+        MenuItemBuilder::with_id("new_window_pick", "New Window with Workspace...").build(app)?;
     let new_terminal = MenuItemBuilder::with_id("new_terminal", "New Terminal Tab")
         .accelerator("CmdOrCtrl+T")
         .build(app)?;
     let close_tab = MenuItemBuilder::with_id("close_tab", "Close Tab")
         .accelerator("CmdOrCtrl+W")
         .build(app)?;
+    let close_window = MenuItemBuilder::with_id("close_window", "Close Window")
+        .accelerator("CmdOrCtrl+Shift+W")
+        .build(app)?;
 
     let file_menu = SubmenuBuilder::new(app, "File")
+        .item(&new_window)
+        .item(&new_window_pick)
+        .separator()
         .item(&new_terminal)
         .item(&close_tab)
+        .separator()
+        .item(&close_window)
         .build()?;
 
     // ── Edit menu (native predefined items for clipboard/undo) ─────────────
@@ -151,23 +164,70 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
     Ok(menu)
 }
 
+/// Return the label of the currently-focused webview window, falling back
+/// to `"main"` when none is focused (e.g. menu hit during a transient
+/// focus loss).
+fn focused_label(app: &AppHandle<Wry>) -> String {
+    for (label, win) in app.webview_windows() {
+        if win.is_focused().unwrap_or(false) {
+            return label;
+        }
+    }
+    "main".to_string()
+}
+
+/// Emit a `menu-action` event to the focused window only.
+///
+/// Broadcasting (`app.emit(...)`) sent Cmd+T to every open window — fine
+/// before multi-window, a real bug after.
+fn emit_action_focused(app: &AppHandle<Wry>, action: &str) {
+    let label = focused_label(app);
+    let _ = app.emit_to(label.as_str(), "menu-action", action);
+}
+
+/// Emit a `menu-navigate` event to the focused window only.
+fn emit_navigate_focused(app: &AppHandle<Wry>, route: &str) {
+    let label = focused_label(app);
+    let _ = app.emit_to(label.as_str(), "menu-navigate", route);
+}
+
 /// Handle a menu event by emitting a frontend event for navigation / actions.
 pub fn handle_menu_event(app: &AppHandle<Wry>, event_id: &str) {
     match event_id {
         // ── App menu ─────────────────────────────────────────────────────────
         "about" => {
-            let _ = app.emit("menu-action", "about");
+            emit_action_focused(app, "about");
         }
         "quit" => {
             app.exit(0);
         }
 
         // ── File menu ────────────────────────────────────────────────────────
+        "new_window" => {
+            // Clone the focused window's workspace into a new window. The
+            // frontend hands us the workspace path via the `menu-action`
+            // event payload roundtrip, but the simpler model is to let the
+            // frontend invoke `window_open(currentWorkspace)` itself when it
+            // receives the `new_window` action — keeps the backend stateless
+            // about which workspace the focused window currently shows.
+            emit_action_focused(app, "new_window");
+        }
+        "new_window_pick" => {
+            // Open with no workspace pre-selected — the frontend lands on
+            // `/landing` so the user can pick a workspace (recent / browse).
+            emit_action_focused(app, "new_window_pick");
+        }
         "new_terminal" => {
-            let _ = app.emit("menu-action", "new_terminal");
+            emit_action_focused(app, "new_terminal");
         }
         "close_tab" => {
-            let _ = app.emit("menu-action", "close_tab");
+            emit_action_focused(app, "close_tab");
+        }
+        "close_window" => {
+            let label = focused_label(app);
+            if let Some(win) = app.get_webview_window(&label) {
+                let _ = win.close();
+            }
         }
 
         // Edit menu items are PredefinedMenuItems — they are handled natively
@@ -183,37 +243,37 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, event_id: &str) {
                 "nav_settings" => "/settings",
                 _ => return,
             };
-            let _ = app.emit("menu-navigate", route);
+            emit_navigate_focused(app, route);
         }
 
         // ── View menu ────────────────────────────────────────────────────────
         "toggle_sidebar" => {
-            let _ = app.emit("menu-action", "toggle_sidebar");
+            emit_action_focused(app, "toggle_sidebar");
         }
         "command_palette" => {
-            let _ = app.emit("menu-action", "command_palette");
+            emit_action_focused(app, "command_palette");
         }
         "toggle_dark" => {
-            let _ = app.emit("menu-action", "toggle_dark");
+            emit_action_focused(app, "toggle_dark");
         }
         "toggle_focus" => {
-            let _ = app.emit("menu-action", "toggle_focus");
+            emit_action_focused(app, "toggle_focus");
         }
 
         // ── Window menu ──────────────────────────────────────────────────────
         "minimize" => {
-            let _ = app.emit("menu-action", "minimize");
+            emit_action_focused(app, "minimize");
         }
         "zoom" => {
-            let _ = app.emit("menu-action", "zoom");
+            emit_action_focused(app, "zoom");
         }
         "fullscreen" => {
-            let _ = app.emit("menu-action", "fullscreen");
+            emit_action_focused(app, "fullscreen");
         }
 
         // ── Help menu ────────────────────────────────────────────────────────
         "shortcuts_help" => {
-            let _ = app.emit("menu-action", "shortcuts_help");
+            emit_action_focused(app, "shortcuts_help");
         }
         "website" => {
             let _ = tauri_plugin_opener::open_url(

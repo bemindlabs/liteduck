@@ -97,12 +97,7 @@ export function GeneralSection({ values, onChange, onDeleteSecret }: GeneralSect
           const validationError = validateNumericRange(field.key, value);
           return (
             <div key={field.key} className="space-y-1.5">
-              <SettingField
-                def={field}
-                value={value}
-                onChange={onChange}
-                error={validationError}
-              />
+              <SettingField def={field} value={value} onChange={onChange} error={validationError} />
               {field.isSecret && values[field.key] && (
                 <button
                   type="button"

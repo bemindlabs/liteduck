@@ -128,10 +128,7 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
   }, [refreshPlugins]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const pinnedPlugins = useMemo(
-    () => installedPlugins.filter((p) => p.pinned),
-    [installedPlugins],
-  );
+  const pinnedPlugins = useMemo(() => installedPlugins.filter((p) => p.pinned), [installedPlugins]);
 
   // ── URL ↔ panel sync ───────────────────────────────────────────────────────
 

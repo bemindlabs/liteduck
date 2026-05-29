@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { NavigateFunction } from "react-router-dom";
 
 interface MenuEventHandlers {
@@ -11,6 +11,8 @@ interface MenuEventHandlers {
   onNewTerminalTab: () => void;
   onCloseTerminalTab: () => void;
   onOpenShortcutsHelp: () => void;
+  onNewWindow?: () => void;
+  onNewWindowPick?: () => void;
 }
 
 /**
@@ -26,94 +28,123 @@ export function useMenuEvents({
   onNewTerminalTab,
   onCloseTerminalTab,
   onOpenShortcutsHelp,
+  onNewWindow,
+  onNewWindowPick,
 }: MenuEventHandlers) {
-  // Navigation events — menu items that navigate to a route
+  // Navigation events — menu items that navigate to a route.
+  //
+  // Scope the listener to THIS webview (`getCurrentWebview().listen`) rather
+  // than the global `@tauri-apps/api/event` `listen`. A bare global listen
+  // registers as `EventTarget::Any`, and Tauri's dispatch short-circuits on
+  // `Any` before checking the label — so the backend's `emit_to(focused, …)`
+  // would reach EVERY window, not just the focused one. Webview-scoped
+  // listeners carry their own label, so `emit_to` isolates correctly.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
 
-    void listen<string>("menu-navigate", (event) => {
-      const route = event.payload;
-      if (route) void navigate(route);
-    }).then((fn) => {
-      unlisten = fn;
-    });
+    void getCurrentWebview()
+      .listen<string>("menu-navigate", (event) => {
+        const route = event.payload;
+        if (route) void navigate(route);
+      })
+      .then((fn) => {
+        // StrictMode runs the effect → cleanup → effect again; the cleanup
+        // can fire before this promise resolves. Without the guard the first
+        // listener would leak and every menu action would fire twice.
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [navigate]);
 
-  // Action events — menu items that trigger an action
+  // Action events — menu items that trigger an action. Same webview-scoping
+  // and StrictMode-race handling as the navigation listener above.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
 
-    void listen<string>("menu-action", (event) => {
-      const action = event.payload;
+    void getCurrentWebview()
+      .listen<string>("menu-action", (event) => {
+        const action = event.payload;
 
-      switch (action) {
-        // App menu
-        case "about":
-          void navigate("/settings");
-          // Scroll to about section after a tick
-          requestAnimationFrame(() => {
-            const el = document.getElementById("section-about");
-            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-          });
-          break;
+        switch (action) {
+          // App menu
+          case "about":
+            void navigate("/settings");
+            // Scroll to about section after a tick
+            requestAnimationFrame(() => {
+              const el = document.getElementById("section-about");
+              el?.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+            break;
 
-        // File menu
-        case "new_terminal":
-          onNewTerminalTab();
-          break;
-        case "close_tab":
-          onCloseTerminalTab();
-          break;
+          // File menu
+          case "new_window":
+            onNewWindow?.();
+            break;
+          case "new_window_pick":
+            onNewWindowPick?.();
+            break;
+          case "new_terminal":
+            onNewTerminalTab();
+            break;
+          case "close_tab":
+            onCloseTerminalTab();
+            break;
 
-        // View menu
-        case "toggle_sidebar":
-          onToggleSidebar();
-          break;
-        case "command_palette":
-          onOpenCommandPalette();
-          break;
-        case "toggle_dark":
-          onToggleDark();
-          break;
-        case "toggle_focus":
-          onToggleFocusMode?.();
-          break;
+          // View menu
+          case "toggle_sidebar":
+            onToggleSidebar();
+            break;
+          case "command_palette":
+            onOpenCommandPalette();
+            break;
+          case "toggle_dark":
+            onToggleDark();
+            break;
+          case "toggle_focus":
+            onToggleFocusMode?.();
+            break;
 
-        // Window menu
-        case "minimize":
-          void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
-            void getCurrentWindow().minimize();
-          });
-          break;
-        case "zoom":
-          void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
-            void getCurrentWindow().toggleMaximize();
-          });
-          break;
-        case "fullscreen":
-          void import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
-            const win = getCurrentWindow();
-            const isFull = await win.isFullscreen();
-            void win.setFullscreen(!isFull);
-          });
-          break;
+          // Window menu
+          case "minimize":
+            void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
+              void getCurrentWindow().minimize();
+            });
+            break;
+          case "zoom":
+            void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
+              void getCurrentWindow().toggleMaximize();
+            });
+            break;
+          case "fullscreen":
+            void import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
+              const win = getCurrentWindow();
+              const isFull = await win.isFullscreen();
+              void win.setFullscreen(!isFull);
+            });
+            break;
 
-        // Help menu
-        case "shortcuts_help":
-          onOpenShortcutsHelp();
-          break;
-        // "website", "release_notes", "report_issue" are handled by the Rust
-        // backend via tauri_plugin_opener (opens in the default browser).
-      }
-    }).then((fn) => {
-      unlisten = fn;
-    });
+          // Help menu
+          case "shortcuts_help":
+            onOpenShortcutsHelp();
+            break;
+          // "website", "release_notes", "report_issue" are handled by the Rust
+          // backend via tauri_plugin_opener (opens in the default browser).
+        }
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [
@@ -125,5 +156,7 @@ export function useMenuEvents({
     onNewTerminalTab,
     onCloseTerminalTab,
     onOpenShortcutsHelp,
+    onNewWindow,
+    onNewWindowPick,
   ]);
 }

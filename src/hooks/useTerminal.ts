@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { Terminal as XTerm } from "@xterm/xterm";
 import { createLogger } from "@/lib/logger";
 import { addNotification } from "@/lib/notifications";
@@ -89,53 +90,63 @@ export function useTerminal(): UseTerminalReturn {
       }
     };
 
-    void listen<PtyOutputEvent>("pty-output", (event) => {
-      const { session_id, data } = event.payload;
-      const tabId = sessionToTab.current.get(session_id);
-      if (!tabId) return;
-      const term = xtermRefs.current.get(tabId);
-      if (term) term.write(data);
-    }).then((fn) => {
-      if (cancelled) {
-        safeUnlisten(fn);
-      } else {
-        unlistenRef.current = fn;
-      }
-    });
+    // Scope to THIS webview. The backend emits `pty-output` via
+    // `emit_to(window_label, …)`, but a global `listen` registers as
+    // `EventTarget::Any` which Tauri delivers to every window regardless of
+    // the emit's target — so each window would process every other window's
+    // PTY output (the session_id filter below makes it harmless but wasteful).
+    // A webview-scoped listener carries its own label so the emit isolates.
+    void getCurrentWebview()
+      .listen<PtyOutputEvent>("pty-output", (event) => {
+        const { session_id, data } = event.payload;
+        const tabId = sessionToTab.current.get(session_id);
+        if (!tabId) return;
+        const term = xtermRefs.current.get(tabId);
+        if (term) term.write(data);
+      })
+      .then((fn) => {
+        if (cancelled) {
+          safeUnlisten(fn);
+        } else {
+          unlistenRef.current = fn;
+        }
+      });
 
     // Subscribe to pty-closed events. If the event arrives before
     // sessionToTab is populated (race condition), buffer it so createTab can
     // replay it.
-    void listen<PtyClosedEvent>("pty-closed", (event) => {
-      const session_id = event.payload;
-      const tabId = sessionToTab.current.get(session_id);
-      if (!tabId) {
-        // Session mapping not yet set — buffer for later replay.
-        pendingClosed.current.add(session_id);
-        return;
-      }
+    void getCurrentWebview()
+      .listen<PtyClosedEvent>("pty-closed", (event) => {
+        const session_id = event.payload;
+        const tabId = sessionToTab.current.get(session_id);
+        if (!tabId) {
+          // Session mapping not yet set — buffer for later replay.
+          pendingClosed.current.add(session_id);
+          return;
+        }
 
-      // Mark the tab as not running
-      setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, running: false } : t)));
+        // Mark the tab as not running
+        setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, running: false } : t)));
 
-      // Auto-close the tab after a short delay.
-      setTimeout(() => {
-        setTabs((prev) => {
-          const tab = prev.find((t) => t.id === tabId);
-          if (tab && !tab.running) {
-            sessionToTab.current.delete(tab.sessionId ?? "");
-            return prev.filter((t) => t.id !== tabId);
-          }
-          return prev;
-        });
-      }, 1000); // 1 second delay before auto-closing
-    }).then((fn) => {
-      if (cancelled) {
-        safeUnlisten(fn);
-      } else {
-        unlistenClosedRef.current = fn;
-      }
-    });
+        // Auto-close the tab after a short delay.
+        setTimeout(() => {
+          setTabs((prev) => {
+            const tab = prev.find((t) => t.id === tabId);
+            if (tab && !tab.running) {
+              sessionToTab.current.delete(tab.sessionId ?? "");
+              return prev.filter((t) => t.id !== tabId);
+            }
+            return prev;
+          });
+        }, 1000); // 1 second delay before auto-closing
+      })
+      .then((fn) => {
+        if (cancelled) {
+          safeUnlisten(fn);
+        } else {
+          unlistenClosedRef.current = fn;
+        }
+      });
 
     return () => {
       cancelled = true;

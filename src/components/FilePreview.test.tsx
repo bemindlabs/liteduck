@@ -47,7 +47,12 @@ describe("FilePreview — code editor (non-markdown)", () => {
     const readFile = vi.fn().mockResolvedValue("const x = 1;");
     const writeFile = vi.fn().mockResolvedValue(undefined);
     render(
-      <FilePreview entry={makeEntry()} readFile={readFile} writeFile={writeFile} docsMode={false} />,
+      <FilePreview
+        entry={makeEntry()}
+        readFile={readFile}
+        writeFile={writeFile}
+        docsMode={false}
+      />,
     );
 
     const textarea = await screen.findByRole("textbox");
@@ -82,11 +87,7 @@ describe("FilePreview — code editor (non-markdown)", () => {
   it("keeps a truncated (>1 MB) file read-only — no textarea", async () => {
     const readFile = vi.fn().mockResolvedValue("partial buffer");
     render(
-      <FilePreview
-        entry={makeEntry({ size: 2_000_000 })}
-        readFile={readFile}
-        docsMode={false}
-      />,
+      <FilePreview entry={makeEntry({ size: 2_000_000 })} readFile={readFile} docsMode={false} />,
     );
 
     await screen.findByText(/1 MB limit/i);

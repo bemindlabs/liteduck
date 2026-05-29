@@ -23,6 +23,8 @@ pub mod pty;
 pub mod settings;
 #[cfg(not(target_os = "ios"))]
 pub mod terminal;
+#[cfg(not(target_os = "ios"))]
+pub mod windows;
 pub mod workspace;
 
 // ── Shared test utilities ─────────────────────────────────────────────────────
@@ -305,6 +307,11 @@ pub fn run() {
             plugins::plugin_open_external,
             plugins::plugin_registry_fetch,
             plugins::plugin_install_from_registry,
+            // Multi-window — desktop only (iOS has a single webview)
+            windows::window_open,
+            windows::window_list,
+            windows::window_set_workspace,
+            windows::window_current_label,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

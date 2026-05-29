@@ -290,7 +290,10 @@ export default function SettingsPage() {
       if (!Number.isNaN(scrollback)) {
         payload.terminal_scrollback = String(Math.min(50000, Math.max(100, scrollback)));
       }
-      if (payload.font_size !== values.font_size || payload.terminal_scrollback !== values.terminal_scrollback) {
+      if (
+        payload.font_size !== values.font_size ||
+        payload.terminal_scrollback !== values.terminal_scrollback
+      ) {
         setValues(payload);
       }
 

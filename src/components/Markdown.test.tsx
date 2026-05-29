@@ -25,9 +25,7 @@ describe("Markdown — HTML sanitization (XSS hard constraint)", () => {
   });
 
   it("drops <script> entirely (tag and contents not executed/rendered)", () => {
-    const { container } = render(
-      <Markdown content={`before<script>alert(1)</script>after`} />,
-    );
+    const { container } = render(<Markdown content={`before<script>alert(1)</script>after`} />);
 
     expect(container.querySelector("script")).toBeNull();
     expect(container.innerHTML).not.toContain("<script");
@@ -38,9 +36,7 @@ describe("Markdown — HTML sanitization (XSS hard constraint)", () => {
   });
 
   it("neutralizes a javascript: href on an anchor", () => {
-    const { container } = render(
-      <Markdown content={`<a href="javascript:alert(1)">click</a>`} />,
-    );
+    const { container } = render(<Markdown content={`<a href="javascript:alert(1)">click</a>`} />);
 
     const anchor = container.querySelector("a");
     // The anchor (and its text) may still render, but the javascript: URL is
@@ -52,9 +48,7 @@ describe("Markdown — HTML sanitization (XSS hard constraint)", () => {
   });
 
   it("strips inline event handlers from arbitrary tags", () => {
-    const { container } = render(
-      <Markdown content={`<p onclick="alert(1)">hi</p>`} />,
-    );
+    const { container } = render(<Markdown content={`<p onclick="alert(1)">hi</p>`} />);
 
     expect(container.innerHTML).not.toContain("onclick");
     expect(container.innerHTML).not.toContain("alert(1)");
@@ -76,7 +70,7 @@ describe("Markdown — HTML sanitization (XSS hard constraint)", () => {
 // ---------------------------------------------------------------------------
 
 describe("Markdown — benign raw/inline HTML renders", () => {
-  it("renders <p align=\"center\"> keeping the align attribute", () => {
+  it('renders <p align="center"> keeping the align attribute', () => {
     const { container } = render(<Markdown content={`<p align="center">hello</p>`} />);
 
     const p = container.querySelector("p[align]");

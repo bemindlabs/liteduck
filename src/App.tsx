@@ -41,6 +41,7 @@ import { ROUTES } from "@/lib/routes";
 import { hasNativeCapabilities } from "@/lib/platform";
 import { getSetting, saveSetting } from "@/lib/settings";
 import { WorkspaceProvider, useWorkspace } from "@/contexts/WorkspaceContext";
+import { openNewWindow } from "@/lib/window";
 import { BiometricProvider } from "@/contexts/BiometricContext";
 import { BiometricLockScreen } from "@/components/BiometricLockScreen";
 import { Sidebar } from "@/components/Sidebar";
@@ -202,6 +203,21 @@ function Layout() {
     shellHandleRef.current?.toggleTerminalMaximized();
   }, []);
 
+  // Multi-window — File menu hooks. "New Window" clones this window's
+  // workspace into a new top-level window; "New Window with Workspace..."
+  // lands the new window at /landing so the user can pick.
+  const handleNewWindow = useCallback(() => {
+    void openNewWindow(workspace || undefined).catch((err: unknown) => {
+      logger.warn("Failed to open new window", err);
+    });
+  }, [workspace]);
+
+  const handleNewWindowPick = useCallback(() => {
+    void openNewWindow(undefined).catch((err: unknown) => {
+      logger.warn("Failed to open new window (picker)", err);
+    });
+  }, []);
+
   useKeyboardShortcuts({
     bindings,
     navigate,
@@ -237,6 +253,8 @@ function Layout() {
     onNewTerminalTab: handleNewTerminalTab,
     onCloseTerminalTab: handleCloseTerminalTab,
     onOpenShortcutsHelp: handleOpenShortcutsHelp,
+    onNewWindow: handleNewWindow,
+    onNewWindowPick: handleNewWindowPick,
   });
 
   // Exit focus mode on Escape

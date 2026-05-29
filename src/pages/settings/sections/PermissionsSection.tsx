@@ -68,8 +68,8 @@ export function PermissionsSection() {
           </h3>
         </div>
         <p className="mt-0.5 text-sm text-[var(--color-muted-foreground)]">
-          System resources this application accesses. Live status reporting is not yet wired
-          to the backend.
+          System resources this application accesses. Live status reporting is not yet wired to the
+          backend.
         </p>
       </div>
 

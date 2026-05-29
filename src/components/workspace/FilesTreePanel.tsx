@@ -12,12 +12,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FileTree } from "@/components/FileTree";
-import {
-  type FileEntry,
-  filesCreateDir,
-  filesOpenInVscode,
-  filesWriteText,
-} from "@/lib/files";
+import { type FileEntry, filesCreateDir, filesOpenInVscode, filesWriteText } from "@/lib/files";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { ROUTES } from "@/lib/routes";
 import { createLogger } from "@/lib/logger";
@@ -253,4 +248,3 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
     </div>
   );
 }
-

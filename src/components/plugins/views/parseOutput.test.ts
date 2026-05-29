@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  normalizeView,
-  parseKeyValue,
-  parseList,
-  parseTable,
-} from "./parseOutput";
+import { normalizeView, parseKeyValue, parseList, parseTable } from "./parseOutput";
 
 describe("normalizeView", () => {
   it("passes through known views", () => {
@@ -72,7 +67,10 @@ describe("parseTable — array-of-objects (BWOC {agents:[...]})", () => {
 
   it("unions keys across heterogeneous rows", () => {
     const raw = JSON.stringify({
-      issues: [{ key: "A-1", status: "Open" }, { key: "A-2", assignee: "duck" }],
+      issues: [
+        { key: "A-1", status: "Open" },
+        { key: "A-2", assignee: "duck" },
+      ],
     });
     const res = parseTable(raw);
     expect(res.ok).toBe(true);

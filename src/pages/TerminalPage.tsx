@@ -1,11 +1,4 @@
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useTerminal } from "@/hooks/useTerminal";
 import type { UseTerminalReturn } from "@/hooks/useTerminal";
