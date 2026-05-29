@@ -16,6 +16,26 @@ Versions follow [Calendar Versioning](https://calver.org/) (YYYY.M.D).
 
 ## [Unreleased]
 
+## [2026.5.29] - 2026-05-29
+
+### Added: Multi-window support
+
+LiteDuck can now open multiple top-level windows, each targeting its own
+workspace, with per-window state isolation.
+
+- **File → New Window** (`Cmd+Shift+N`) clones the current window's workspace
+  into a new window; **File → New Window with Workspace…** opens a new window
+  on the workspace picker; **Close Window** (`Cmd+Shift+W`).
+- **Per-window workspace** — each window resolves its workspace from its entry
+  URL / the `~/.liteduck/windows.json` registry, so windows no longer share a
+  single global workspace.
+- **Per-window terminals** — PTY sessions are tagged with their owning window;
+  `pty-output` and the terminal tab list are scoped per window instead of
+  shared across the process.
+- **Window-scoped menu + PTY events** — native menu actions and PTY events are
+  delivered only to the focused/owning window (via `getCurrentWebview().listen`
+  + `emit_to`), fixing cross-window leakage.
+
 ### Distribution: Homebrew-formula-from-source only
 
 LiteDuck is now distributed **only** as a build-from-source Homebrew formula. The
