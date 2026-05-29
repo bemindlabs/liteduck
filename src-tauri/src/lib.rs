@@ -152,20 +152,6 @@ pub fn run() {
         #[cfg(not(target_os = "ios"))]
         app.manage(std::sync::Arc::new(pty::PtyManager::new()));
 
-        // Per-window event-sink registry. Lets backend code emit_to a specific
-        // webview label (see `windows.rs` and `pty.rs`). Desktop only — iOS
-        // has a single fixed webview.
-        #[cfg(not(target_os = "ios"))]
-        {
-            let sinks = std::sync::Arc::new(windows::WindowSinks::new());
-            app.manage(sinks.clone());
-            if let Some(window) = app.get_webview_window("main") {
-                sinks.register("main", window);
-            } else {
-                log::warn!("setup: 'main' window not found — WindowSinks not seeded");
-            }
-        }
-
         // Wire TauriEventSink into managed state.
         if let Some(window) = app.get_webview_window("main") {
             let sink: std::sync::Arc<dyn liteduck_core::traits::EventSink> =

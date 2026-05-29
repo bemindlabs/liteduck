@@ -49,7 +49,14 @@ multi-window UX.
 |--------|-------|-------|
 | `pty.rs` → `pty-output` | `app.emit("pty-output", …)` (broadcast) | `app.emit_to(window_label, "pty-output", …)` |
 | `app_menu.rs` → `menu-action` / `menu-navigate` | `app.emit(...)` (broadcast) | `app.emit_to(focused_label, ...)` |
-| `event_sink::TauriEventSink` | Wraps `"main"` window once at startup | One sink per webview, registered when `window_open` creates a new one |
+| `event_sink::TauriEventSink` | Wraps `"main"` window once at startup | Unchanged in Phase 1 |
+
+> **Note (post-review):** an earlier draft of this PR added a `WindowSinks`
+> registry (one `TauriEventSink` per webview label). It was dropped before
+> merge — per-window emits go through `app.emit_to(label, …)` directly, so the
+> registry's read side was never called. If a future phase needs to hand a
+> per-window `EventSink` to `liteduck-core` business logic, reintroduce it then
+> with an actual consumer.
 
 ### PTY scoping
 
@@ -75,12 +82,11 @@ window-scoped — so close/write/resize keep working with bare IDs.
 
 ### Phase 1 — Core multi-window (this PR)
 
-1. `windows.rs` module + `window_open` / `window_list` / `window_set_workspace` IPC
-2. Per-window `TauriEventSink` registration on window creation
-3. `PtyManager`: window-label scoping + `emit_to`
-4. `app_menu.rs`: `emit_to(focused, …)` + File→New Window + File→New Window with Workspace…
-5. Frontend: `lib/window.ts`, URL-driven `WorkspaceContext`, menu wiring
-6. `~/.liteduck/windows.json` skeleton (workspace per window; geometry deferred)
+1. `windows.rs` module + `window_open` / `window_list` / `window_set_workspace` / `window_current_label` IPC
+2. `PtyManager`: window-label scoping + `emit_to`
+3. `app_menu.rs`: `emit_to(focused, …)` + File→New Window + File→New Window with Workspace… + Close Window
+4. Frontend: `lib/window.ts`, URL-driven `WorkspaceContext`, menu wiring
+5. `~/.liteduck/windows.json` skeleton (workspace per window; geometry deferred). Read-modify-write serialised behind a process-global lock.
 
 ### Phase 2 — State restoration (follow-up)
 
@@ -89,6 +95,24 @@ window-scoped — so close/write/resize keep working with bare IDs.
   workspace + geometry; fall back to a single `main` if the file is missing
   or corrupt.
 * `Cmd+~` / Window-menu list to cycle focus between open windows.
+
+**Two review findings deferred to Phase 2 (they're entangled with the
+restore-on-launch lifecycle, which doesn't exist yet):**
+
+* **Registry self-wipes on close.** The `Destroyed` handler in `window_open`
+  calls `remove_window(label)`, so a window's entry disappears as soon as it
+  closes — including when the whole app quits (every window fires
+  `Destroyed`). Today that's harmless (nothing reads the registry on launch),
+  but it directly defeats the restore-on-launch goal above. Phase 2 must
+  distinguish "user closed one window" (drop the entry) from "app is quitting"
+  (keep all entries) — e.g. only `remove_window` on an explicit
+  `CloseRequested` from the user, and snapshot the full set on app exit.
+* **`main` window has no lifecycle handler.** Only `window_open`-created
+  windows get an `on_window_event` cleanup closure. If `main` is closed while
+  other windows keep the process alive (macOS), its PTY sessions + reader
+  threads leak and its `windows.json` entry lingers. Phase 2 should wire a
+  cleanup path for `main` (reap its PTY sessions, prune the registry entry)
+  when it closes but the app stays up.
 
 ## Non-goals
 

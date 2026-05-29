@@ -15,18 +15,23 @@
 //! Desktop-only — iOS has a single webview and no concept of secondary
 //! windows.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use crate::event_sink::TauriEventSink;
 use crate::home::home_dir;
 
 const WINDOWS_REGISTRY_FILE: &str = "windows.json";
 const REGISTRY_SCHEMA_VERSION: u32 = 1;
+
+/// Serialises the read-modify-write cycle over `windows.json`. Two windows
+/// persisting their workspace concurrently (or one closing while another sets
+/// a workspace) would otherwise read the same base, mutate, and write back —
+/// silently dropping one window's entry.
+static REGISTRY_LOCK: Mutex<()> = Mutex::new(());
 
 // ── Registry types ──────────────────────────────────────────────────────────
 
@@ -85,6 +90,7 @@ fn write_registry(file: &WindowsFile) -> Result<(), String> {
 }
 
 fn upsert_window(label: &str, workspace: Option<String>) {
+    let _guard = REGISTRY_LOCK.lock();
     let mut file = read_registry();
     file.version = REGISTRY_SCHEMA_VERSION;
     if let Some(existing) = file.windows.iter_mut().find(|w| w.label == label) {
@@ -101,40 +107,11 @@ fn upsert_window(label: &str, workspace: Option<String>) {
 }
 
 fn remove_window(label: &str) {
+    let _guard = REGISTRY_LOCK.lock();
     let mut file = read_registry();
     file.windows.retain(|w| w.label != label);
     if let Err(e) = write_registry(&file) {
         log::warn!("windows.json remove failed: {e}");
-    }
-}
-
-// ── Per-window event sink registry ──────────────────────────────────────────
-
-/// Holds one `TauriEventSink` per webview label so business logic can target
-/// a specific window. The `"main"` sink is registered at app setup; secondary
-/// windows are registered in [`window_open`].
-#[derive(Default)]
-pub struct WindowSinks {
-    sinks: Mutex<std::collections::HashMap<String, Arc<TauriEventSink>>>,
-}
-
-impl WindowSinks {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn register(&self, label: &str, window: WebviewWindow) {
-        self.sinks
-            .lock()
-            .insert(label.to_string(), Arc::new(TauriEventSink(window)));
-    }
-
-    pub fn unregister(&self, label: &str) {
-        self.sinks.lock().remove(label);
-    }
-
-    pub fn get(&self, label: &str) -> Option<Arc<TauriEventSink>> {
-        self.sinks.lock().get(label).cloned()
     }
 }
 
@@ -143,6 +120,20 @@ impl WindowSinks {
 fn next_window_label() -> String {
     let id = uuid::Uuid::new_v4().simple().to_string();
     format!("window-{}", &id[..8])
+}
+
+/// Generate a window label guaranteed not to collide with an already-open
+/// window. Tauri requires unique webview labels — a collision makes
+/// `WebviewWindowBuilder::build()` fail — so we retry until the candidate is
+/// free. 8 hex chars make a collision astronomically rare, but a one-off
+/// retry costs nothing and removes the failure mode entirely.
+fn unique_window_label(existing: &HashSet<String>) -> String {
+    loop {
+        let candidate = next_window_label();
+        if !existing.contains(&candidate) {
+            return candidate;
+        }
+    }
 }
 
 /// Build `index.html?workspace=<encoded>&window=<label>` as the entry URL.
@@ -179,7 +170,8 @@ fn urlencoding_encode(s: &str) -> String {
 /// (e.g. focus, close, set workspace).
 #[tauri::command]
 pub fn window_open(app: AppHandle, workspace: Option<String>) -> Result<String, String> {
-    let label = next_window_label();
+    let existing: HashSet<String> = app.webview_windows().into_keys().collect();
+    let label = unique_window_label(&existing);
     let url = build_entry_url(&label, workspace.as_deref());
 
     let window = WebviewWindowBuilder::new(&app, &label, url)
@@ -193,19 +185,10 @@ pub fn window_open(app: AppHandle, workspace: Option<String>) -> Result<String, 
     // a recoverable record.
     upsert_window(&label, workspace);
 
-    // Register a per-window event sink so backend `emit_to(label, …)` works.
-    if let Some(sinks) = app.try_state::<Arc<WindowSinks>>() {
-        sinks.register(&label, window.clone());
-    }
-
     // Clean up the per-window state when the window is destroyed.
     let label_for_cleanup = label.clone();
-    let app_for_cleanup = app.clone();
     window.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
-            if let Some(sinks) = app_for_cleanup.try_state::<Arc<WindowSinks>>() {
-                sinks.unregister(&label_for_cleanup);
-            }
             remove_window(&label_for_cleanup);
         }
     });
@@ -216,6 +199,7 @@ pub fn window_open(app: AppHandle, workspace: Option<String>) -> Result<String, 
 /// Return the list of recorded windows from `~/.liteduck/windows.json`.
 #[tauri::command]
 pub fn window_list() -> Vec<WindowState> {
+    let _guard = REGISTRY_LOCK.lock();
     read_registry().windows
 }
 
