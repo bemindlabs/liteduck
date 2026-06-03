@@ -2,13 +2,19 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mockInvoke, resetTauriMocks } from "@/test/tauri-mocks";
 import {
   FILE_ICONS,
+  filesCopy,
   filesCreateDir,
   filesDelete,
+  filesFind,
   filesGetMetadata,
   filesListDir,
+  filesMove,
   filesOpenInVscode,
   filesReadText,
   filesRename,
+  filesRevealInOs,
+  filesUnwatch,
+  filesWatch,
   filesWriteText,
   formatBytes,
   formatModified,
@@ -190,5 +196,85 @@ describe("files helpers", () => {
       path: "/tmp/new-folder",
       workspace: null,
     });
+  });
+
+  it("copies a path with nullable workspace by default", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+
+    await expect(filesCopy("/tmp/a.txt", "/tmp/b.txt")).resolves.toBeUndefined();
+    expect(mockInvoke).toHaveBeenCalledWith("files_copy", {
+      src: "/tmp/a.txt",
+      dest: "/tmp/b.txt",
+      workspace: null,
+    });
+  });
+
+  it("copies a path with an explicit workspace", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+
+    await filesCopy("/ws/a.txt", "/ws/b.txt", "/ws");
+
+    expect(mockInvoke).toHaveBeenCalledWith("files_copy", {
+      src: "/ws/a.txt",
+      dest: "/ws/b.txt",
+      workspace: "/ws",
+    });
+  });
+
+  it("moves a path with nullable workspace by default", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+
+    await expect(filesMove("/tmp/a.txt", "/tmp/sub/a.txt")).resolves.toBeUndefined();
+    expect(mockInvoke).toHaveBeenCalledWith("files_move", {
+      src: "/tmp/a.txt",
+      dest: "/tmp/sub/a.txt",
+      workspace: null,
+    });
+  });
+
+  it("reveals a path in the OS file manager", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+
+    await filesRevealInOs("/tmp/project");
+
+    expect(mockInvoke).toHaveBeenCalledWith("files_reveal_in_os", { path: "/tmp/project" });
+  });
+
+  it("finds entries with nullable limit/showHidden/workspace by default", async () => {
+    const result: FileEntry[] = [];
+    mockInvoke.mockResolvedValueOnce(result);
+
+    await expect(filesFind("/tmp/project", "report")).resolves.toEqual(result);
+    expect(mockInvoke).toHaveBeenCalledWith("files_find", {
+      root: "/tmp/project",
+      query: "report",
+      limit: null,
+      showHidden: null,
+      workspace: null,
+    });
+  });
+
+  it("finds entries with explicit limit, showHidden, and workspace", async () => {
+    mockInvoke.mockResolvedValueOnce([]);
+
+    await filesFind("/ws", "log", 50, true, "/ws");
+
+    expect(mockInvoke).toHaveBeenCalledWith("files_find", {
+      root: "/ws",
+      query: "log",
+      limit: 50,
+      showHidden: true,
+      workspace: "/ws",
+    });
+  });
+
+  it("starts and stops watching a path", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+
+    await expect(filesWatch("/tmp/project")).resolves.toBeUndefined();
+    await expect(filesUnwatch("/tmp/project")).resolves.toBeUndefined();
+
+    expect(mockInvoke).toHaveBeenNthCalledWith(1, "files_watch", { path: "/tmp/project" });
+    expect(mockInvoke).toHaveBeenNthCalledWith(2, "files_unwatch", { path: "/tmp/project" });
   });
 });

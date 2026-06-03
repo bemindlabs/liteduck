@@ -16,6 +16,55 @@ Versions follow [Calendar Versioning](https://calver.org/) (YYYY.M.D).
 
 ## [Unreleased]
 
+## [2026.6.3] - 2026-06-03
+
+### Added
+
+- **Code editor — CodeMirror 6.** The editor moved from a `<textarea>` + custom-regex
+  highlight overlay to CodeMirror 6, bringing standard editor features: language-aware
+  syntax highlighting (lazy-loaded grammars for JS/TS/Rust/Python/JSON/Markdown/HTML/CSS/
+  YAML and more), **find & replace** (Cmd+F), a real undo/redo history, bracket matching +
+  auto-close, smart auto-indent, code folding, and multi-cursor. The theme is bound to the
+  app's design tokens so it looks identical to the rest of the UI. Markdown editing
+  (edit/split) runs on the same editor; the formatting toolbar drives it via an imperative
+  handle.
+- **File manager — richer right-click menu.** The file-tree context menu now offers
+  **Cut / Copy / Paste**, **Duplicate**, **New File / New Folder** (on a folder),
+  **Copy Relative Path**, and **Reveal in Finder**, alongside the existing Rename / Delete /
+  Copy Path / Open in VS Code / Open Terminal Here. The empty Explorer area has its own
+  background menu (New File / New Folder / Paste / Refresh).
+- **Drag-to-move.** Dragging a tree entry onto a folder moves it there (collision-safe
+  naming); dragging onto the terminal still inserts its path.
+- **File-manager backend commands:** `files_copy`, `files_move` (cross-device safe),
+  `files_reveal_in_os`, `files_find` (bounded recursive name search), and
+  `files_watch`/`files_unwatch` (filesystem change events via the `notify` crate).
+- **Error surfacing.** Failed file operations (copy/move/rename/delete/create) now raise a
+  notification instead of failing silently.
+- **Live auto-refresh.** The file tree now watches the workspace (`files://changed`) and
+  refreshes **in place** on external changes — expanded folders stay open (no remount).
+  Events are debounced.
+- **App zoom.** Cmd/Ctrl `+` / `-` adjusts the overall UI/text size and Cmd/Ctrl `0`
+  resets it (browser-style, persisted across launches). Listed under Appearance in the
+  keyboard-shortcuts help.
+
+### Fixed
+
+- **Notifications page now matches the app.** The notification categories are the ones
+  LiteDuck actually emits — **System / File / Terminal** — replacing the dead "GitHub"
+  category left over from LoopDuck (nothing ever produced it). File-op and terminal
+  failures are now tagged with their real category, so the page's type filter is
+  meaningful.
+
+### Changed
+
+- Relaxed the prior "no external dependencies" stance for the editor specifically —
+  CodeMirror is the standard, added with lazy language loading to keep the bundle lean.
+
+### Notes
+
+- Multi-select and full keyboard tree navigation remain deferred (they need a flattened
+  tree model).
+
 ## [2026.5.29] - 2026-05-29
 
 ### Added: Multi-window support

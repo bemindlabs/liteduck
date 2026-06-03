@@ -2,7 +2,10 @@
 // Notification types
 // ---------------------------------------------------------------------------
 
-export type NotificationType = "github" | "system";
+// The categories LiteDuck actually emits today: file-manager operation failures,
+// terminal failures, and generic system/logger errors. (The old "github" category
+// was a LoopDuck leftover — GitHub integration is no longer part of core.)
+export type NotificationType = "system" | "file" | "terminal";
 
 export interface Notification {
   id: string;

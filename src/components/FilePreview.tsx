@@ -1,5 +1,14 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { CheckCircle2, ClipboardCopy, Columns2, Eye, Pencil, Save, Undo2 } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import {
+  CheckCircle2,
+  ClipboardCopy,
+  Columns2,
+  Eye,
+  Pencil,
+  Save,
+  Search,
+  Undo2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PageLoading } from "@/components/ui/skeleton";
@@ -12,14 +21,12 @@ import {
 } from "@/lib/files";
 import { Markdown } from "@/components/Markdown";
 import { ReadingView } from "@/components/ReadingView";
-import { highlightLine } from "./file-preview/syntax-highlight";
+import { CodeEditor, type CodeEditorHandle } from "@/components/editor/CodeEditor";
 import { MdToolbar } from "./file-preview/MdToolbar";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MAX_BYTES = 1_048_576; // 1 MiB
-
-// Syntax highlighter and MdToolbar extracted to ./file-preview/
 
 // ── Override fn types ────────────────────────────────────────────────────────
 
@@ -53,11 +60,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
   const [mdViewMode, setMdViewMode] = useState<MdViewMode>(docsMode ? "edit" : "preview");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
-  // Highlight overlay (the colored <pre> behind the transparent code textarea)
-  // and its line-number gutter — both must scroll in lock-step with the textarea.
-  const highlightRef = useRef<HTMLPreElement>(null);
-  const gutterRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<CodeEditorHandle>(null);
 
   const ext = entry?.extension?.toLowerCase() ?? "";
   const isMd = ext === "md" || ext === "markdown" || ext === "mdx";
@@ -112,7 +115,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
   }, [entry, readFile, docsMode]);
 
   const handleSave = useCallback(async () => {
-    if (!entry || !hasChanges) return;
+    if (!entry || editContent === originalContent) return;
     setSaving(true);
     const doWrite = writeFile ?? filesWriteText;
     try {
@@ -126,7 +129,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
     } finally {
       setSaving(false);
     }
-  }, [entry, editContent, hasChanges, writeFile]);
+  }, [entry, editContent, originalContent, writeFile]);
 
   const handleRevert = useCallback(() => {
     setEditContent(originalContent);
@@ -143,59 +146,6 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
       /* silent */
     }
   }
-
-  // Handle Ctrl+S / Cmd+S in editor
-  const handleEditorKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        void handleSave();
-      }
-      // Tab key inserts 2 spaces
-      if (e.key === "Tab") {
-        e.preventDefault();
-        const textarea = e.currentTarget;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const newVal = editContent.slice(0, start) + "  " + editContent.slice(end);
-        setEditContent(newVal);
-        requestAnimationFrame(() => {
-          textarea.selectionStart = textarea.selectionEnd = start + 2;
-        });
-      }
-    },
-    [handleSave, editContent],
-  );
-
-  // Keep the highlight overlay + line-number gutter aligned with the textarea
-  // as the user scrolls (the textarea is the only scrollable layer).
-  const handleEditorScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
-    const { scrollTop, scrollLeft } = e.currentTarget;
-    if (highlightRef.current) {
-      highlightRef.current.scrollTop = scrollTop;
-      highlightRef.current.scrollLeft = scrollLeft;
-    }
-    if (gutterRef.current) {
-      gutterRef.current.scrollTop = scrollTop;
-    }
-  }, []);
-
-  // Pre-highlight each line of the editable buffer once per content/ext change.
-  // Mirrors the read-only view's coloring; cheap enough to skip virtualization.
-  // An empty line gets a zero-width space so it keeps full line-height and stays
-  // aligned with the textarea's caret. A trailing "" element guards the final
-  // newline (a <pre> collapses a trailing blank line; a textarea keeps it).
-  const editLineCount = useMemo(
-    () => (isMd ? 0 : editContent.split("\n").length),
-    [editContent, isMd],
-  );
-  const highlightedEditLines = useMemo(() => {
-    if (!isEditing || isMd) return null;
-    return editContent.split("\n").map((line, i) => {
-      const nodes = highlightLine(line, ext);
-      return <div key={i}>{line.length === 0 ? "​" : nodes}</div>;
-    });
-  }, [editContent, ext, isEditing, isMd]);
 
   // ── Empty / dir states ─────────────────────────────────────────────────
 
@@ -243,7 +193,7 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
 
   // ── Content / Editor ───────────────────────────────────────────────────
 
-  const lines = (content ?? "").split("\n");
+  const lineCount = (isEditing ? editContent : (content ?? "")).split("\n").length;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -318,6 +268,20 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
             </div>
           )}
 
+          {/* Find — opens the CodeMirror search panel (also Cmd+F). */}
+          {isEditing && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => editorRef.current?.openSearch()}
+              className="h-7 gap-1.5 text-xs"
+              title="Find / Replace (Cmd+F)"
+            >
+              <Search className="h-3.5 w-3.5" />
+              Find
+            </Button>
+          )}
+
           {/* Revert */}
           {isEditing && hasChanges && (
             <Button
@@ -360,176 +324,64 @@ export function FilePreview({ entry, readFile, writeFile, docsMode }: FilePrevie
       </div>
 
       {/* Markdown formatting toolbar */}
-      {isMd && mdViewMode !== "preview" && (
-        <MdToolbar
-          textareaRef={editorRef}
-          editContent={editContent}
-          setEditContent={setEditContent}
-        />
-      )}
+      {isMd && mdViewMode !== "preview" && <MdToolbar editor={editorRef} />}
 
-      {/* Editor or Code view */}
+      {/* Editor or preview */}
       {isMd ? (
-        /* Markdown modes: edit, split, preview */
         mdViewMode === "preview" ? (
           <div className="flex-1 overflow-auto p-6">
             <Markdown content={content ?? ""} />
           </div>
         ) : mdViewMode === "split" ? (
           <div className="flex flex-1 overflow-hidden">
-            {/* Editor pane */}
-            <div className="flex-1 overflow-hidden relative border-r border-[var(--color-border)]">
-              <textarea
+            <div className="flex-1 overflow-hidden border-r border-[var(--color-border)]">
+              <CodeEditor
                 ref={editorRef}
                 value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                onKeyDown={handleEditorKeyDown}
-                spellCheck={false}
-                className={cn(
-                  "absolute inset-0 w-full h-full resize-none font-mono text-xs leading-relaxed",
-                  "bg-[var(--color-background)] text-[var(--color-foreground)] p-4 pl-14",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-ring)] border-none",
-                  "selection:bg-[var(--color-accent)]",
-                )}
+                onChange={setEditContent}
+                filename={entry.name}
+                onSave={() => void handleSave()}
               />
-              <div
-                className="absolute left-0 top-0 bottom-0 w-12 pointer-events-none overflow-hidden bg-[var(--color-card)] border-r border-[var(--color-border)]"
-                style={{ paddingTop: "1rem" }}
-              >
-                {editContent.split("\n").map((_, i) => (
-                  <div
-                    key={i}
-                    className="text-right pr-2 text-[var(--color-muted-foreground)] font-mono text-xs leading-relaxed select-none"
-                  >
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
             </div>
-            {/* Preview pane */}
             <div className="flex-1 overflow-auto p-6">
               <Markdown content={editContent} />
             </div>
           </div>
         ) : (
-          /* Edit-only mode */
-          <div className="flex-1 overflow-hidden relative">
-            <textarea
+          <div className="flex-1 overflow-hidden">
+            <CodeEditor
               ref={editorRef}
               value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              onKeyDown={handleEditorKeyDown}
-              spellCheck={false}
-              className={cn(
-                "absolute inset-0 w-full h-full resize-none font-mono text-xs leading-relaxed",
-                "bg-[var(--color-background)] text-[var(--color-foreground)] p-4 pl-14",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-ring)] border-none",
-                "selection:bg-[var(--color-accent)]",
-              )}
+              onChange={setEditContent}
+              filename={entry.name}
+              onSave={() => void handleSave()}
             />
-            <div
-              className="absolute left-0 top-0 bottom-0 w-12 pointer-events-none overflow-hidden bg-[var(--color-card)] border-r border-[var(--color-border)]"
-              style={{ paddingTop: "1rem" }}
-            >
-              {editContent.split("\n").map((_, i) => (
-                <div
-                  key={i}
-                  className="text-right pr-2 text-[var(--color-muted-foreground)] font-mono text-xs leading-relaxed select-none"
-                >
-                  {i + 1}
-                </div>
-              ))}
-            </div>
           </div>
         )
-      ) : isEditing ? (
-        /* Non-markdown editor — directly editable (VS Code-style) with live syntax
-           highlighting via a transparent textarea layered over a colored <pre>. */
-        <div className="flex-1 overflow-hidden relative">
-          {/* Highlight layer (behind) — colored, non-interactive, scroll-synced. */}
-          <pre
-            ref={highlightRef}
-            aria-hidden="true"
-            className={cn(
-              "absolute inset-0 w-full h-full m-0 overflow-hidden pointer-events-none",
-              "font-mono text-xs leading-relaxed whitespace-pre-wrap break-words",
-              "bg-[var(--color-background)] text-[var(--color-foreground)] p-4 pl-14",
-            )}
-            style={{ tabSize: 2 }}
-          >
-            {highlightedEditLines}
-          </pre>
-          {/* Input layer (top) — transparent text, visible caret + selection. */}
-          <textarea
+      ) : (
+        /* Non-markdown: always-on code editor (read-only when truncated). */
+        <div className="flex-1 overflow-hidden">
+          <CodeEditor
             ref={editorRef}
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            onKeyDown={handleEditorKeyDown}
-            onScroll={handleEditorScroll}
-            spellCheck={false}
-            className={cn(
-              "absolute inset-0 w-full h-full resize-none font-mono text-xs leading-relaxed",
-              "whitespace-pre-wrap break-words bg-transparent text-transparent p-4 pl-14",
-              "caret-[var(--color-foreground)]",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-ring)] border-none",
-              "selection:bg-[var(--color-accent)]",
-            )}
-            style={{ tabSize: 2 }}
+            onChange={setEditContent}
+            filename={entry.name}
+            readOnly={isTruncated}
+            onSave={() => void handleSave()}
           />
-          {/* Line-number gutter — scroll-synced with the textarea. */}
-          <div
-            ref={gutterRef}
-            className="absolute left-0 top-0 bottom-0 w-12 pointer-events-none overflow-hidden bg-[var(--color-card)] border-r border-[var(--color-border)]"
-            style={{ paddingTop: "1rem" }}
-          >
-            {Array.from({ length: editLineCount }, (_, i) => (
-              <div
-                key={i}
-                className="text-right pr-2 text-[var(--color-muted-foreground)] font-mono text-xs leading-relaxed select-none"
-              >
-                {i + 1}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        /* Code view with syntax highlighting */
-        <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse font-mono text-xs">
-            <tbody>
-              {lines.map((line, i) => (
-                <tr key={i} className="hover:bg-[var(--color-accent)] transition-colors">
-                  <td
-                    className={cn(
-                      "select-none pr-4 pl-3 py-0 text-right text-[var(--color-muted-foreground)]",
-                      "border-r border-[var(--color-border)] min-w-[3rem] sticky left-0 bg-[var(--color-card)]",
-                    )}
-                    style={{ width: `${String(lines.length).length + 1}ch` }}
-                  >
-                    {i + 1}
-                  </td>
-                  <td className="pl-4 pr-2 py-0 whitespace-pre text-[var(--color-foreground)]">
-                    {highlightLine(line, ext)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
 
       {/* Status bar */}
       <div className="flex shrink-0 items-center justify-between border-t border-[var(--color-border)] bg-[var(--color-card)] px-3 py-1 text-[10px] text-[var(--color-muted-foreground)]">
         <span>
-          {isEditing
-            ? `Editing — ${editContent.split("\n").length} lines`
-            : `${lines.length} lines`}
+          {isEditing ? `Editing — ${lineCount} lines` : `${lineCount} lines`}
           {hasChanges && " (modified)"}
         </span>
         <div className="flex items-center gap-3">
           <span>{ext.toUpperCase() || "TXT"}</span>
           <span>UTF-8</span>
-          {isEditing && <span>Cmd+S to save • Tab for indent</span>}
+          {isEditing && <span>Cmd+S save • Cmd+F find</span>}
         </div>
       </div>
     </div>

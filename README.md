@@ -50,7 +50,8 @@ brew upgrade liteduck
 | Feature | Description |
 |---------|-------------|
 | **Workspace Shell** | VS Code-style layout: activity rail, file-tree side panel, editor area, collapsible terminal dock, and status bar — all visible at once |
-| **File Manager** | Tree view, preview (code, images, markdown), inline editing, new file/folder, open in VS Code; context menus + drag a file/folder onto the terminal to insert its path |
+| **File Manager** | Tree view with a full right-click menu (cut/copy/paste, duplicate, new file/folder, rename, delete, copy path / relative path, reveal in Finder, open in VS Code, open terminal here), drag-to-move onto folders, image/markdown preview; drag a file/folder onto the terminal to insert its path |
+| **Code Editor** | CodeMirror 6: language-aware syntax highlighting, find & replace (Cmd+F), undo/redo, bracket matching, auto-indent, code folding, multi-cursor; markdown edit/split with a formatting toolbar |
 | **Terminal** | Tabs, split panes, full-view mode (Cmd+Shift+`), raw PTY |
 | **Git** | Branch management, status, commits, diffs, worktrees |
 | **Plugins** | Manifest-based plugin system — install from a local folder or the GitHub registry; scope-limited (no chat/agent/LLM kinds) |
@@ -61,7 +62,7 @@ brew upgrade liteduck
 
 | Layer | Technology |
 |-------|-----------|
-| **Frontend** | React 19, TypeScript, Tailwind CSS, Vite 8, xterm.js |
+| **Frontend** | React 19, TypeScript, Tailwind CSS, Vite 8, CodeMirror 6, xterm.js |
 | **Backend** | Rust, Tauri v2 |
 | **Database** | SQLite (bundled via rusqlite) |
 | **Auth** | System keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service) |

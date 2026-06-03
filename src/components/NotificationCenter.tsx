@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
-import { Bell, X, CheckCheck, Trash2, Github, Monitor } from "lucide-react";
+import { Bell, X, CheckCheck, Trash2, FileText, SquareTerminal, Monitor } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
@@ -32,14 +32,18 @@ const TYPE_META: Record<
   NotificationType,
   { Icon: React.ElementType; colorClass: string; labelColor: string }
 > = {
-  github: {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    Icon: Github,
-    colorClass: "bg-muted text-foreground",
-    labelColor: "text-foreground",
-  },
   system: {
     Icon: Monitor,
+    colorClass: "bg-[var(--color-secondary)] text-[var(--color-muted-foreground)]",
+    labelColor: "text-[var(--color-muted-foreground)]",
+  },
+  file: {
+    Icon: FileText,
+    colorClass: "bg-[var(--color-secondary)] text-[var(--color-muted-foreground)]",
+    labelColor: "text-[var(--color-muted-foreground)]",
+  },
+  terminal: {
+    Icon: SquareTerminal,
     colorClass: "bg-[var(--color-secondary)] text-[var(--color-muted-foreground)]",
     labelColor: "text-[var(--color-muted-foreground)]",
   },

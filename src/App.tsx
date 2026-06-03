@@ -35,6 +35,7 @@ import {
 } from "@/hooks/useKeyboardShortcuts";
 import { useMenuEvents } from "@/hooks/useMenuEvents";
 import { useSuppressNativeContextMenu } from "@/hooks/useSuppressNativeContextMenu";
+import { useFontZoom } from "@/hooks/useFontZoom";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
@@ -62,6 +63,9 @@ function Layout() {
 
   // Kill the native WebView right-click menu app-wide (editable fields exempt).
   useSuppressNativeContextMenu();
+
+  // App-wide zoom: Cmd/Ctrl +/− adjusts the overall UI/text size, Cmd/Ctrl+0 resets.
+  useFontZoom();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);

@@ -152,6 +152,10 @@ pub fn run() {
         #[cfg(not(target_os = "ios"))]
         app.manage(std::sync::Arc::new(pty::PtyManager::new()));
 
+        // Filesystem watch manager (notify-backed) — desktop only.
+        #[cfg(not(target_os = "ios"))]
+        app.manage(files::FileWatchManager::new());
+
         // Wire TauriEventSink into managed state.
         if let Some(window) = app.get_webview_window("main") {
             let sink: std::sync::Arc<dyn liteduck_core::traits::EventSink> =
@@ -246,6 +250,12 @@ pub fn run() {
             files::files_rename,
             files::files_create_dir,
             files::files_delete,
+            files::files_copy,
+            files::files_move,
+            files::files_reveal_in_os,
+            files::files_find,
+            files::files_watch,
+            files::files_unwatch,
             // Git — desktop only (git2 / libgit2)
             git::git_status,
             git::git_log,

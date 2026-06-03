@@ -31,11 +31,13 @@ export function EditorArea({ tabs, activeTabId, onSelectTab, onCloseTab }: Edito
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      // Inside an editable field (markdown edit/split textarea) the global
-      // suppression hook lets the native editing menu through — don't override
-      // it with our read-only menu.
+      // Inside an editable field — the markdown/code CodeMirror editor (a
+      // contenteditable `.cm-content`), a textarea, or an input — the global
+      // suppression hook lets the native editing menu (cut/copy/paste/find)
+      // through, so don't override it with our read-only menu.
       const target = e.target as HTMLElement;
       if (target.tagName === "TEXTAREA" || target.tagName === "INPUT") return;
+      if (target.isContentEditable || target.closest(".cm-editor")) return;
       if (!activeTab) return;
       e.preventDefault();
       const sel = window.getSelection();

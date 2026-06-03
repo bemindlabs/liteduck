@@ -13,155 +13,46 @@ import {
   Table,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { CodeEditorHandle } from "@/components/editor/CodeEditor";
 
 interface MdToolbarProps {
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  editContent: string;
-  setEditContent: (v: string) => void;
+  /** Imperative handle to the markdown CodeEditor instance. */
+  editor: React.RefObject<CodeEditorHandle | null>;
 }
 
 interface FmtAction {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  action: (ta: HTMLTextAreaElement, content: string) => { text: string; cursor: number };
+  run: (ed: CodeEditorHandle) => void;
 }
 
 const MD_ACTIONS: FmtAction[] = [
-  {
-    icon: Bold,
-    label: "Bold",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const e = ta.selectionEnd;
-      const sel = c.slice(s, e) || "bold text";
-      const text = c.slice(0, s) + `**${sel}**` + c.slice(e);
-      return { text, cursor: s + 2 + sel.length };
-    },
-  },
-  {
-    icon: Italic,
-    label: "Italic",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const e = ta.selectionEnd;
-      const sel = c.slice(s, e) || "italic text";
-      const text = c.slice(0, s) + `*${sel}*` + c.slice(e);
-      return { text, cursor: s + 1 + sel.length };
-    },
-  },
-  {
-    icon: Heading1,
-    label: "Heading 1",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const text = c.slice(0, s) + "# " + c.slice(s);
-      return { text, cursor: s + 2 };
-    },
-  },
-  {
-    icon: Heading2,
-    label: "Heading 2",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const text = c.slice(0, s) + "## " + c.slice(s);
-      return { text, cursor: s + 3 };
-    },
-  },
-  {
-    icon: Heading3,
-    label: "Heading 3",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const text = c.slice(0, s) + "### " + c.slice(s);
-      return { text, cursor: s + 4 };
-    },
-  },
-  {
-    icon: Link,
-    label: "Link",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const e = ta.selectionEnd;
-      const sel = c.slice(s, e) || "link text";
-      const text = c.slice(0, s) + `[${sel}](url)` + c.slice(e);
-      return { text, cursor: s + sel.length + 3 };
-    },
-  },
-  {
-    icon: Image,
-    label: "Image",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const text = c.slice(0, s) + "![alt](image-url)" + c.slice(ta.selectionEnd);
-      return { text, cursor: s + 2 };
-    },
-  },
-  {
-    icon: Code,
-    label: "Code",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const e = ta.selectionEnd;
-      const sel = c.slice(s, e);
-      if (sel.includes("\n")) {
-        const text = c.slice(0, s) + "```\n" + sel + "\n```" + c.slice(e);
-        return { text, cursor: s + 4 + sel.length };
-      }
-      const code = sel || "code";
-      const text = c.slice(0, s) + "`" + code + "`" + c.slice(e);
-      return { text, cursor: s + 1 + code.length };
-    },
-  },
-  {
-    icon: List,
-    label: "Bullet List",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const text = c.slice(0, s) + "- " + c.slice(s);
-      return { text, cursor: s + 2 };
-    },
-  },
-  {
-    icon: ListOrdered,
-    label: "Numbered List",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const text = c.slice(0, s) + "1. " + c.slice(s);
-      return { text, cursor: s + 3 };
-    },
-  },
-  {
-    icon: Quote,
-    label: "Blockquote",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const text = c.slice(0, s) + "> " + c.slice(s);
-      return { text, cursor: s + 2 };
-    },
-  },
+  { icon: Bold, label: "Bold", run: (ed) => ed.wrapSelection("**", "**") },
+  { icon: Italic, label: "Italic", run: (ed) => ed.wrapSelection("*", "*") },
+  { icon: Heading1, label: "Heading 1", run: (ed) => ed.prefixLines("# ") },
+  { icon: Heading2, label: "Heading 2", run: (ed) => ed.prefixLines("## ") },
+  { icon: Heading3, label: "Heading 3", run: (ed) => ed.prefixLines("### ") },
+  { icon: Link, label: "Link", run: (ed) => ed.wrapSelection("[", "](url)") },
+  { icon: Image, label: "Image", run: (ed) => ed.insertText("![alt](image-url)") },
+  { icon: Code, label: "Code", run: (ed) => ed.wrapSelection("`", "`") },
+  { icon: List, label: "Bullet List", run: (ed) => ed.prefixLines("- ") },
+  { icon: ListOrdered, label: "Numbered List", run: (ed) => ed.prefixLines("1. ") },
+  { icon: Quote, label: "Blockquote", run: (ed) => ed.prefixLines("> ") },
   {
     icon: Table,
     label: "Table",
-    action: (ta, c) => {
-      const s = ta.selectionStart;
-      const tbl =
-        "| Column 1 | Column 2 | Column 3 |\n| -------- | -------- | -------- |\n| Cell     | Cell     | Cell     |\n";
-      const text = c.slice(0, s) + tbl + c.slice(ta.selectionEnd);
-      return { text, cursor: s + tbl.length };
-    },
+    run: (ed) =>
+      ed.insertText(
+        "| Column 1 | Column 2 | Column 3 |\n| -------- | -------- | -------- |\n| Cell     | Cell     | Cell     |\n",
+      ),
   },
 ];
 
-export function MdToolbar({ textareaRef, editContent, setEditContent }: MdToolbarProps) {
-  function run(action: FmtAction["action"]) {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const { text, cursor } = action(ta, editContent);
-    setEditContent(text);
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.selectionStart = ta.selectionEnd = cursor;
-    });
+export function MdToolbar({ editor }: MdToolbarProps) {
+  function run(action: FmtAction["run"]) {
+    const ed = editor.current;
+    if (!ed) return;
+    action(ed);
   }
 
   return (
@@ -169,7 +60,7 @@ export function MdToolbar({ textareaRef, editContent, setEditContent }: MdToolba
       {MD_ACTIONS.map((a) => (
         <button
           key={a.label}
-          onClick={() => run(a.action)}
+          onClick={() => run(a.run)}
           title={a.label}
           className={cn(
             "flex h-7 w-7 items-center justify-center rounded-md transition-colors",

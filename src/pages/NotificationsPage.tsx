@@ -1,5 +1,14 @@
 import { useState, useSyncExternalStore, useMemo } from "react";
-import { Bell, Trash2, CheckCheck, Search, Github, Monitor, Inbox } from "lucide-react";
+import {
+  Bell,
+  Trash2,
+  CheckCheck,
+  Search,
+  FileText,
+  SquareTerminal,
+  Monitor,
+  Inbox,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { notificationStore, markRead, markAllRead, clearAll } from "@/lib/notifications";
@@ -11,18 +20,25 @@ const TYPE_META: Record<
   NotificationType,
   { Icon: React.ElementType; colorClass: string; label: string }
 > = {
-  github: {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    Icon: Github,
-    colorClass: "bg-muted text-foreground",
-    label: "GitHub",
-  },
   system: {
     Icon: Monitor,
     colorClass: "bg-(--color-secondary) text-(--color-muted-foreground)",
     label: "System",
   },
+  file: {
+    Icon: FileText,
+    colorClass: "bg-(--color-secondary) text-(--color-muted-foreground)",
+    label: "File",
+  },
+  terminal: {
+    Icon: SquareTerminal,
+    colorClass: "bg-(--color-secondary) text-(--color-muted-foreground)",
+    label: "Terminal",
+  },
 };
+
+// Filter order — keep in sync with NotificationType.
+const FILTER_TYPES: NotificationType[] = ["system", "file", "terminal"];
 
 export default function NotificationsPage() {
   const notifications = useSyncExternalStore(
@@ -131,7 +147,7 @@ export default function NotificationsPage() {
               >
                 All
               </button>
-              {(["github", "system"] as NotificationType[]).map((type) => (
+              {FILTER_TYPES.map((type) => (
                 <button
                   key={type}
                   onClick={() => setFilterType(type)}

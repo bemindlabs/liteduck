@@ -12,7 +12,18 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FileTree } from "@/components/FileTree";
-import { type FileEntry, filesCreateDir, filesOpenInVscode, filesWriteText } from "@/lib/files";
+import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
+import {
+  type FileEntry,
+  filesCreateDir,
+  filesOpenInVscode,
+  filesUnwatch,
+  filesWatch,
+  filesWriteText,
+} from "@/lib/files";
+import { listen } from "@tauri-apps/api/event";
+import { fileClipboardStore, useFileClipboard } from "@/lib/fileClipboard";
+import { pasteInto, surfaceFileError } from "@/lib/fileOps";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { ROUTES } from "@/lib/routes";
 import { createLogger } from "@/lib/logger";
@@ -33,7 +44,12 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
   const [showHidden, setShowHidden] = useState(true);
   const [newFileDialog, setNewFileDialog] = useState<"file" | "folder" | null>(null);
   const [newFileName, setNewFileName] = useState("");
+  // Directory a New File/Folder lands in — set by the toolbar (workspace root) or
+  // by the tree context menu (the right-clicked folder).
+  const [createTargetDir, setCreateTargetDir] = useState<string | null>(null);
+  const [bgMenu, setBgMenu] = useState<{ x: number; y: number } | null>(null);
   const newFileInputRef = useRef<HTMLInputElement>(null);
+  const clipboard = useFileClipboard();
 
   // Reset when workspace changes. Synchronising local UI state with an external
   // change (the active workspace) is a valid effect use.
@@ -67,24 +83,44 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
     setRefreshKey((k) => k + 1);
   }
 
-  const targetDir = (() => {
-    if (!workspaceDir) return null;
-    if (!selectedPath) return workspaceDir;
-    return selectedPath;
-  })();
+  // Live auto-refresh: watch the workspace tree and bump the refresh signal on
+  // any filesystem change. The signal drives an *in-place* tree refresh (not a
+  // remount), so expanded folders stay open. Events are debounced because a
+  // single save/move can emit a burst.
+  useEffect(() => {
+    if (!workspaceDir) return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unlistenP = listen("files://changed", () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!disposed) setRefreshKey((k) => k + 1);
+      }, 250);
+    });
+    void filesWatch(workspaceDir).catch((err: unknown) => logger.error("watch failed:", err));
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      void unlistenP.then((un) => un());
+      void filesUnwatch(workspaceDir).catch((err: unknown) => logger.error("unwatch failed:", err));
+    };
+  }, [workspaceDir]);
+
+  // Begin a New File/Folder flow targeted at `dir` (defaults to workspace root).
+  const startCreate = useCallback(
+    (kind: "file" | "folder", dir: string | null) => {
+      setCreateTargetDir(dir ?? workspaceDir);
+      setNewFileDialog(kind);
+      setNewFileName("");
+      requestAnimationFrame(() => newFileInputRef.current?.focus());
+    },
+    [workspaceDir],
+  );
 
   const handleNewFileSubmit = useCallback(async () => {
-    if (!targetDir || !newFileName.trim()) return;
-    // If the selected path is a file, create alongside it.
-    const dir = (() => {
-      const parts = targetDir.split("/");
-      if (parts.length > 1 && !targetDir.endsWith("/")) {
-        // We don't know is_dir here from path alone — fall back to using the path as a dir.
-        return targetDir;
-      }
-      return targetDir;
-    })();
-    const fullPath = `${dir}/${newFileName.trim()}`;
+    const dir = createTargetDir ?? workspaceDir;
+    if (!dir || !newFileName.trim()) return;
+    const fullPath = `${dir.replace(/\/+$/, "")}/${newFileName.trim()}`;
     try {
       if (newFileDialog === "folder") {
         await filesCreateDir(fullPath);
@@ -95,9 +131,30 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
       setNewFileDialog(null);
       setNewFileName("");
     } catch (err) {
-      logger.error("create failed:", err);
+      surfaceFileError("Create", err);
     }
-  }, [targetDir, newFileName, newFileDialog]);
+  }, [createTargetDir, workspaceDir, newFileName, newFileDialog]);
+
+  // Background (empty-space) context menu — create at root / paste / refresh.
+  async function handleBgPaste() {
+    if (!clipboard || !workspaceDir) return;
+    const op = clipboard.op;
+    const n = await pasteInto(workspaceDir, clipboard);
+    if (op === "cut" && n > 0) fileClipboardStore.clear();
+    setRefreshKey((k) => k + 1);
+  }
+
+  const bgMenuItems: ContextMenuItem[] = [
+    { label: "New File", onSelect: () => startCreate("file", workspaceDir) },
+    { label: "New Folder", onSelect: () => startCreate("folder", workspaceDir) },
+    {
+      label: "Paste",
+      onSelect: handleBgPaste,
+      show: !!clipboard,
+      separatorBefore: true,
+    },
+    { label: "Refresh", onSelect: handleRefresh, separatorBefore: true },
+  ];
 
   if (!workspaceDir) {
     return (
@@ -137,11 +194,7 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
           </button>
           <button
             type="button"
-            onClick={() => {
-              setNewFileDialog("file");
-              setNewFileName("");
-              requestAnimationFrame(() => newFileInputRef.current?.focus());
-            }}
+            onClick={() => startCreate("file", workspaceDir)}
             title="New File"
             className="rounded p-1 text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-foreground)] transition-colors"
           >
@@ -149,11 +202,7 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
           </button>
           <button
             type="button"
-            onClick={() => {
-              setNewFileDialog("folder");
-              setNewFileName("");
-              requestAnimationFrame(() => newFileInputRef.current?.focus());
-            }}
+            onClick={() => startCreate("folder", workspaceDir)}
             title="New Folder"
             className="rounded p-1 text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-foreground)] transition-colors"
           >
@@ -229,10 +278,19 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
         </label>
       </div>
 
-      {/* The tree itself */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      {/* The tree itself — the empty area also takes a context menu (create/paste). */}
+      <div
+        className="flex-1 min-h-0 overflow-y-auto"
+        onContextMenu={(e) => {
+          // Only when the click lands on the background, not on a tree row
+          // (rows stop propagation by opening their own menu via preventDefault).
+          if (e.defaultPrevented) return;
+          e.preventDefault();
+          setBgMenu({ x: e.clientX, y: e.clientY });
+        }}
+      >
         <FileTree
-          key={refreshKey}
+          key={workspaceDir}
           rootPath={workspaceDir}
           selectedPath={selectedPath}
           onFileSelect={(entry) => {
@@ -242,9 +300,22 @@ export function FilesTreePanel({ selectedPath, onFileOpen }: FilesTreePanelProps
           onRefresh={handleRefresh}
           onDelete={() => setRefreshKey((k) => k + 1)}
           onRename={() => setRefreshKey((k) => k + 1)}
+          onCreate={(dir, kind) => startCreate(kind, dir)}
+          onChanged={() => setRefreshKey((k) => k + 1)}
           showHidden={showHidden}
+          refreshSignal={refreshKey}
         />
       </div>
+
+      {bgMenu && (
+        <ContextMenu
+          x={bgMenu.x}
+          y={bgMenu.y}
+          items={bgMenuItems}
+          onClose={() => setBgMenu(null)}
+          ariaLabel="Explorer actions"
+        />
+      )}
     </div>
   );
 }

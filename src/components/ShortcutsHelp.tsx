@@ -33,6 +33,19 @@ const ACTION_GROUP: Record<string, Group> = {
 
 const GROUP_ORDER: Group[] = ["Navigation", "Terminal", "General"];
 
+// Static shortcuts handled outside the configurable binding system (the app zoom
+// shortcuts mirror the browser's and aren't user-remappable).
+const STATIC_SECTIONS: { group: string; rows: { label: string; keys: string }[] }[] = [
+  {
+    group: "Appearance",
+    rows: [
+      { label: "Zoom in", keys: "Cmd / Ctrl +" },
+      { label: "Zoom out", keys: "Cmd / Ctrl -" },
+      { label: "Reset zoom", keys: "Cmd / Ctrl 0" },
+    ],
+  },
+];
+
 // ── ShortcutRow ───────────────────────────────────────────────────────────────
 
 interface ShortcutRowProps {
@@ -167,6 +180,26 @@ export function ShortcutsHelp({ open, onClose, bindings = DEFAULT_BINDINGS }: Sh
               </section>
             );
           })}
+
+          {STATIC_SECTIONS.map((section) => (
+            <section key={section.group}>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]">
+                {section.group}
+              </h3>
+              <div className="divide-y divide-[var(--color-border)]">
+                {section.rows.map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4 py-1.5">
+                    <span className="flex-1 min-w-0 truncate text-sm text-[var(--color-foreground)]">
+                      {row.label}
+                    </span>
+                    <kbd className="shrink-0 rounded border border-[var(--color-border)] bg-[var(--color-muted)] px-2 py-0.5 text-[11px] font-mono text-[var(--color-muted-foreground)] whitespace-nowrap">
+                      {row.keys}
+                    </kbd>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
 
         {/* Footer */}

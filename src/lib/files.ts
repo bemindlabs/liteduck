@@ -185,3 +185,69 @@ export async function filesCreateDir(path: string, workspace?: string): Promise<
 export async function filesDelete(path: string, workspace?: string): Promise<void> {
   return invoke<undefined>("files_delete", { path, workspace: workspace ?? null });
 }
+
+/**
+ * Copy a file or directory (recursively for directories) from `src` to `dest`.
+ * The backend errors if `dest` already exists — it never silently overwrites.
+ * When `workspace` is provided, both paths must be within it.
+ */
+export async function filesCopy(src: string, dest: string, workspace?: string): Promise<void> {
+  return invoke<undefined>("files_copy", { src, dest, workspace: workspace ?? null });
+}
+
+/**
+ * Move (or rename) a file or directory from `src` to `dest`, including across
+ * directories. Falls back to copy-then-delete on cross-device moves. The
+ * backend errors if `dest` already exists. When `workspace` is provided, both
+ * paths must be within it.
+ */
+export async function filesMove(src: string, dest: string, workspace?: string): Promise<void> {
+  return invoke<undefined>("files_move", { src, dest, workspace: workspace ?? null });
+}
+
+/**
+ * Reveal a path in the OS file manager (Finder on macOS via `open -R`).
+ * The backend validates the path exists.
+ */
+export async function filesRevealInOs(path: string): Promise<void> {
+  return invoke<undefined>("files_reveal_in_os", { path });
+}
+
+/**
+ * Recursively search `root` for entries whose NAME contains `query`
+ * (case-insensitive substring match). Dotfiles are skipped unless `showHidden`
+ * is true; OS/system clutter is always skipped. Results are capped at `limit`
+ * (default 200 on the Rust side). When `workspace` is provided, `root` must be
+ * within it.
+ */
+export async function filesFind(
+  root: string,
+  query: string,
+  limit?: number,
+  showHidden?: boolean,
+  workspace?: string,
+): Promise<FileEntry[]> {
+  return invoke<FileEntry[]>("files_find", {
+    root,
+    query,
+    limit: limit ?? null,
+    showHidden: showHidden ?? null,
+    workspace: workspace ?? null,
+  });
+}
+
+/**
+ * Start watching `path` recursively for filesystem changes. The backend emits a
+ * `files://changed` Tauri event (payload: the changed path string) on any
+ * change. Watching the same path twice replaces the prior watcher.
+ */
+export async function filesWatch(path: string): Promise<void> {
+  return invoke<undefined>("files_watch", { path });
+}
+
+/**
+ * Stop watching `path`. No-op if the path was not being watched.
+ */
+export async function filesUnwatch(path: string): Promise<void> {
+  return invoke<undefined>("files_unwatch", { path });
+}

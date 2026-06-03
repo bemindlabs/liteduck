@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Mutex;
+
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use tauri::{AppHandle, Emitter, State};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -226,6 +231,193 @@ mod tests {
         // Verified with Python:
         //   datetime.datetime.utcfromtimestamp(1710503696) == datetime(2024, 3, 15, 11, 54, 56)
         assert_eq!(epoch_to_iso(1_710_503_696), "2024-03-15T11:54:56Z");
+    }
+
+    // ── files_copy ───────────────────────────────────────────────────────────────
+
+    /// Copying a plain file produces an identical copy at the destination.
+    #[test]
+    fn files_copy_copies_a_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let src = dir.path().join("a.txt");
+        let dst = dir.path().join("b.txt");
+        fs::write(&src, "hello").unwrap();
+
+        files_copy(
+            src.to_str().unwrap().to_string(),
+            dst.to_str().unwrap().to_string(),
+            None,
+        )
+        .expect("copy should succeed");
+
+        assert!(src.exists(), "source should remain");
+        assert_eq!(fs::read_to_string(&dst).unwrap(), "hello");
+    }
+
+    /// Copying a directory recreates the whole tree at the destination.
+    #[test]
+    fn files_copy_copies_a_directory_recursively() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let src = dir.path().join("src");
+        fs::create_dir(&src).unwrap();
+        fs::write(src.join("top.txt"), "top").unwrap();
+        let nested = src.join("nested");
+        fs::create_dir(&nested).unwrap();
+        fs::write(nested.join("deep.txt"), "deep").unwrap();
+
+        let dst = dir.path().join("dst");
+        files_copy(
+            src.to_str().unwrap().to_string(),
+            dst.to_str().unwrap().to_string(),
+            None,
+        )
+        .expect("recursive copy should succeed");
+
+        assert_eq!(fs::read_to_string(dst.join("top.txt")).unwrap(), "top");
+        assert_eq!(
+            fs::read_to_string(dst.join("nested").join("deep.txt")).unwrap(),
+            "deep"
+        );
+    }
+
+    /// Copying onto an existing destination must error (no silent overwrite).
+    #[test]
+    fn files_copy_refuses_existing_destination() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let src = dir.path().join("a.txt");
+        let dst = dir.path().join("b.txt");
+        fs::write(&src, "src").unwrap();
+        fs::write(&dst, "existing").unwrap();
+
+        let result = files_copy(
+            src.to_str().unwrap().to_string(),
+            dst.to_str().unwrap().to_string(),
+            None,
+        );
+        assert!(result.is_err(), "copy onto existing dest must error");
+        assert_eq!(
+            fs::read_to_string(&dst).unwrap(),
+            "existing",
+            "destination must be untouched"
+        );
+    }
+
+    // ── files_move ───────────────────────────────────────────────────────────────
+
+    /// Moving a file relocates it and removes the source.
+    #[test]
+    fn files_move_relocates_a_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let sub = dir.path().join("sub");
+        fs::create_dir(&sub).unwrap();
+        let src = dir.path().join("a.txt");
+        let dst = sub.join("a.txt");
+        fs::write(&src, "payload").unwrap();
+
+        files_move(
+            src.to_str().unwrap().to_string(),
+            dst.to_str().unwrap().to_string(),
+            None,
+        )
+        .expect("move should succeed");
+
+        assert!(!src.exists(), "source should be gone after move");
+        assert_eq!(fs::read_to_string(&dst).unwrap(), "payload");
+    }
+
+    /// Moving onto an existing destination must error.
+    #[test]
+    fn files_move_refuses_existing_destination() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let src = dir.path().join("a.txt");
+        let dst = dir.path().join("b.txt");
+        fs::write(&src, "src").unwrap();
+        fs::write(&dst, "existing").unwrap();
+
+        let result = files_move(
+            src.to_str().unwrap().to_string(),
+            dst.to_str().unwrap().to_string(),
+            None,
+        );
+        assert!(result.is_err(), "move onto existing dest must error");
+        assert!(src.exists(), "source must remain on error");
+    }
+
+    // ── files_find ───────────────────────────────────────────────────────────────
+
+    /// Find matches file names case-insensitively across nested directories.
+    #[test]
+    fn files_find_matches_names_case_insensitively() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join("Report.md"), "x").unwrap();
+        fs::write(dir.path().join("other.txt"), "x").unwrap();
+        let nested = dir.path().join("nested");
+        fs::create_dir(&nested).unwrap();
+        fs::write(nested.join("report-final.md"), "x").unwrap();
+
+        let results = files_find(
+            dir.path().to_str().unwrap().to_string(),
+            "report".to_string(),
+            None,
+            None,
+            None,
+        )
+        .expect("find should succeed");
+
+        let names: Vec<&str> = results.iter().map(|e| e.name.as_str()).collect();
+        assert!(names.contains(&"Report.md"), "should match Report.md");
+        assert!(
+            names.contains(&"report-final.md"),
+            "should match nested report-final.md"
+        );
+        assert!(!names.contains(&"other.txt"), "should not match other.txt");
+    }
+
+    /// Find respects the result limit cap.
+    #[test]
+    fn files_find_respects_limit() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for i in 0..10 {
+            fs::write(dir.path().join(format!("match-{i}.txt")), "x").unwrap();
+        }
+
+        let results = files_find(
+            dir.path().to_str().unwrap().to_string(),
+            "match".to_string(),
+            Some(3),
+            None,
+            None,
+        )
+        .expect("find should succeed");
+
+        assert_eq!(results.len(), 3, "result count must be capped at limit");
+    }
+
+    /// Find skips dotfiles unless show_hidden is true.
+    #[test]
+    fn files_find_skips_dotfiles_unless_show_hidden() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::write(dir.path().join(".secretmatch.txt"), "x").unwrap();
+
+        let hidden_off = files_find(
+            dir.path().to_str().unwrap().to_string(),
+            "secretmatch".to_string(),
+            None,
+            None,
+            None,
+        )
+        .expect("find should succeed");
+        assert!(hidden_off.is_empty(), "dotfile must be skipped by default");
+
+        let hidden_on = files_find(
+            dir.path().to_str().unwrap().to_string(),
+            "secretmatch".to_string(),
+            None,
+            Some(true),
+            None,
+        )
+        .expect("find should succeed");
+        assert_eq!(hidden_on.len(), 1, "dotfile must match when show_hidden");
     }
 }
 
@@ -561,4 +753,333 @@ pub fn files_delete(path: String, workspace: Option<String>) -> Result<(), Strin
     } else {
         fs::remove_file(p).map_err(|e| format!("Failed to delete file {}: {e}", p.display()))
     }
+}
+
+// ── Copy / Move ─────────────────────────────────────────────────────────────
+
+/// Recursively copy a directory tree from `src` to `dst`. `dst` must not exist.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    fs::create_dir_all(dst)
+        .map_err(|e| format!("Failed to create directory {}: {e}", dst.display()))?;
+    let read_dir = fs::read_dir(src)
+        .map_err(|e| format!("Failed to read directory {}: {e}", src.display()))?;
+    for entry_result in read_dir {
+        let entry =
+            entry_result.map_err(|e| format!("Failed to read entry in {}: {e}", src.display()))?;
+        let entry_path = entry.path();
+        let target = dst.join(entry.file_name());
+        if entry_path.is_dir() {
+            copy_dir_recursive(&entry_path, &target)?;
+        } else {
+            fs::copy(&entry_path, &target).map_err(|e| {
+                format!(
+                    "Failed to copy {} → {}: {e}",
+                    entry_path.display(),
+                    target.display()
+                )
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// Copy a file or directory (recursively) from `src` to `dest`.
+///
+/// Both paths are validated. The destination must NOT already exist — this
+/// command never silently overwrites.
+#[tauri::command]
+pub fn files_copy(src: String, dest: String, workspace: Option<String>) -> Result<(), String> {
+    let workspace_buf = workspace.as_deref().map(PathBuf::from);
+    let workspace_root = workspace_buf.as_deref();
+    let safe_src = validate_path(&src, workspace_root)?;
+    let safe_dst = validate_path(&dest, workspace_root)?;
+    let src_path = safe_src.as_path();
+    let dst_path = safe_dst.as_path();
+
+    if !src_path.exists() {
+        return Err(format!("Source does not exist: {}", src_path.display()));
+    }
+    if dst_path.exists() {
+        return Err(format!(
+            "Destination already exists: {}",
+            dst_path.display()
+        ));
+    }
+
+    if src_path.is_dir() {
+        copy_dir_recursive(src_path, dst_path)
+    } else {
+        fs::copy(src_path, dst_path).map(|_| ()).map_err(|e| {
+            format!(
+                "Failed to copy {} → {}: {e}",
+                src_path.display(),
+                dst_path.display()
+            )
+        })
+    }
+}
+
+/// Move (or rename) a file or directory from `src` to `dest`, including across
+/// directories.
+///
+/// Tries `std::fs::rename` first; on a cross-device link error it falls back to
+/// copy-then-delete. Both paths are validated and the destination must NOT
+/// already exist.
+#[tauri::command]
+pub fn files_move(src: String, dest: String, workspace: Option<String>) -> Result<(), String> {
+    let workspace_buf = workspace.as_deref().map(PathBuf::from);
+    let workspace_root = workspace_buf.as_deref();
+    let safe_src = validate_path(&src, workspace_root)?;
+    let safe_dst = validate_path(&dest, workspace_root)?;
+    let src_path = safe_src.as_path();
+    let dst_path = safe_dst.as_path();
+
+    if !src_path.exists() {
+        return Err(format!("Source does not exist: {}", src_path.display()));
+    }
+    if dst_path.exists() {
+        return Err(format!(
+            "Destination already exists: {}",
+            dst_path.display()
+        ));
+    }
+
+    match fs::rename(src_path, dst_path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            // EXDEV (cross-device link) — rename can't span filesystems. Fall
+            // back to copy-then-delete. raw_os_error() == 18 on Unix.
+            let is_cross_device =
+                e.raw_os_error() == Some(18) || e.kind() == std::io::ErrorKind::CrossesDevices;
+            if !is_cross_device {
+                return Err(format!(
+                    "Failed to move {} → {}: {e}",
+                    src_path.display(),
+                    dst_path.display()
+                ));
+            }
+            if src_path.is_dir() {
+                copy_dir_recursive(src_path, dst_path)?;
+                fs::remove_dir_all(src_path).map_err(|e| {
+                    format!(
+                        "Moved (copied) but failed to remove source {}: {e}",
+                        src_path.display()
+                    )
+                })
+            } else {
+                fs::copy(src_path, dst_path).map_err(|e| {
+                    format!(
+                        "Failed to copy {} → {}: {e}",
+                        src_path.display(),
+                        dst_path.display()
+                    )
+                })?;
+                fs::remove_file(src_path).map_err(|e| {
+                    format!(
+                        "Moved (copied) but failed to remove source {}: {e}",
+                        src_path.display()
+                    )
+                })
+            }
+        }
+    }
+}
+
+// ── Reveal in OS ──────────────────────────────────────────────────────────────
+
+/// Reveal a path in the OS file manager (macOS Finder via `open -R`).
+///
+/// The path is validated and must exist. Non-macOS platforms return an
+/// explanatory error for now.
+#[tauri::command]
+pub fn files_reveal_in_os(path: String) -> Result<(), String> {
+    let safe_path = validate_path(&path, None)?;
+    let p = safe_path.as_path();
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", p.display()));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(p)
+            .spawn()
+            .map_err(|e| format!("Failed to reveal {} in Finder: {e}", p.display()))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(format!(
+            "Reveal-in-OS is not yet supported on this platform: {}",
+            p.display()
+        ))
+    }
+}
+
+// ── Find ────────────────────────────────────────────────────────────────────
+
+/// Maximum number of directories visited during a single `files_find` walk.
+/// Guards against descending into pathologically large trees.
+const FIND_MAX_DIRS: usize = 20_000;
+
+/// Recursively search `root` for entries whose NAME contains `query`
+/// (case-insensitive substring match).
+///
+/// OS/system clutter is always skipped; dotfiles are skipped unless
+/// `show_hidden` is true. Results are capped at `limit` (default 200). The walk
+/// is bounded by [`FIND_MAX_DIRS`] visited directories so very large trees do
+/// not hang the search.
+#[tauri::command]
+pub fn files_find(
+    root: String,
+    query: String,
+    limit: Option<usize>,
+    show_hidden: Option<bool>,
+    workspace: Option<String>,
+) -> Result<Vec<FileEntry>, String> {
+    let workspace_buf = workspace.as_deref().map(PathBuf::from);
+    let safe_root = validate_path(&root, workspace_buf.as_deref())?;
+    let root_path = safe_root.as_path();
+
+    if !root_path.exists() {
+        return Err(format!("Path does not exist: {}", root_path.display()));
+    }
+    if !root_path.is_dir() {
+        return Err(format!("Path is not a directory: {}", root_path.display()));
+    }
+
+    let cap = limit.unwrap_or(200);
+    let include_hidden = show_hidden.unwrap_or(false);
+    let needle = query.to_lowercase();
+
+    let mut results: Vec<FileEntry> = Vec::new();
+    let mut stack: Vec<PathBuf> = vec![root_path.to_path_buf()];
+    let mut dirs_visited: usize = 0;
+
+    while let Some(dir) = stack.pop() {
+        if results.len() >= cap || dirs_visited >= FIND_MAX_DIRS {
+            break;
+        }
+        dirs_visited += 1;
+
+        let read_dir = match fs::read_dir(&dir) {
+            Ok(rd) => rd,
+            Err(_) => continue, // skip unreadable directories gracefully
+        };
+
+        for entry_result in read_dir {
+            if results.len() >= cap {
+                break;
+            }
+            let entry = match entry_result {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let entry_name = entry.file_name();
+            let name_str = entry_name.to_string_lossy();
+
+            // Always omit OS/system clutter.
+            if is_os_system_entry(&name_str) {
+                continue;
+            }
+            // Skip dotfiles unless show_hidden.
+            if !include_hidden && name_str.starts_with('.') {
+                continue;
+            }
+
+            let entry_path = entry.path();
+            let is_dir = entry_path.is_dir();
+
+            // Case-insensitive substring match on the NAME. An empty query
+            // matches everything.
+            if needle.is_empty() || name_str.to_lowercase().contains(&needle) {
+                if let Ok(fe) = metadata_to_entry(&entry_path) {
+                    results.push(fe);
+                }
+            }
+
+            if is_dir {
+                stack.push(entry_path);
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// ── Watch / Unwatch ───────────────────────────────────────────────────────────
+
+/// Tauri-managed state holding active filesystem watchers, keyed by the
+/// validated (canonical) path string they watch. Mirrors the `PtyManager`
+/// managed-state pattern.
+#[derive(Default)]
+pub struct FileWatchManager {
+    watchers: Mutex<HashMap<String, RecommendedWatcher>>,
+}
+
+impl FileWatchManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+/// Start watching `path` recursively for filesystem changes. On any change the
+/// backend emits a `files://changed` Tauri event whose payload is the changed
+/// path (string). Watching the same path twice replaces the prior watcher.
+#[tauri::command]
+pub fn files_watch(
+    app: AppHandle,
+    state: State<'_, FileWatchManager>,
+    path: String,
+) -> Result<(), String> {
+    let safe_path = validate_path(&path, None)?;
+    let p = safe_path.as_path();
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", p.display()));
+    }
+    let key = safe_path
+        .to_str()
+        .ok_or_else(|| format!("Path is not valid UTF-8: {}", safe_path.display()))?
+        .to_string();
+
+    let app_handle = app.clone();
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(event) = res {
+            for changed in event.paths {
+                let payload = changed.to_string_lossy().to_string();
+                let _ = app_handle.emit("files://changed", payload);
+            }
+        }
+    })
+    .map_err(|e| format!("Failed to create watcher: {e}"))?;
+
+    watcher
+        .watch(p, RecursiveMode::Recursive)
+        .map_err(|e| format!("Failed to watch {}: {e}", p.display()))?;
+
+    let mut watchers = state
+        .watchers
+        .lock()
+        .map_err(|e| format!("Watcher state poisoned: {e}"))?;
+    // Dropping any prior watcher for this key stops it.
+    watchers.insert(key, watcher);
+    Ok(())
+}
+
+/// Stop watching `path`. No-op if the path was not being watched.
+#[tauri::command]
+pub fn files_unwatch(state: State<'_, FileWatchManager>, path: String) -> Result<(), String> {
+    let safe_path = validate_path(&path, None)?;
+    let key = safe_path
+        .to_str()
+        .ok_or_else(|| format!("Path is not valid UTF-8: {}", safe_path.display()))?
+        .to_string();
+    let mut watchers = state
+        .watchers
+        .lock()
+        .map_err(|e| format!("Watcher state poisoned: {e}"))?;
+    // Dropping the watcher (removed from the map) stops it.
+    watchers.remove(&key);
+    Ok(())
 }

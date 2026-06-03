@@ -24,8 +24,12 @@ import {
   filesCreateDir,
   filesGetMetadata,
   filesOpenInVscode,
+  filesUnwatch,
+  filesWatch,
   filesWriteText,
 } from "@/lib/files";
+import { listen } from "@tauri-apps/api/event";
+import { surfaceFileError } from "@/lib/fileOps";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 // ── Breadcrumb ────────────────────────────────────────────────────────────────
@@ -137,6 +141,8 @@ export default function FilesPage() {
   // New file / folder state
   const [newFileDialog, setNewFileDialog] = useState<"file" | "folder" | null>(null);
   const [newFileName, setNewFileName] = useState("");
+  // Explicit create target from the tree context menu; null falls back to `targetDir`.
+  const [createTargetDir, setCreateTargetDir] = useState<string | null>(null);
   const newFileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset selected entry when workspace changes. Synchronising local UI state
@@ -183,6 +189,28 @@ export default function FilesPage() {
     setSelectedEntry(null);
   }
 
+  // Live auto-refresh: watch the workspace and bump the in-place refresh signal
+  // on filesystem changes (debounced). The tree refreshes without remounting, so
+  // expanded folders stay open.
+  useEffect(() => {
+    if (!workspaceDir) return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unlistenP = listen("files://changed", () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!disposed) setRefreshKey((k) => k + 1);
+      }, 250);
+    });
+    void filesWatch(workspaceDir).catch((err: unknown) => logger.error("watch failed:", err));
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      void unlistenP.then((un) => un());
+      void filesUnwatch(workspaceDir).catch((err: unknown) => logger.error("unwatch failed:", err));
+    };
+  }, [workspaceDir]);
+
   /** The directory to create new items in: selected dir, parent of selected file, or workspace root. */
   const targetDir = useMemo(() => {
     if (!workspaceDir) return null;
@@ -194,9 +222,17 @@ export default function FilesPage() {
     return parts.join("/") || workspaceDir;
   }, [workspaceDir, selectedEntry]);
 
+  const startCreate = useCallback((kind: "file" | "folder", dir: string | null) => {
+    setCreateTargetDir(dir);
+    setNewFileDialog(kind);
+    setNewFileName("");
+    requestAnimationFrame(() => newFileInputRef.current?.focus());
+  }, []);
+
   const handleNewFileSubmit = useCallback(async () => {
-    if (!targetDir || !newFileName.trim()) return;
-    const fullPath = `${targetDir}/${newFileName.trim()}`;
+    const dir = createTargetDir ?? targetDir;
+    if (!dir || !newFileName.trim()) return;
+    const fullPath = `${dir.replace(/\/+$/, "")}/${newFileName.trim()}`;
     try {
       if (newFileDialog === "folder") {
         await filesCreateDir(fullPath);
@@ -207,9 +243,9 @@ export default function FilesPage() {
       setNewFileDialog(null);
       setNewFileName("");
     } catch (err) {
-      logger.error("create failed:", err);
+      surfaceFileError("Create", err);
     }
-  }, [targetDir, newFileName, newFileDialog]);
+  }, [createTargetDir, targetDir, newFileName, newFileDialog]);
 
   const handleDelete = useCallback(
     (deleted: FileEntry) => {
@@ -287,11 +323,7 @@ export default function FilesPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => {
-            setNewFileDialog("file");
-            setNewFileName("");
-            requestAnimationFrame(() => newFileInputRef.current?.focus());
-          }}
+          onClick={() => startCreate("file", null)}
           title="New File"
           className="h-7 gap-1.5 text-xs shrink-0"
         >
@@ -301,11 +333,7 @@ export default function FilesPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => {
-            setNewFileDialog("folder");
-            setNewFileName("");
-            requestAnimationFrame(() => newFileInputRef.current?.focus());
-          }}
+          onClick={() => startCreate("folder", null)}
           title="New Folder"
           className="h-7 gap-1.5 text-xs shrink-0"
         >
@@ -394,14 +422,17 @@ export default function FilesPage() {
           </div>
           <div className="flex-1 overflow-y-auto">
             <FileTree
-              key={refreshKey}
+              key={workspaceDir}
               rootPath={workspaceDir}
               selectedPath={selectedEntry?.path ?? null}
               onFileSelect={handleFileSelect}
               onRefresh={handleRefresh}
               onDelete={handleDelete}
               onRename={handleRename}
+              onCreate={(dir, kind) => startCreate(kind, dir)}
+              onChanged={() => setRefreshKey((k) => k + 1)}
               showHidden={showHidden}
+              refreshSignal={refreshKey}
             />
           </div>
         </div>

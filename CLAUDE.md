@@ -15,7 +15,7 @@ baked in — integrations live in plugins, never in core. (LiteDuck was derived 
 
 ## Tech Stack
 
-- **Frontend:** React 19, TypeScript, Tailwind CSS v4, Vite, xterm.js
+- **Frontend:** React 19, TypeScript, Tailwind CSS v4, Vite, xterm.js, CodeMirror 6 (code/markdown editor)
 - **Backend:** Rust (Tauri v2), SQLite (rusqlite), Git (git2), PTY (portable-pty)
 - **UI:** shadcn/ui components (`src/components/ui/`), lucide-react icons
 - **Plugins:** tauri-plugin-opener, tauri-plugin-dialog
@@ -84,7 +84,7 @@ All commands return `Result<T, String>`.
 | --------- | ----------------------------------------------------------------------- | ---------------------------------------------------- |
 | Core      | `db.rs`, `settings.rs`, `keychain.rs`, `keyring_store.rs`, `workspace.rs`, `home.rs`, `app_menu.rs` | SQLite, keychain secrets, workspace init, app home, native menu |
 | Terminal  | `terminal.rs`, `pty.rs`                                                  | Raw PTY session management (managed state: `PtyManager`) |
-| Files     | `files.rs`                                                               | File listing, read/write, rename/delete, open in VS Code (hides OS clutter: `.DS_Store`, `Thumbs.db`, …) |
+| Files     | `files.rs`                                                               | File listing, read/write, rename/delete, copy/move, recursive name search (`files_find`), reveal in Finder, filesystem watch (`files_watch`/`files_unwatch` via `notify` → `files://changed` event), open in VS Code (hides OS clutter: `.DS_Store`, `Thumbs.db`, …) |
 | Git       | `git.rs`                                                                 | Status, log, diffs, branches, worktrees (git2)       |
 | Plugins   | `plugins.rs`                                                             | Plugin manifest loader, install/list/run, GitHub registry fetch |
 | Identity  | `device_identity.rs`, `biometric.rs`                                    | Device fingerprint, biometric auth                   |

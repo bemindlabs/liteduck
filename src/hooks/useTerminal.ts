@@ -247,7 +247,7 @@ export function useTerminal(): UseTerminalReturn {
       } catch (err) {
         logger.error("terminal_create failed:", err);
         const msg = err instanceof Error ? err.message : String(err);
-        addNotification("system", "Terminal failed", msg);
+        addNotification("terminal", "Terminal failed", msg);
         setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, running: false } : t)));
       }
 

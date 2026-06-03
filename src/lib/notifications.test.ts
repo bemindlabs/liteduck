@@ -34,8 +34,8 @@ describe("NotificationStore", () => {
 
   describe("addNotification", () => {
     it("adds a notification and returns it with the correct fields", () => {
-      const n = addNotification("github", "PR merged", "body text");
-      expect(n.type).toBe("github");
+      const n = addNotification("file", "PR merged", "body text");
+      expect(n.type).toBe("file");
       expect(n.title).toBe("PR merged");
       expect(n.message).toBe("body text");
       expect(n.read).toBe(false);
@@ -51,8 +51,8 @@ describe("NotificationStore", () => {
     });
 
     it("increments the id with each addition", () => {
-      const a = addNotification("github", "a", "");
-      const b = addNotification("github", "b", "");
+      const a = addNotification("file", "a", "");
+      const b = addNotification("file", "b", "");
       expect(Number(b.id)).toBeGreaterThan(Number(a.id));
     });
 
@@ -77,14 +77,14 @@ describe("NotificationStore", () => {
     it("notifies subscribers when a notification is added", () => {
       const listener = vi.fn();
       const unsub = notificationStore.subscribe(listener);
-      addNotification("github", "x", "");
+      addNotification("file", "x", "");
       unsub();
       expect(listener).toHaveBeenCalledTimes(1);
     });
 
     it("snapshot length grows with each addition", () => {
-      addNotification("github", "a", "");
-      addNotification("github", "b", "");
+      addNotification("file", "a", "");
+      addNotification("file", "b", "");
       expect(notificationStore.getSnapshot()).toHaveLength(2);
     });
   });
@@ -93,22 +93,22 @@ describe("NotificationStore", () => {
 
   describe("markRead", () => {
     it("marks a specific notification as read", () => {
-      const n = addNotification("github", "PR", "body");
+      const n = addNotification("file", "PR", "body");
       markRead(n.id);
       const found = notificationStore.getSnapshot().find((x) => x.id === n.id);
       expect(found?.read).toBe(true);
     });
 
     it("does not affect other notifications", () => {
-      const a = addNotification("github", "A", "");
-      const b = addNotification("github", "B", "");
+      const a = addNotification("file", "A", "");
+      const b = addNotification("file", "B", "");
       markRead(a.id);
       const bInStore = notificationStore.getSnapshot().find((x) => x.id === b.id);
       expect(bInStore?.read).toBe(false);
     });
 
     it("does not notify listeners when notification is already read", () => {
-      const n = addNotification("github", "PR", "body");
+      const n = addNotification("file", "PR", "body");
       markRead(n.id); // first mark — makes it read
       const listener = vi.fn();
       const unsub = notificationStore.subscribe(listener);
@@ -135,8 +135,8 @@ describe("NotificationStore", () => {
 
   describe("markAllRead", () => {
     it("marks every notification as read", () => {
-      addNotification("github", "a", "");
-      addNotification("github", "b", "");
+      addNotification("file", "a", "");
+      addNotification("file", "b", "");
       markAllRead();
       const unread = notificationStore.getSnapshot().filter((n) => !n.read);
       expect(unread).toHaveLength(0);
@@ -174,8 +174,8 @@ describe("NotificationStore", () => {
 
   describe("clearAll", () => {
     it("removes all notifications from the store", () => {
-      addNotification("github", "a", "");
-      addNotification("github", "b", "");
+      addNotification("file", "a", "");
+      addNotification("file", "b", "");
       clearAll();
       expect(notificationStore.getSnapshot()).toHaveLength(0);
     });
@@ -206,14 +206,14 @@ describe("NotificationStore", () => {
     });
 
     it("returns the total count when none are read", () => {
-      addNotification("github", "a", "");
-      addNotification("github", "b", "");
+      addNotification("file", "a", "");
+      addNotification("file", "b", "");
       expect(getUnreadCount()).toBe(2);
     });
 
     it("counts only unread notifications", () => {
-      const a = addNotification("github", "a", "");
-      addNotification("github", "b", "");
+      const a = addNotification("file", "a", "");
+      addNotification("file", "b", "");
       markRead(a.id);
       expect(getUnreadCount()).toBe(1);
     });
@@ -248,7 +248,7 @@ describe("NotificationStore", () => {
       const l2 = vi.fn();
       const u1 = notificationStore.subscribe(l1);
       const u2 = notificationStore.subscribe(l2);
-      addNotification("github", "a", "");
+      addNotification("file", "a", "");
       u1();
       u2();
       expect(l1).toHaveBeenCalledTimes(1);
@@ -267,8 +267,8 @@ describe("NotificationStore", () => {
     });
 
     it("returns all notifications in order (newest first)", () => {
-      addNotification("github", "first", "");
-      addNotification("github", "second", "");
+      addNotification("file", "first", "");
+      addNotification("file", "second", "");
       const [head, tail] = notificationStore.getSnapshot();
       expect(head.title).toBe("second");
       expect(tail.title).toBe("first");
@@ -278,7 +278,7 @@ describe("NotificationStore", () => {
   // -- NotificationType coverage ----------------------------------------------
 
   describe("NotificationType", () => {
-    const types: NotificationType[] = ["github", "system"];
+    const types: NotificationType[] = ["system", "file", "terminal"];
 
     it.each(types)("stores type '%s' correctly", (type) => {
       const n = addNotification(type, "title", "msg");
