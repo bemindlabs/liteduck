@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -62,6 +63,13 @@ export function TerminalPane({
   useEffect(() => {
     onInputRefForDrop.current = onInput;
   }, [onInput]);
+
+  // Stable ref for `visible` so the native drop listener can ignore drops onto
+  // hidden panes (split layout / background tabs all stay mounted).
+  const visibleRef = useRef(visible);
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
 
   // Use refs for callbacks so the effect closure never becomes stale.
   const onInputRef = useRef(onInput);
@@ -286,6 +294,47 @@ export function TerminalPane({
     const paths = raw.split(/\r?\n/).filter((p) => p.trim().length > 0);
     const insert = quotePathsForShell(paths);
     if (insert) onInputRefForDrop.current(insert);
+  }, []);
+
+  // Native OS file drops (e.g. dragging from Finder/Explorer) → insert
+  // shell-quoted path(s). HTML5 DataTransfer doesn't expose filesystem paths
+  // inside Tauri webviews, so the React handlers above only catch internal
+  // file-tree drags; native drops arrive via Tauri's own drag-drop event. We
+  // bounds-check the cursor against this pane so only the pane under the drop
+  // (and only when visible) consumes it.
+  useEffect(() => {
+    let cancelled = false;
+    const within = (x: number, y: number) => {
+      const el = containerRef.current;
+      if (!el || !visibleRef.current) return false;
+      const rect = el.getBoundingClientRect();
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    };
+    const unlisten = getCurrentWebview().onDragDropEvent((event) => {
+      if (cancelled) return;
+      const payload = event.payload;
+      if (payload.type === "over") {
+        setDropActive(within(payload.position.x, payload.position.y));
+        return;
+      }
+      if (payload.type === "leave") {
+        setDropActive(false);
+        return;
+      }
+      if (payload.type === "drop") {
+        if (payload.paths.length === 0 || !within(payload.position.x, payload.position.y)) {
+          setDropActive(false);
+          return;
+        }
+        const insert = quotePathsForShell(payload.paths);
+        if (insert) onInputRefForDrop.current(insert);
+        setDropActive(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+      void unlisten.then((fn) => fn());
+    };
   }, []);
 
   const menuItems: ContextMenuItem[] = menu
