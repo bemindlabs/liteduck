@@ -58,8 +58,16 @@ export function EditorTabs({ tabs, activeTabId, ...actions }: EditorTabsProps) {
         const hasRight = tabs.slice(idx + 1).some((t) => !t.pinned);
         return [
           { label: "Close", onSelect: () => actions.onClose(menu.tab.id) },
-          { label: "Close Others", onSelect: () => actions.onCloseOthers(menu.tab.id), disabled: !hasOthers },
-          { label: "Close to the Right", onSelect: () => actions.onCloseToRight(menu.tab.id), disabled: !hasRight },
+          {
+            label: "Close Others",
+            onSelect: () => actions.onCloseOthers(menu.tab.id),
+            disabled: !hasOthers,
+          },
+          {
+            label: "Close to the Right",
+            onSelect: () => actions.onCloseToRight(menu.tab.id),
+            disabled: !hasRight,
+          },
           { label: "Close All", onSelect: () => actions.onCloseAll(), disabled: !hasOthers },
           {
             label: menu.tab.pinned ? "Unpin" : "Pin",

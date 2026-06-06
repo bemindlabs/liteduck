@@ -1,10 +1,5 @@
 import { useSyncExternalStore } from "react";
-import {
-  getDragging,
-  getDragPointer,
-  getDragVersion,
-  subscribeDrag,
-} from "@/lib/internalDrag";
+import { getDragging, getDragPointer, getDragVersion, subscribeDrag } from "@/lib/internalDrag";
 
 /**
  * Floating label that follows the cursor during an internal pointer drag

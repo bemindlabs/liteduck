@@ -207,8 +207,5 @@ export function useDropZone(
     };
   }, [ref, accept]);
 
-  return useSyncExternalStore(
-    subscribe,
-    () => dragging !== null && overEl === ref.current,
-  );
+  return useSyncExternalStore(subscribe, () => dragging !== null && overEl === ref.current);
 }
