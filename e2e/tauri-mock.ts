@@ -53,88 +53,70 @@ export function tauriMockScript(): string {
     }
 
     // ── IPC defaults ──
+    // Commands that resolve to undefined (fire-and-forget mutations). Listed
+    // separately because JSON round-tripping an undefined value throws.
+    const VOID_COMMANDS = new Set([
+      'save_setting', 'delete_setting', 'reset_all_settings', 'preload_secrets',
+      'workspace_init', 'workspace_init_template', 'workspace_scaffold',
+      'terminal_write', 'terminal_resize', 'terminal_close',
+      'files_write_text', 'files_watch', 'files_unwatch', 'files_copy', 'files_move',
+      'files_delete', 'files_rename', 'files_create_dir', 'files_reveal_in_os',
+      'files_open_in_vscode',
+      'git_init', 'git_worktree_add', 'git_worktree_remove', 'git_worktree_prune',
+      'home_ensure', 'home_config_write', 'home_profile_write', 'home_memory_write',
+      'home_memory_delete', 'home_workspaces_update', 'home_migration_run',
+      'plugin_install', 'plugin_install_from_registry', 'plugin_uninstall',
+      'plugin_run_command', 'plugin_open_external',
+      'device_reset_identity', 'biometric_set_gate',
+      'window_open', 'window_set_workspace',
+    ]);
+
     function getDefault(cmd, args) {
-      // Settings — return workspace so app doesn't redirect to /landing
+      // Settings — return a workspace so the app doesn't redirect to /landing.
       if (cmd === 'get_setting') {
         if (args && args.key === 'workspace_directory') return '/tmp/mock-workspace';
         if (args && args.key === 'wizard_completed') return 'true';
-        if (args && args.key === 'openclaw_gateway_url') return 'http://localhost:18789';
         return null;
       }
 
+      if (VOID_COMMANDS.has(cmd)) return undefined;
+
+      // Lean defaults — only commands the current app actually invokes.
       const defaults = {
         get_settings: { workspace_directory: '/tmp/mock-workspace' },
-        save_setting: undefined,
-        delete_setting: undefined,
-        workspace_exists: false,
-        workspace_init: undefined,
-        workspace_list_recent: [],
-        agents_list: [],
-        agents_create: { slug: 'test', name: 'Test', role: '', status: 'active', tags: [], icon: '🤖', color: '#8B5CF6', content: '' },
-        agents_get_profile: '',
-        agents_save_profile: undefined,
-        agents_delete: undefined,
-        agents_list_memories: [],
-        agents_list_tasks: [],
-        terminal_create: { session_id: 'mock-sid-' + Date.now() },
-        terminal_write: undefined,
-        terminal_resize: undefined,
-        terminal_close: undefined,
-        terminal_list: [],
-        openclaw_check_connection: { connected: false, version: null, uptime: null, message: 'Mock' },
-        openclaw_send_message: 'Mock AI response',
-        openclaw_send_message_stream: undefined,
-        openclaw_cancel_chat: undefined,
-        openclaw_get_agents: [],
-        openclaw_get_status: { connected: false, channels: [], providers: [], agent_count: 0 },
+        get_app_version: '0.0.0-e2e',
+        path_exists: false,
+        workspace_check_templates: [],
+        terminal_create: { session_id: 'mock-sid' },
         git_status: { branch: 'main', files: [], ahead: 0, behind: 0, stashes: 0 },
+        git_current_branch: 'main',
         git_log: [],
-        git_branches: [],
-        git_diff: '',
-        docker_ps: [],
-        docker_images: [],
-        docker_compose_services: [],
-        scrum_list_projects: [],
-        scrum_list_sprints: [],
-        scrum_list_stories: [],
-        scrum_list_epics: [],
-        github_auth_check: null,
-        github_list_repos: [],
-        github_list_prs: [],
-        a2a_get_card: { name: 'LiteDuck', version: '0.1.0', description: '', url: '', skills: [], defaultInputModes: [], defaultOutputModes: [], capabilities: {} },
-        chat_session_list: [],
-        chat_list_messages: [],
-        chat_session_create: { id: 'mock', title: 'New Chat', created_at: new Date().toISOString() },
+        git_list_branches: [],
+        git_diff_working: '',
+        git_diff_commit: '',
+        git_scan_repos: [],
+        git_worktree_list: [],
         files_list_dir: [],
         files_read_text: '',
-        files_write_text: undefined,
-        automations_list: [],
-        workspace_check_templates: [],
-        workspace_init_template: 'Initialized',
-        mcp_list_server_configs: [],
-        device_identity_get: { device_id: 'mock-device', hostname: 'mock' },
-        lan_chat_start: undefined,
-        lan_chat_stop: undefined,
-        lan_chat_peers: [],
-        ble_chat_start: undefined,
-        ble_chat_stop: undefined,
-        ssh_list_connections: [],
-        ssh_list_profiles: [],
-        biometric_available: false,
-        dev_task_status: null,
-        coding_workflow_generate_plan_cli: [
-          { id: 'cli-1', description: 'Create component', step_type: 'create_file', file_path: 'src/Foo.tsx', content: 'export default function Foo() {}', command: null, status: 'pending' },
-          { id: 'cli-2', description: 'Run tests', step_type: 'run_tests', file_path: null, content: null, command: 'npm test', status: 'pending' },
-        ],
-        coding_workflow_generate_plan: [
-          { id: 'step-1', description: 'Create login component', step_type: 'create_file', file_path: 'src/Login.tsx', content: 'export default function Login() {}', command: null, status: 'pending' },
-          { id: 'step-2', description: 'Add login route', step_type: 'edit_file', file_path: 'src/routes.ts', content: null, command: null, status: 'pending' },
-          { id: 'step-3', description: 'Run tests', step_type: 'run_tests', file_path: null, content: null, command: 'npm test', status: 'pending' },
-        ],
-        coding_workflow_start: 'wf-mock-001',
-        coding_workflow_status: { id: '', phase: 'planning', running: false, plan: null, current_step: null, total_steps: 0, fix_iteration: 0, logs: [], error: null, started_at: null, finished_at: null },
-        coding_workflow_cancel: undefined,
-        coding_workflow_logs: [],
+        files_find: [],
+        files_get_metadata: null,
+        home_config_read: {},
+        home_resolve_config: {},
+        home_dir_path: '/tmp/.liteduck',
+        home_workspaces_list: [],
+        home_templates_list: [],
+        home_memory_list: [],
+        home_memory_search: [],
+        home_memory_read: '',
+        home_profile_read: '',
+        home_migration_check: false,
+        plugin_list: [],
+        plugin_registry_fetch: [],
+        device_get_identity: { device_id: 'mock-device', hostname: 'mock' },
+        biometric_status: { available: false, enabled: false },
+        biometric_authenticate: false,
+        window_current_label: 'main',
+        window_list: [{ label: 'main' }],
       };
 
       if (cmd in defaults) return JSON.parse(JSON.stringify(defaults[cmd]));

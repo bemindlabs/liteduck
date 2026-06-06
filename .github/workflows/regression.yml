@@ -24,12 +24,17 @@ on:
     branches:
       - main
 
-  # Note: pull_request trigger intentionally omitted. The Playwright suite
-  # currently has pre-existing test rot (most tests assume the first-run
-  # wizard has been completed but don't pre-skip it), so it's not a useful
-  # PR gate yet. Once the wizard-skip helper lands, re-add a path-filtered
-  # pull_request trigger here. The summary job below stays so this workflow
-  # is still required-checkable from branch protection on main pushes.
+  # The suite is now a lean set of smoke tests (no first-run-wizard rot), so it
+  # is a useful PR gate. Path-filtered to runtime UI + the e2e harness so we
+  # don't double-run with ci.yml on unrelated changes.
+  pull_request:
+    paths:
+      - "src/**"
+      - "e2e/**"
+      - "package.json"
+      - "package-lock.json"
+      - "playwright.config.ts"
+      - ".github/workflows/regression.yml"
 
 permissions:
   contents: read
@@ -47,11 +52,9 @@ jobs:
   e2e:
     name: Playwright E2E (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    # 45 min: playwright.config.ts pins workers=1 on CI for stability +
-    # retries=2, so 9 spec files * up to 3 attempts each can comfortably
-    # run 25-35 min on a cold runner. The first-ever run hit the previous
-    # 25-min cap mid-suite. Bump to 45 to leave headroom.
-    timeout-minutes: 45
+    # The trimmed smoke suite runs in ~1-2 min; 15 leaves ample headroom for a
+    # cold runner (npm ci + browser download + retries=2 on CI).
+    timeout-minutes: 15
 
     strategy:
       fail-fast: false

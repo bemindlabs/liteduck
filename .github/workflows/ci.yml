@@ -12,6 +12,11 @@ permissions:
   # actions/cache + upload-artifact require this when workflow permissions are explicit
   actions: write
 
+# Cancel superseded runs on the same ref so rapid pushes don't queue up runners.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ---------------------------------------------------------------------------
   # Frontend: type-check + lint + format + unit tests with coverage
