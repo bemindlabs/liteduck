@@ -17,8 +17,8 @@
 class Liteduck < Formula
   desc "Lightweight code editor with file browser, terminal, and Git"
   homepage "https://buildonclaw.cloud/products/liteduck"
-  url "https://github.com/bemindlabs/liteduck/archive/refs/tags/v2026.6.3.tar.gz"
-  sha256 "04626238edc9f26ddb2e631294817bd39bfcab2d31095f541fa515a4422f1b46"
+  url "https://github.com/bemindlabs/liteduck/archive/refs/tags/v2026.6.6.tar.gz"
+  sha256 "9897c1daacc792fd6e27e42322875bc3716d68ccf419e8e168ea0b7124e49042"
   license "MIT"
 
   depends_on "node" => :build
