@@ -48,15 +48,23 @@ echo "  Cargo.toml -> $VERSION"
 
 # --- src-tauri/tauri.conf.json ---
 TAURI_CONF="$PROJECT_ROOT/src-tauri/tauri.conf.json"
+# Replace ONLY the top-level "version" value, preserving the rest of the file
+# byte-for-byte. Do NOT strip "comments" or re-serialize: the config contains
+# no real comments, and the previous `//` strip also matched the `http://…`
+# URLs inside the CSP (and devUrl / timestampUrl), corrupting the file. VERSION
+# is passed via the environment so it never lands inside the regex.
+# `-0777` slurps the whole file; `s///` without /g replaces the first (top-level)
+# "version" only.
+NEW_VERSION="$VERSION" perl -0777 -i -pe \
+  's/("version"\s*:\s*")[^"]*(")/$1 . $ENV{NEW_VERSION} . $2/e' "$TAURI_CONF"
+# Fail loudly if the bump left the file as invalid JSON or didn't take effect.
 node -e "
 const fs = require('fs');
-// Strip JS-style comments before parsing (tauri.conf.json allows them)
-const raw = fs.readFileSync('$TAURI_CONF', 'utf8');
-const stripped = raw.replace(/\/\/[^\n]*/g, '');
-const conf = JSON.parse(stripped);
-conf.version = '$VERSION';
-// Re-serialize; comments are lost but version is correct
-fs.writeFileSync('$TAURI_CONF', JSON.stringify(conf, null, 2) + '\n');
+const conf = JSON.parse(fs.readFileSync('$TAURI_CONF', 'utf8'));
+if (conf.version !== '$VERSION') {
+  console.error('Error: tauri.conf.json version is ' + conf.version + ', expected $VERSION');
+  process.exit(1);
+}
 "
 echo "  tauri.conf.json -> $VERSION"
 
