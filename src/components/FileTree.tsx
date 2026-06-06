@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
-import { LITEDUCK_PATH_MIME } from "@/utils/shellQuote";
+import { useDragSource, useDropZone } from "@/lib/internalDrag";
 import {
   type FileEntry,
   filesDelete,
@@ -273,8 +273,8 @@ function TreeNode({
   const [children, setChildren] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState(false);
   const loadedRef = useRef(false);
+  const rowRef = useRef<HTMLButtonElement>(null);
 
   const loadChildren = useCallback(
     async (force = false) => {
@@ -330,6 +330,21 @@ function TreeNode({
     return true;
   }
 
+  // Internal pointer-drag (HTML5 DnD is swallowed by Tauri's native file-drop
+  // handler — see src/lib/internalDrag.ts). Each row is a drag source carrying
+  // its path; folder rows additionally accept a drop to move the entry inside.
+  const { onMouseDown: onRowMouseDown } = useDragSource(() => ({
+    paths: [entry.path],
+    label: entry.name,
+  }));
+  const isDropOver = useDropZone(
+    rowRef,
+    (paths) => {
+      if (paths[0]) onMove(paths[0], entry.path);
+    },
+    (paths) => paths.length > 0 && canAcceptDrop(paths[0]),
+  );
+
   const isSelected = selectedPath === entry.path;
   // The row a context menu currently targets — highlighted like a selection so
   // it's clear which item the actions apply to, without opening the file.
@@ -341,40 +356,10 @@ function TreeNode({
     <div>
       {/* Row */}
       <button
+        ref={rowRef}
         onClick={handleClick}
         onContextMenu={(e) => onContextMenu(e, entry)}
-        draggable
-        onDragStart={(e) => {
-          // Internal drag payload: drop onto the terminal inserts the path; drop
-          // onto a folder moves the entry. effectAllowed allows both.
-          e.dataTransfer.setData(LITEDUCK_PATH_MIME, entry.path);
-          e.dataTransfer.setData("text/plain", entry.path);
-          e.dataTransfer.effectAllowed = "copyMove";
-        }}
-        onDragOver={
-          entry.is_dir
-            ? (e) => {
-                if (e.dataTransfer.types.includes(LITEDUCK_PATH_MIME)) {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  if (!dropTarget) setDropTarget(true);
-                }
-              }
-            : undefined
-        }
-        onDragLeave={entry.is_dir ? () => setDropTarget(false) : undefined}
-        onDrop={
-          entry.is_dir
-            ? (e) => {
-                setDropTarget(false);
-                const src = e.dataTransfer.getData(LITEDUCK_PATH_MIME);
-                if (src && canAcceptDrop(src)) {
-                  e.preventDefault();
-                  onMove(src, entry.path);
-                }
-              }
-            : undefined
-        }
+        onMouseDown={onRowMouseDown}
         className={cn(
           "group flex w-full items-center gap-1.5 rounded-sm px-2 py-0.5 text-left text-sm transition-colors",
           "text-[var(--color-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
@@ -382,7 +367,7 @@ function TreeNode({
             "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] font-medium",
           isContextTarget &&
             "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] ring-1 ring-inset ring-[var(--color-border)]",
-          dropTarget && "ring-1 ring-inset ring-[var(--color-primary)] bg-[var(--color-accent)]",
+          isDropOver && "ring-1 ring-inset ring-[var(--color-primary)] bg-[var(--color-accent)]",
         )}
         style={{ paddingLeft: `${indentPx + 8}px` }}
         title={entry.path}

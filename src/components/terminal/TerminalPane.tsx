@@ -7,7 +7,8 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { cn } from "@/lib/utils";
 import { TERMINAL_OPTIONS } from "@/lib/terminal-theme";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
-import { LITEDUCK_PATH_MIME, quotePathsForShell } from "@/utils/shellQuote";
+import { quotePathsForShell } from "@/utils/shellQuote";
+import { useDropZone } from "@/lib/internalDrag";
 
 import "@xterm/xterm/css/xterm.css";
 
@@ -263,38 +264,16 @@ export function TerminalPane({
     xtermRef.current?.clear();
   }, []);
 
-  // ── Drop handling (file-tree path → terminal) ─────────────────────────────────
+  // ── Drop handling ─────────────────────────────────────────────────────────────
+  // Two paths, because the webview can't see both kinds of drag through one API:
+  //   • Internal file-tree drags use the pointer-based system (HTML5 DnD is
+  //     swallowed by Tauri's native file-drop handler) — see src/lib/internalDrag.
+  //   • External OS drops (Finder/Explorer) arrive via Tauri's onDragDropEvent.
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    // Only react to internal path drags; let native OS-file drops fall through
-    // to Tauri's own handler.
-    if (
-      !e.dataTransfer.types.includes(LITEDUCK_PATH_MIME) &&
-      !e.dataTransfer.types.includes("text/plain")
-    ) {
-      return;
-    }
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-    setDropActive(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    // Ignore leaves into descendant elements.
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setDropActive(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    setDropActive(false);
-    const raw = e.dataTransfer.getData(LITEDUCK_PATH_MIME) || e.dataTransfer.getData("text/plain");
-    if (!raw) return;
-    e.preventDefault();
-    // A drag may carry multiple newline-separated paths; quote + space-join.
-    const paths = raw.split(/\r?\n/).filter((p) => p.trim().length > 0);
+  const isInternalDropOver = useDropZone(containerRef, (paths) => {
     const insert = quotePathsForShell(paths);
     if (insert) onInputRefForDrop.current(insert);
-  }, []);
+  });
 
   // Native OS file drops (e.g. dragging from Finder/Explorer) → insert
   // shell-quoted path(s). HTML5 DataTransfer doesn't expose filesystem paths
@@ -358,13 +337,10 @@ export function TerminalPane({
       <div
         ref={containerRef}
         onContextMenu={handleContextMenu}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
         className={cn(
           "absolute inset-0",
           !visible && "pointer-events-none invisible",
-          dropActive && "ring-2 ring-inset ring-[var(--color-primary)]",
+          (dropActive || isInternalDropOver) && "ring-2 ring-inset ring-[var(--color-primary)]",
         )}
         style={{ backgroundColor: "var(--color-background)" }}
         aria-label={`Terminal pane ${tabId}`}

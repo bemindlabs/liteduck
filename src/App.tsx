@@ -26,6 +26,7 @@ import { createLogger } from "@/lib/logger";
 
 const logger = createLogger("App");
 import { CommandPalette } from "@/components/CommandPalette";
+import { DragGhost } from "@/components/DragGhost";
 import { ShortcutsHelp } from "@/components/ShortcutsHelp";
 import { Header } from "@/components/Header";
 import {
@@ -491,6 +492,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      <DragGhost />
       <BiometricProvider>
         <BiometricLockScreen />
         <WorkspaceProvider>
