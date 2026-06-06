@@ -9,7 +9,12 @@ interface MenuEventHandlers {
   onToggleDark: () => void;
   onToggleFocusMode?: () => void;
   onNewTerminalTab: () => void;
-  onCloseTerminalTab: () => void;
+  /** Cmd+W — context-aware close (editor tab when editing, else terminal tab). */
+  onCloseTab: () => void;
+  /** Cmd+Alt+W — close all editor tabs. */
+  onCloseAllTabs: () => void;
+  /** Cmd+Shift+T — reopen the most recently closed editor tab. */
+  onReopenClosedTab: () => void;
   onOpenShortcutsHelp: () => void;
   onNewWindow?: () => void;
   onNewWindowPick?: () => void;
@@ -26,7 +31,9 @@ export function useMenuEvents({
   onToggleDark,
   onToggleFocusMode,
   onNewTerminalTab,
-  onCloseTerminalTab,
+  onCloseTab,
+  onCloseAllTabs,
+  onReopenClosedTab,
   onOpenShortcutsHelp,
   onNewWindow,
   onNewWindowPick,
@@ -94,7 +101,13 @@ export function useMenuEvents({
             onNewTerminalTab();
             break;
           case "close_tab":
-            onCloseTerminalTab();
+            onCloseTab();
+            break;
+          case "close_all_tabs":
+            onCloseAllTabs();
+            break;
+          case "reopen_closed_tab":
+            onReopenClosedTab();
             break;
 
           // View menu
@@ -154,7 +167,9 @@ export function useMenuEvents({
     onToggleDark,
     onToggleFocusMode,
     onNewTerminalTab,
-    onCloseTerminalTab,
+    onCloseTab,
+    onCloseAllTabs,
+    onReopenClosedTab,
     onOpenShortcutsHelp,
     onNewWindow,
     onNewWindowPick,

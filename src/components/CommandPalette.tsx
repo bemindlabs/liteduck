@@ -13,6 +13,10 @@ import {
   GitBranch,
   FolderTree,
   Bell,
+  Pin,
+  Undo2,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +44,10 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   GitBranch: <GitBranch className="h-4 w-4" />,
   FolderTree: <FolderTree className="h-4 w-4" />,
   Bell: <Bell className="h-4 w-4" />,
+  Pin: <Pin className="h-4 w-4" />,
+  Undo2: <Undo2 className="h-4 w-4" />,
+  ArrowLeft: <ArrowLeft className="h-4 w-4" />,
+  ArrowRight: <ArrowRight className="h-4 w-4" />,
 };
 
 function resolveIcon(iconName: string): React.ReactNode {
@@ -63,6 +71,13 @@ export interface CommandPaletteProps {
   onToggleDark: () => void;
   onToggleSidebar?: () => void;
   onToggleFocusMode?: () => void;
+  // Editor tab actions (operate on the active tab where applicable).
+  onCloseTab?: () => void;
+  onCloseAllTabs?: () => void;
+  onReopenClosedTab?: () => void;
+  onTogglePinTab?: () => void;
+  onNextTab?: () => void;
+  onPrevTab?: () => void;
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -123,6 +138,12 @@ export function CommandPalette({
   onToggleDark,
   onToggleSidebar,
   onToggleFocusMode,
+  onCloseTab,
+  onCloseAllTabs,
+  onReopenClosedTab,
+  onTogglePinTab,
+  onNextTab,
+  onPrevTab,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -193,11 +214,37 @@ export function CommandPalette({
         return;
       }
 
+      const editorTabActions: Record<string, (() => void) | undefined> = {
+        "action-editor-close-tab": onCloseTab,
+        "action-editor-close-all": onCloseAllTabs,
+        "action-editor-reopen": onReopenClosedTab,
+        "action-editor-pin": onTogglePinTab,
+        "action-editor-next": onNextTab,
+        "action-editor-prev": onPrevTab,
+      };
+      const editorAction = editorTabActions[cmd.id];
+      if (editorAction) {
+        editorAction();
+        return;
+      }
+
       // Agent launches and remaining actions delegate to the injected action
       // callback if one was bound, otherwise they are silent no-ops until wired.
       cmd.action?.();
     },
-    [onClose, onNavigate, onToggleDark, onToggleSidebar, onToggleFocusMode],
+    [
+      onClose,
+      onNavigate,
+      onToggleDark,
+      onToggleSidebar,
+      onToggleFocusMode,
+      onCloseTab,
+      onCloseAllTabs,
+      onReopenClosedTab,
+      onTogglePinTab,
+      onNextTab,
+      onPrevTab,
+    ],
   );
 
   const handleKeyDown = useCallback(

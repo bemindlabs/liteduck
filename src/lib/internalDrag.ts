@@ -25,7 +25,13 @@ import {
  */
 
 export interface InternalDragData {
-  /** Absolute filesystem path(s) being dragged. */
+  /**
+   * Drag category, so a drop zone only accepts compatible drags. Without this a
+   * tab drag (whose payload is the file path) would be accepted by the folder /
+   * terminal file drop zones. e.g. "file" | "tab".
+   */
+  kind: string;
+  /** Payload value(s) — filesystem path(s) for files, the tab id for tabs. */
   paths: string[];
   /** Short label rendered in the drag ghost. */
   label: string;
@@ -34,9 +40,17 @@ export interface InternalDragData {
 type DropHandler = (paths: string[]) => void;
 type CanDrop = (paths: string[]) => boolean;
 
+export interface DropZoneOptions {
+  /** Only accept drags of this kind (matches InternalDragData.kind). */
+  accept?: string;
+  /** Reject specific payloads (also hides the over-highlight). */
+  canDrop?: CanDrop;
+}
+
 interface Zone {
   el: HTMLElement;
   onDrop: DropHandler;
+  accept?: string;
   canDrop: CanDrop;
 }
 
@@ -72,12 +86,14 @@ export function getDragPointer(): { x: number; y: number } {
 }
 export { subscribe as subscribeDrag };
 
-/** Topmost registered drop zone under (x, y) that accepts the payload. */
-function resolveZone(x: number, y: number, paths: string[]): Zone | null {
+/** Topmost registered drop zone under (x, y) that accepts the drag. */
+function resolveZone(x: number, y: number, data: InternalDragData): Zone | null {
   let node = document.elementFromPoint(x, y) as HTMLElement | null;
   while (node) {
     for (const zone of zones) {
-      if (zone.el === node && zone.canDrop(paths)) return zone;
+      if (zone.el !== node) continue;
+      if (zone.accept && zone.accept !== data.kind) continue;
+      if (zone.canDrop(data.paths)) return zone;
     }
     node = node.parentElement;
   }
@@ -104,13 +120,13 @@ function beginPress(startX: number, startY: number, getData: () => InternalDragD
       document.body.style.userSelect = "none";
       document.body.style.cursor = "grabbing";
     }
-    overEl = resolveZone(e.clientX, e.clientY, data.paths)?.el ?? null;
+    overEl = resolveZone(e.clientX, e.clientY, data)?.el ?? null;
     emit();
   };
 
   const onUp = (e: MouseEvent) => {
     if (data) {
-      const zone = resolveZone(e.clientX, e.clientY, data.paths);
+      const zone = resolveZone(e.clientX, e.clientY, data);
       if (zone) zone.onDrop(data.paths);
     }
     cleanup();
@@ -166,20 +182,22 @@ export function useDragSource(getData: () => InternalDragData | null): {
 export function useDropZone(
   ref: RefObject<HTMLElement | null>,
   onDrop: DropHandler,
-  canDrop?: CanDrop,
+  options?: DropZoneOptions,
 ): boolean {
   const onDropRef = useRef(onDrop);
-  const canDropRef = useRef(canDrop);
+  const canDropRef = useRef(options?.canDrop);
   useEffect(() => {
     onDropRef.current = onDrop;
-    canDropRef.current = canDrop;
+    canDropRef.current = options?.canDrop;
   });
 
+  const accept = options?.accept;
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const zone: Zone = {
       el,
+      accept,
       onDrop: (paths) => onDropRef.current(paths),
       canDrop: (paths) => (canDropRef.current ? canDropRef.current(paths) : true),
     };
@@ -187,7 +205,7 @@ export function useDropZone(
     return () => {
       zones.delete(zone);
     };
-  }, [ref]);
+  }, [ref, accept]);
 
   return useSyncExternalStore(
     subscribe,

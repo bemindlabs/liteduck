@@ -33,7 +33,9 @@ function makeHandlers(overrides: Partial<Parameters<typeof useMenuEvents>[0]> = 
     onOpenCommandPalette: vi.fn(),
     onToggleDark: vi.fn(),
     onNewTerminalTab: vi.fn(),
-    onCloseTerminalTab: vi.fn(),
+    onCloseTab: vi.fn(),
+    onCloseAllTabs: vi.fn(),
+    onReopenClosedTab: vi.fn(),
     onOpenShortcutsHelp: vi.fn(),
     ...overrides,
   };
@@ -117,9 +119,19 @@ describe("useMenuEvents — menu-action", () => {
     expect(handlers.onNewTerminalTab).toHaveBeenCalledTimes(1);
   });
 
-  it("close_tab calls onCloseTerminalTab", () => {
+  it("close_tab calls onCloseTab", () => {
     act(() => fireAction("close_tab"));
-    expect(handlers.onCloseTerminalTab).toHaveBeenCalledTimes(1);
+    expect(handlers.onCloseTab).toHaveBeenCalledTimes(1);
+  });
+
+  it("close_all_tabs calls onCloseAllTabs", () => {
+    act(() => fireAction("close_all_tabs"));
+    expect(handlers.onCloseAllTabs).toHaveBeenCalledTimes(1);
+  });
+
+  it("reopen_closed_tab calls onReopenClosedTab", () => {
+    act(() => fireAction("reopen_closed_tab"));
+    expect(handlers.onReopenClosedTab).toHaveBeenCalledTimes(1);
   });
 
   it("toggle_sidebar calls onToggleSidebar", () => {

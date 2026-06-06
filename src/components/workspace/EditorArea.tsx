@@ -9,13 +9,13 @@ import { useCallback, useRef, useState } from "react";
 import { FileText } from "lucide-react";
 import { FilePreview } from "@/components/FilePreview";
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
-import { EditorTabs, type EditorTab } from "./EditorTabs";
+import { EditorTabs, type EditorTab, type EditorTabActions } from "./EditorTabs";
 
 interface EditorAreaProps {
   tabs: EditorTab[];
   activeTabId: string | null;
-  onSelectTab: (id: string) => void;
-  onCloseTab: (id: string) => void;
+  /** Full tab action set, forwarded to EditorTabs. */
+  tabActions: EditorTabActions;
 }
 
 interface EditorMenuState {
@@ -24,7 +24,7 @@ interface EditorMenuState {
   hasSelection: boolean;
 }
 
-export function EditorArea({ tabs, activeTabId, onSelectTab, onCloseTab }: EditorAreaProps) {
+export function EditorArea({ tabs, activeTabId, tabActions }: EditorAreaProps) {
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   const contentRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<EditorMenuState | null>(null);
@@ -80,7 +80,7 @@ export function EditorArea({ tabs, activeTabId, onSelectTab, onCloseTab }: Edito
         {
           label: "Close Tab",
           onSelect: () => {
-            if (activeTabId) onCloseTab(activeTabId);
+            if (activeTabId) tabActions.onClose(activeTabId);
           },
           show: !!activeTabId,
           separatorBefore: true,
@@ -90,12 +90,7 @@ export function EditorArea({ tabs, activeTabId, onSelectTab, onCloseTab }: Edito
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <EditorTabs
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onSelect={onSelectTab}
-        onClose={onCloseTab}
-      />
+      <EditorTabs tabs={tabs} activeTabId={activeTabId} {...tabActions} />
 
       <div
         ref={contentRef}

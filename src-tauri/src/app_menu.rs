@@ -35,6 +35,14 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
     let close_tab = MenuItemBuilder::with_id("close_tab", "Close Tab")
         .accelerator("CmdOrCtrl+W")
         .build(app)?;
+    // Close All Tabs uses Cmd+Alt+W — VS Code's Cmd+K Cmd+W chord can't be
+    // expressed as a single accelerator, and Cmd+Shift+W is Close Window.
+    let close_all_tabs = MenuItemBuilder::with_id("close_all_tabs", "Close All Tabs")
+        .accelerator("CmdOrCtrl+Alt+W")
+        .build(app)?;
+    let reopen_closed_tab = MenuItemBuilder::with_id("reopen_closed_tab", "Reopen Closed Tab")
+        .accelerator("CmdOrCtrl+Shift+T")
+        .build(app)?;
     let close_window = MenuItemBuilder::with_id("close_window", "Close Window")
         .accelerator("CmdOrCtrl+Shift+W")
         .build(app)?;
@@ -45,6 +53,8 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
         .separator()
         .item(&new_terminal)
         .item(&close_tab)
+        .item(&close_all_tabs)
+        .item(&reopen_closed_tab)
         .separator()
         .item(&close_window)
         .build()?;
@@ -69,9 +79,9 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<tauri::menu::Menu<Wry>, tauri:
     let nav_files = MenuItemBuilder::with_id("nav_files", "Files")
         .accelerator("CmdOrCtrl+Shift+F")
         .build(app)?;
-    let nav_terminal = MenuItemBuilder::with_id("nav_terminal", "Terminal")
-        .accelerator("CmdOrCtrl+Shift+T")
-        .build(app)?;
+    // No accelerator: Cmd+Shift+T is now Reopen Closed Tab (VS Code parity).
+    // "Go to Terminal" remains reachable via Cmd+1 (webview shortcut).
+    let nav_terminal = MenuItemBuilder::with_id("nav_terminal", "Terminal").build(app)?;
 
     // Source Control
     let nav_git = MenuItemBuilder::with_id("nav_git", "Git")
@@ -222,6 +232,12 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, event_id: &str) {
         }
         "close_tab" => {
             emit_action_focused(app, "close_tab");
+        }
+        "close_all_tabs" => {
+            emit_action_focused(app, "close_all_tabs");
+        }
+        "reopen_closed_tab" => {
+            emit_action_focused(app, "reopen_closed_tab");
         }
         "close_window" => {
             let label = focused_label(app);

@@ -19,14 +19,14 @@
  * two-column layout has room to breathe.
  */
 
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ActivityRail } from "./ActivityRail";
 import { SidePanel } from "./SidePanel";
 import { EditorArea } from "./EditorArea";
 import { TerminalDock } from "./TerminalDock";
 import { StatusBar } from "./StatusBar";
-import { type EditorTab } from "./EditorTabs";
+import { type EditorTab, type EditorTabActions } from "./EditorTabs";
 import { ROUTES, panelFromPath, type WorkspacePanel } from "@/lib/routes";
 import type { FileEntry } from "@/lib/files";
 import { type InstalledPlugin, pluginList } from "@/lib/plugins";
@@ -48,11 +48,30 @@ const PluginsPanel = lazy(() =>
   import("@/components/plugins/PluginsPanel").then((m) => ({ default: m.PluginsPanel })),
 );
 
-// Re-export for parent forwarding refs of imperative actions (toggles).
+// Re-export for parent forwarding refs of imperative actions (toggles + editor
+// tab management, driven from the native menu / keyboard shortcuts in App).
 export interface WorkspaceShellHandle {
   toggleSidePanel: () => void;
   toggleTerminalDock: () => void;
   toggleTerminalMaximized: () => void;
+  /** Close the active editor tab. Returns false when no editor tab is active. */
+  closeActiveTab: () => boolean;
+  closeOtherTabs: () => void;
+  closeAllTabs: () => void;
+  closeTabsToRight: () => void;
+  togglePinActiveTab: () => void;
+  reopenClosedTab: () => void;
+  nextTab: () => void;
+  prevTab: () => void;
+  /** Activate the nth tab (1-based). No-op when out of range. */
+  goToTab: (n: number) => void;
+}
+
+/** Keep pinned tabs ahead of unpinned ones, preserving relative order. */
+function sortByPinned(tabs: EditorTab[]): EditorTab[] {
+  const pinned = tabs.filter((t) => t.pinned);
+  const rest = tabs.filter((t) => !t.pinned);
+  return pinned.length === 0 || rest.length === 0 ? tabs : [...pinned, ...rest];
 }
 
 interface WorkspaceShellProps {
@@ -99,6 +118,20 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
   const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  // Live snapshots so the tab ops below stay referentially stable (no tabs /
+  // activeTabId deps) — the shell registers them once on the imperative handle.
+  const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
+  useEffect(() => {
+    tabsRef.current = tabs;
+  });
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  });
+
+  // LIFO history of recently closed tabs, for "Reopen Closed Tab".
+  const closedTabsRef = useRef<{ entry: FileEntry; pinned: boolean; index: number }[]>([]);
 
   // ── Pinned plugins (activity-rail icons) ─────────────────────────────────────
 
@@ -170,10 +203,6 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
     });
   }, []);
 
-  useEffect(() => {
-    registerHandle?.({ toggleSidePanel, toggleTerminalDock, toggleTerminalMaximized });
-  }, [registerHandle, toggleSidePanel, toggleTerminalDock, toggleTerminalMaximized]);
-
   // ── Activity rail handler ──────────────────────────────────────────────────
 
   const handleRailSelect = useCallback(
@@ -225,12 +254,19 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
 
   // ── Editor tab handlers ────────────────────────────────────────────────────
 
+  const MAX_CLOSED = 10;
+  const recordClosed = useCallback((tab: EditorTab, index: number) => {
+    closedTabsRef.current = [
+      { entry: tab.entry, pinned: tab.pinned, index },
+      ...closedTabsRef.current,
+    ].slice(0, MAX_CLOSED);
+  }, []);
+
   const handleFileOpen = useCallback((entry: FileEntry) => {
     if (entry.is_dir) return;
     setTabs((prev) => {
-      const existing = prev.find((t) => t.id === entry.path);
-      if (existing) return prev;
-      return [...prev, { id: entry.path, entry }];
+      if (prev.some((t) => t.id === entry.path)) return prev;
+      return [...prev, { id: entry.path, entry, pinned: false }];
     });
     setActiveTabId(entry.path);
   }, []);
@@ -239,24 +275,192 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
     setActiveTabId(id);
   }, []);
 
-  const handleCloseTab = useCallback(
-    (id: string) => {
-      // Compute the neighbour-fallback using the current snapshot. Both setters
-      // are called separately so each updater stays pure (no side effects).
-      const idx = tabs.findIndex((t) => t.id === id);
-      const next = tabs.filter((t) => t.id !== id);
+  // The neighbour to activate after removing the tab at `idx` from `remaining`.
+  const neighbourId = (remaining: EditorTab[], idx: number): string | null =>
+    remaining.length === 0 ? null : (remaining[Math.max(0, idx - 1)] ?? remaining[0]).id;
+
+  const closeTab = useCallback(
+    (id: string): boolean => {
+      const cur = tabsRef.current;
+      const idx = cur.findIndex((t) => t.id === id);
+      if (idx === -1) return false;
+      recordClosed(cur[idx], idx);
+      const next = cur.filter((t) => t.id !== id);
       setTabs(next);
-      if (activeTabId === id) {
-        if (next.length === 0) {
-          setActiveTabId(null);
-        } else {
-          const fallback = next[Math.max(0, idx - 1)] ?? next[0];
-          setActiveTabId(fallback.id);
-        }
-      }
+      if (activeTabIdRef.current === id) setActiveTabId(neighbourId(next, idx));
+      return true;
     },
-    [tabs, activeTabId],
+    [recordClosed],
   );
+
+  const closeActiveTab = useCallback((): boolean => {
+    const id = activeTabIdRef.current;
+    return id ? closeTab(id) : false;
+  }, [closeTab]);
+
+  const closeOtherTabs = useCallback(
+    (id: string) => {
+      const cur = tabsRef.current;
+      cur.forEach((t, i) => {
+        if (t.id !== id && !t.pinned) recordClosed(t, i);
+      });
+      setTabs(cur.filter((t) => t.id === id || t.pinned));
+      setActiveTabId(id);
+    },
+    [recordClosed],
+  );
+
+  const closeAllTabs = useCallback(() => {
+    const cur = tabsRef.current;
+    cur.forEach((t, i) => {
+      if (!t.pinned) recordClosed(t, i);
+    });
+    const kept = cur.filter((t) => t.pinned);
+    setTabs(kept);
+    setActiveTabId((curId) =>
+      kept.some((t) => t.id === curId) ? curId : (kept[kept.length - 1]?.id ?? null),
+    );
+  }, [recordClosed]);
+
+  const closeTabsToRight = useCallback(
+    (id: string) => {
+      const cur = tabsRef.current;
+      const idx = cur.findIndex((t) => t.id === id);
+      if (idx === -1) return;
+      cur.forEach((t, i) => {
+        if (i > idx && !t.pinned) recordClosed(t, i);
+      });
+      const kept = cur.filter((t, i) => i <= idx || t.pinned);
+      setTabs(kept);
+      setActiveTabId((curId) => (kept.some((t) => t.id === curId) ? curId : id));
+    },
+    [recordClosed],
+  );
+
+  const togglePinTab = useCallback((id: string) => {
+    setTabs((prev) => {
+      const tab = prev.find((t) => t.id === id);
+      if (!tab) return prev;
+      return sortByPinned(prev.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)));
+    });
+  }, []);
+
+  const togglePinActiveTab = useCallback(() => {
+    const id = activeTabIdRef.current;
+    if (id) togglePinTab(id);
+  }, [togglePinTab]);
+
+  const reorderTab = useCallback((fromId: string, toId: string) => {
+    setTabs((prev) => {
+      const from = prev.findIndex((t) => t.id === fromId);
+      const to = prev.findIndex((t) => t.id === toId);
+      // Only reorder within the same (pinned / unpinned) group.
+      if (from === -1 || to === -1 || from === to || prev[from].pinned !== prev[to].pinned) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const reopenClosedTab = useCallback(() => {
+    if (closedTabsRef.current.length === 0) return;
+    const closed = closedTabsRef.current[0];
+    closedTabsRef.current = closedTabsRef.current.slice(1);
+    setTabs((prev) => {
+      if (prev.some((t) => t.id === closed.entry.path)) return prev;
+      const next = [...prev];
+      next.splice(Math.min(closed.index, next.length), 0, {
+        id: closed.entry.path,
+        entry: closed.entry,
+        pinned: closed.pinned,
+      });
+      return sortByPinned(next);
+    });
+    setActiveTabId(closed.entry.path);
+  }, []);
+
+  const nextTab = useCallback(() => {
+    const cur = tabsRef.current;
+    if (cur.length === 0) return;
+    const i = cur.findIndex((t) => t.id === activeTabIdRef.current);
+    setActiveTabId(cur[(i + 1) % cur.length].id);
+  }, []);
+
+  const prevTab = useCallback(() => {
+    const cur = tabsRef.current;
+    if (cur.length === 0) return;
+    const i = cur.findIndex((t) => t.id === activeTabIdRef.current);
+    setActiveTabId(cur[(i <= 0 ? cur.length : i) - 1].id);
+  }, []);
+
+  const goToTab = useCallback((n: number) => {
+    const cur = tabsRef.current;
+    if (n >= 1 && n <= cur.length) setActiveTabId(cur[n - 1].id);
+  }, []);
+
+  const tabActions: EditorTabActions = useMemo(
+    () => ({
+      onSelect: handleSelectTab,
+      onClose: closeTab,
+      onCloseOthers: closeOtherTabs,
+      onCloseAll: closeAllTabs,
+      onCloseToRight: closeTabsToRight,
+      onTogglePin: togglePinTab,
+      onReorder: reorderTab,
+    }),
+    [
+      handleSelectTab,
+      closeTab,
+      closeOtherTabs,
+      closeAllTabs,
+      closeTabsToRight,
+      togglePinTab,
+      reorderTab,
+    ],
+  );
+
+  // Register the imperative handle once all toggles + tab ops are defined, so
+  // the native menu / keyboard shortcuts in App can drive them. (Declared here,
+  // after the tab ops, to avoid a temporal-dead-zone on the op callbacks.)
+  useEffect(() => {
+    registerHandle?.({
+      toggleSidePanel,
+      toggleTerminalDock,
+      toggleTerminalMaximized,
+      closeActiveTab,
+      closeOtherTabs: () => {
+        const id = activeTabIdRef.current;
+        if (id) closeOtherTabs(id);
+      },
+      closeAllTabs,
+      closeTabsToRight: () => {
+        const id = activeTabIdRef.current;
+        if (id) closeTabsToRight(id);
+      },
+      togglePinActiveTab,
+      reopenClosedTab,
+      nextTab,
+      prevTab,
+      goToTab,
+    });
+  }, [
+    registerHandle,
+    toggleSidePanel,
+    toggleTerminalDock,
+    toggleTerminalMaximized,
+    closeActiveTab,
+    closeOtherTabs,
+    closeAllTabs,
+    closeTabsToRight,
+    togglePinActiveTab,
+    reopenClosedTab,
+    nextTab,
+    prevTab,
+    goToTab,
+  ]);
 
   // ── Derived state ──────────────────────────────────────────────────────────
 
@@ -351,12 +555,7 @@ export function WorkspaceShell({ registerHandle }: WorkspaceShellProps) {
                 </div>
               </Suspense>
             ) : (
-              <EditorArea
-                tabs={tabs}
-                activeTabId={activeTabId}
-                onSelectTab={handleSelectTab}
-                onCloseTab={handleCloseTab}
-              />
+              <EditorArea tabs={tabs} activeTabId={activeTabId} tabActions={tabActions} />
             )}
           </div>
 

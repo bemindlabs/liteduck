@@ -12,6 +12,8 @@ export type ShortcutAction =
   | "open-shortcuts-help"
   | "terminal-new-tab"
   | "terminal-close-tab"
+  | "editor-next-tab"
+  | "editor-prev-tab"
   | "toggle-focus-mode"
   | "toggle-side-panel"
   | "toggle-terminal-dock"
@@ -31,6 +33,8 @@ export interface ShortcutBinding {
   key: string;
   mod: boolean;
   shift?: boolean;
+  /** Additionally requires the Alt/Option modifier. */
+  alt?: boolean;
   /** When true the shortcut fires even while a terminal/input has focus */
   globalOverride?: boolean;
 }
@@ -40,7 +44,7 @@ export interface ShortcutBinding {
  * at their defaults. Keyed by action.
  */
 export type ShortcutOverrides = Partial<
-  Record<ShortcutAction, Pick<ShortcutBinding, "key" | "mod" | "shift">>
+  Record<ShortcutAction, Pick<ShortcutBinding, "key" | "mod" | "shift" | "alt">>
 >;
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -143,6 +147,24 @@ export const DEFAULT_BINDINGS: ShortcutBinding[] = [
     globalOverride: true,
   },
   {
+    action: "editor-next-tab",
+    label: "Next Editor Tab",
+    description: "Activate the next editor tab",
+    key: "ArrowRight",
+    mod: true,
+    alt: true,
+    globalOverride: true,
+  },
+  {
+    action: "editor-prev-tab",
+    label: "Previous Editor Tab",
+    description: "Activate the previous editor tab",
+    key: "ArrowLeft",
+    mod: true,
+    alt: true,
+    globalOverride: true,
+  },
+  {
     action: "toggle-focus-mode",
     label: "Toggle Focus Mode",
     description: "Hide all chrome for distraction-free editing",
@@ -199,7 +221,16 @@ export function resolveBindings(overrides: ShortcutOverrides): ShortcutBinding[]
   });
 }
 
-/** Format a binding as a human-readable label like "Cmd+K" or "Cmd+Shift+P". */
+/** Human-readable names for keys that don't render nicely via toUpperCase(). */
+const KEY_LABELS: Record<string, string> = {
+  arrowright: "→",
+  arrowleft: "←",
+  arrowup: "↑",
+  arrowdown: "↓",
+  ",": ",",
+};
+
+/** Format a binding as a human-readable label like "Cmd+K" or "Cmd+Alt+→". */
 export function formatShortcut(binding: ShortcutBinding): string {
   const isMac =
     typeof navigator !== "undefined" &&
@@ -209,7 +240,8 @@ export function formatShortcut(binding: ShortcutBinding): string {
   const parts: string[] = [];
   if (binding.mod) parts.push(modLabel);
   if (binding.shift) parts.push("Shift");
-  parts.push(binding.key === "," ? "," : binding.key.toUpperCase());
+  if (binding.alt) parts.push(isMac ? "Option" : "Alt");
+  parts.push(KEY_LABELS[binding.key.toLowerCase()] ?? binding.key.toUpperCase());
   return parts.join("+");
 }
 
@@ -232,6 +264,10 @@ export interface KeyboardShortcutsConfig {
   onNewTerminalTab: () => void;
   /** Called when "terminal-close-tab" fires. */
   onCloseTerminalTab: () => void;
+  /** Called when "editor-next-tab" fires. */
+  onNextEditorTab?: () => void;
+  /** Called when "editor-prev-tab" fires. */
+  onPrevEditorTab?: () => void;
   /** Called when "toggle-focus-mode" fires. */
   onToggleFocusMode?: () => void;
   /** Called when "toggle-side-panel" (Cmd+B) fires. */
@@ -273,6 +309,8 @@ export function useKeyboardShortcuts({
   onOpenShortcutsHelp,
   onNewTerminalTab,
   onCloseTerminalTab,
+  onNextEditorTab,
+  onPrevEditorTab,
   onToggleFocusMode,
   onToggleSidePanel,
   onToggleTerminalDock,
@@ -300,6 +338,12 @@ export function useKeyboardShortcuts({
         case "terminal-close-tab":
           onCloseTerminalTab();
           break;
+        case "editor-next-tab":
+          onNextEditorTab?.();
+          break;
+        case "editor-prev-tab":
+          onPrevEditorTab?.();
+          break;
         case "toggle-focus-mode":
           onToggleFocusMode?.();
           break;
@@ -322,6 +366,8 @@ export function useKeyboardShortcuts({
       onOpenShortcutsHelp,
       onNewTerminalTab,
       onCloseTerminalTab,
+      onNextEditorTab,
+      onPrevEditorTab,
       onToggleFocusMode,
       onToggleSidePanel,
       onToggleTerminalDock,
@@ -336,9 +382,10 @@ export function useKeyboardShortcuts({
       for (const binding of bindings) {
         const modMatch = binding.mod ? mod : !mod;
         const shiftMatch = binding.shift ? e.shiftKey : !e.shiftKey;
+        const altMatch = binding.alt ? e.altKey : !e.altKey;
         const keyMatch = e.key.toLowerCase() === binding.key.toLowerCase();
 
-        if (!modMatch || !shiftMatch || !keyMatch) continue;
+        if (!modMatch || !shiftMatch || !altMatch || !keyMatch) continue;
 
         // Skip form-element suppression for globalOverride shortcuts.
         if (!binding.globalOverride && isTypingTarget(document.activeElement)) {

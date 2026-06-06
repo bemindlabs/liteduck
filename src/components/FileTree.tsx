@@ -334,6 +334,7 @@ function TreeNode({
   // handler — see src/lib/internalDrag.ts). Each row is a drag source carrying
   // its path; folder rows additionally accept a drop to move the entry inside.
   const { onMouseDown: onRowMouseDown } = useDragSource(() => ({
+    kind: "file",
     paths: [entry.path],
     label: entry.name,
   }));
@@ -342,7 +343,7 @@ function TreeNode({
     (paths) => {
       if (paths[0]) onMove(paths[0], entry.path);
     },
-    (paths) => paths.length > 0 && canAcceptDrop(paths[0]),
+    { accept: "file", canDrop: (paths) => paths.length > 0 && canAcceptDrop(paths[0]) },
   );
 
   const isSelected = selectedPath === entry.path;

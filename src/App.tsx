@@ -192,6 +192,63 @@ function Layout() {
     window.dispatchEvent(new CustomEvent("aidlc:terminal:close-tab"));
   }, []);
 
+  // ── Editor tab actions (driven from the native menu + keyboard shortcuts) ──
+  // The editor tab state lives in WorkspaceShell; reach it via the imperative
+  // handle. Cmd+W is context-aware: a focused terminal closes its own tab,
+  // otherwise the active editor tab closes (falling back to the terminal when
+  // no editor tab is open, so Cmd+W is never a dead key).
+  const handleCloseTab = useCallback(() => {
+    const inTerminal = !!document.activeElement?.closest(".xterm");
+    if (inTerminal) {
+      handleCloseTerminalTab();
+      return;
+    }
+    if (!shellHandleRef.current?.closeActiveTab()) {
+      handleCloseTerminalTab();
+    }
+  }, [handleCloseTerminalTab]);
+
+  const handleCloseAllTabs = useCallback(() => {
+    shellHandleRef.current?.closeAllTabs();
+  }, []);
+
+  const handleReopenClosedTab = useCallback(() => {
+    shellHandleRef.current?.reopenClosedTab();
+  }, []);
+
+  const handleNextEditorTab = useCallback(() => {
+    shellHandleRef.current?.nextTab();
+  }, []);
+
+  const handlePrevEditorTab = useCallback(() => {
+    shellHandleRef.current?.prevTab();
+  }, []);
+
+  // Command-palette "Close Editor Tab" / "Pin" act on the active tab directly
+  // (the palette isn't the terminal, so no context check needed).
+  const handleCloseActiveEditorTab = useCallback(() => {
+    shellHandleRef.current?.closeActiveTab();
+  }, []);
+
+  const handleTogglePinTab = useCallback(() => {
+    shellHandleRef.current?.togglePinActiveTab();
+  }, []);
+
+  // Go to tab N — Cmd/Ctrl+Alt+1..9. Keyed off `event.code` (Digit1..9) because
+  // on macOS Option remaps `event.key` to a special glyph (Option+1 → "¡").
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || !e.altKey || e.shiftKey) return;
+      const m = /^Digit([1-9])$/.exec(e.code);
+      if (m) {
+        e.preventDefault();
+        shellHandleRef.current?.goToTab(Number(m[1]));
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const handleToggleFocusMode = useCallback(() => {
     setFocusMode((v) => !v);
   }, []);
@@ -230,6 +287,8 @@ function Layout() {
     onOpenShortcutsHelp: handleOpenShortcutsHelp,
     onNewTerminalTab: handleNewTerminalTab,
     onCloseTerminalTab: handleCloseTerminalTab,
+    onNextEditorTab: handleNextEditorTab,
+    onPrevEditorTab: handlePrevEditorTab,
     onToggleFocusMode: handleToggleFocusMode,
     onToggleSidePanel: handleToggleSidePanel,
     onToggleTerminalDock: handleToggleTerminalDock,
@@ -256,7 +315,9 @@ function Layout() {
     onToggleDark: toggleDark,
     onToggleFocusMode: handleToggleFocusMode,
     onNewTerminalTab: handleNewTerminalTab,
-    onCloseTerminalTab: handleCloseTerminalTab,
+    onCloseTab: handleCloseTab,
+    onCloseAllTabs: handleCloseAllTabs,
+    onReopenClosedTab: handleReopenClosedTab,
     onOpenShortcutsHelp: handleOpenShortcutsHelp,
     onNewWindow: handleNewWindow,
     onNewWindowPick: handleNewWindowPick,
@@ -424,6 +485,12 @@ function Layout() {
           }
         }}
         onToggleFocusMode={handleToggleFocusMode}
+        onCloseTab={handleCloseActiveEditorTab}
+        onCloseAllTabs={handleCloseAllTabs}
+        onReopenClosedTab={handleReopenClosedTab}
+        onTogglePinTab={handleTogglePinTab}
+        onNextTab={handleNextEditorTab}
+        onPrevTab={handlePrevEditorTab}
       />
 
       <ShortcutsHelp

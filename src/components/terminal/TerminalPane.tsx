@@ -270,10 +270,14 @@ export function TerminalPane({
   //     swallowed by Tauri's native file-drop handler) — see src/lib/internalDrag.
   //   • External OS drops (Finder/Explorer) arrive via Tauri's onDragDropEvent.
 
-  const isInternalDropOver = useDropZone(containerRef, (paths) => {
-    const insert = quotePathsForShell(paths);
-    if (insert) onInputRefForDrop.current(insert);
-  });
+  const isInternalDropOver = useDropZone(
+    containerRef,
+    (paths) => {
+      const insert = quotePathsForShell(paths);
+      if (insert) onInputRefForDrop.current(insert);
+    },
+    { accept: "file" },
+  );
 
   // Native OS file drops (e.g. dragging from Finder/Explorer) → insert
   // shell-quoted path(s). HTML5 DataTransfer doesn't expose filesystem paths
