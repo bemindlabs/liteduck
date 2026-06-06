@@ -16,6 +16,29 @@ Versions follow [Calendar Versioning](https://calver.org/) (YYYY.M.D).
 
 ## [Unreleased]
 
+## [2026.6.6] - 2026-06-06
+
+### Added
+
+- **VS Code-style editor tab management.** Pinned tabs (kept to the left with a pin
+  affordance, surviving Close All / Close Others), drag-to-reorder, and a per-tab
+  right-click menu (Close, Close Others, Close All, Close to the Right, Pin/Unpin,
+  Copy Path, Reveal in Finder). Reopen-closed-tab history (last 10) and next /
+  previous / go-to-tab navigation. New shortcuts: context-aware **Cmd+W** (closes the
+  editor tab when editing, the terminal tab when the terminal is focused),
+  **Cmd+Alt+W** Close All Tabs, **Cmd+Shift+T** Reopen Closed Tab, **Cmd+Alt+←/→**
+  next/previous tab, **Cmd+Alt+1–9** go to tab. Middle-click a tab to close it. All
+  actions are also in the command palette.
+
+### Fixed
+
+- **Drag-and-drop into the terminal and file tree now works.** HTML5 drag-and-drop is
+  swallowed by Tauri's native file-drop handler (required so external Finder/Explorer
+  drops deliver real filesystem paths), which had broken every in-app drag. Internal
+  drags (file tree → terminal, file tree → folder, tab reorder) now use a pointer-based
+  drag system; dragging a file from Finder onto the terminal inserts its shell-quoted
+  path.
+
 ## [2026.6.3] - 2026-06-03
 
 ### Added

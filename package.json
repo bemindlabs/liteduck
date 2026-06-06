@@ -1,7 +1,7 @@
 {
   "name": "liteduck",
   "private": true,
-  "version": "2026.6.3",
+  "version": "2026.6.6",
   "type": "module",
   "description": "A lightweight code editor — file browser + editor, integrated terminal, and Git in a fast native desktop app. No AI, no clutter.",
   "license": "MIT",
