@@ -16,6 +16,17 @@ Versions follow [Calendar Versioning](https://calver.org/) (YYYY.M.D).
 
 ## [Unreleased]
 
+## [2026.6.6-1] - 2026-06-06
+
+Maintenance release — no user-facing changes.
+
+### Changed
+
+- **Release tooling.** `scripts/bump-version.sh` no longer corrupts
+  `tauri.conf.json`: it now substitutes only the top-level `version` value
+  instead of stripping `//` (which had matched the `http://…` URLs inside the
+  CSP) and re-serializing.
+
 ## [2026.6.6] - 2026-06-06
 
 ### Added

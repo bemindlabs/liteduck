@@ -1,6 +1,6 @@
 [package]
 name = "liteduck"
-version = "2026.6.6"
+version = "2026.6.6-1"
 description = "LiteDuck — a lightweight code editor by Bemind Technology"
 authors = ["you"]
 edition = "2021"
