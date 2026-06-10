@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: [self-hosted, macOS, ARM64, apple-build]
+    runs-on: [self-hosted, apple-build]
     timeout-minutes: 60
     env:
       APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
