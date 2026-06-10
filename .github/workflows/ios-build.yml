@@ -1,0 +1,43 @@
+# Tauri 2 → iOS build on self-hosted macOS runner (Apple build server)
+name: ios-build
+on:
+  workflow_dispatch: {}
+  push:
+    tags: ['ios-v*']
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: [self-hosted, macOS, ARM64, apple-build]
+    timeout-minutes: 60
+    env:
+      APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain check
+        run: |
+          node --version && npm --version
+          rustc --version && rustup target list --installed | grep ios || true
+          xcodebuild -version
+      - name: Install frontend deps
+        run: npm ci
+      - name: Init iOS project (idempotent)
+        run: |
+          if [ ! -d src-tauri/gen/apple ]; then npm run tauri ios init; fi
+      - name: Build signed IPA (automatic signing)
+        run: npm run tauri ios build -- --export-method release-testing
+      - name: Locate IPA
+        id: ipa
+        run: echo "path=$(find src-tauri/gen/apple/build -name '*.ipa' | head -1)" >> "$GITHUB_OUTPUT"
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: liteduck-ipa
+          path: src-tauri/gen/apple/build/**/*.ipa
+          if-no-files-found: error
+      - name: Publish to OTA host (best-effort)
+        continue-on-error: true
+        run: |
+          scp -o StrictHostKeyChecking=accept-new "${{ steps.ipa.outputs.path }}" \
+            bmt@bemindlabs.tail32ca95.ts.net:/home/bmt/Solutions/server/nginx/html/ios/builds/ || echo "OTA scp skipped (ยังไม่ได้ตั้ง Mac→bemindlabs SSH key)"
